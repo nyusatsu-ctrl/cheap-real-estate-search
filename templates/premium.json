@@ -1,0 +1,201 @@
+{
+  "company": "premium",
+  "label": "プレミア",
+  "templateImage": "/templates/premium_template.png",
+  "page": {
+    "size": "A4",
+    "orientation": "landscape",
+    "dpi": 300,
+    "widthPx": 3508,
+    "heightPx": 2480,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "defaults": {
+    "fontSize": 20,
+    "fontColor": "#111111"
+  },
+  "whiteouts": [
+    {
+      "x": 1605,
+      "y": 404,
+      "width": 120,
+      "height": 24
+    }
+  ],
+  "fields": {
+    "addressPrefecture": {
+      "label": "住所 都道府県",
+      "x": 319,
+      "y": 559,
+      "fontSize": 40,
+      "maxWidth": 120
+    },
+    "addressDetail": {
+      "label": "住所 市町村・番地",
+      "x": 644,
+      "y": 555,
+      "fontSize": 40,
+      "maxWidth": 1225
+    },
+    "addressKana": {
+      "label": "現住所フリガナ",
+      "x": 640,
+      "y": 477,
+      "fontSize": 24,
+      "maxWidth": 1225
+    },
+    "phone": {
+      "label": "電話番号",
+      "x": 393,
+      "y": 426,
+      "fontSize": 38,
+      "maxWidth": 296,
+      "backgroundWhite": true
+    },
+    "mobile": {
+      "label": "携帯番号",
+      "x": 915,
+      "y": 432,
+      "fontSize": 38,
+      "maxWidth": 315,
+      "backgroundWhite": true
+    },
+    "email": {
+      "label": "メールアドレス",
+      "x": 1416,
+      "y": 429,
+      "fontSize": 36,
+      "maxWidth": 425,
+      "backgroundWhite": true
+    },
+    "birthDate": {
+      "label": "生年月日",
+      "x": 1398,
+      "y": 305,
+      "fontSize": 38,
+      "maxWidth": 302,
+      "backgroundWhite": true
+    },
+    "age": {
+      "label": "年齢",
+      "x": 1572,
+      "y": 355,
+      "fontSize": 38,
+      "maxWidth": 60
+    },
+    "workplace": {
+      "label": "勤務先",
+      "x": 766,
+      "y": 977,
+      "fontSize": 42,
+      "maxWidth": 620
+    },
+    "workplaceKana": {
+      "label": "お勤め先フリガナ",
+      "x": 760,
+      "y": 894,
+      "fontSize": 24,
+      "maxWidth": 620
+    },
+    "workAddressPrefecture": {
+      "label": "勤務先住所 都道府県",
+      "x": 688,
+      "y": 1220,
+      "fontSize": 30,
+      "maxWidth": 120
+    },
+    "workAddressCity": {
+      "label": "勤務先住所 市町村など",
+      "x": 917,
+      "y": 1219,
+      "fontSize": 30,
+      "maxWidth": 343
+    },
+    "workAddressStreet": {
+      "label": "勤務先住所 番地",
+      "x": 699,
+      "y": 1300,
+      "fontSize": 38,
+      "maxWidth": 540
+    },
+    "workPhone": {
+      "label": "勤務先電話番号",
+      "x": 789,
+      "y": 1094,
+      "fontSize": 38,
+      "maxWidth": 414,
+      "backgroundWhite": true
+    },
+    "businessContent": {
+      "label": "業務内容",
+      "x": 1656,
+      "y": 1041,
+      "fontSize": 33,
+      "maxWidth": 206
+    },
+    "yearsEmployed": {
+      "label": "勤続年数",
+      "x": 1379,
+      "y": 1100,
+      "fontSize": 38,
+      "maxWidth": 168
+    },
+    "payday": {
+      "label": "給料日",
+      "x": 1760,
+      "y": 1102,
+      "fontSize": 38,
+      "maxWidth": 90
+    },
+    "annualIncome": {
+      "label": "年収",
+      "x": 407,
+      "y": 1077,
+      "fontSize": 38,
+      "maxWidth": 180
+    },
+    "companyName": {
+      "label": "販売店名称",
+      "x": 2046,
+      "y": 2094,
+      "fontSize": 45,
+      "maxWidth": 520
+    },
+    "companyRepresentative": {
+      "label": "代表者",
+      "x": 2044,
+      "y": 2152,
+      "fontSize": 40,
+      "maxWidth": 520
+    },
+    "companyAddress": {
+      "label": "販売店住所",
+      "x": 2044,
+      "y": 2212,
+      "fontSize": 40,
+      "maxWidth": 620
+    },
+    "companyPhone": {
+      "label": "販売店電話番号",
+      "x": 2043,
+      "y": 2271,
+      "fontSize": 40,
+      "maxWidth": 260
+    },
+    "companyFax": {
+      "label": "販売店FAX",
+      "x": 2041,
+      "y": 2336,
+      "fontSize": 40,
+      "maxWidth": 260
+    },
+    "salesStaff": {
+      "label": "販売担当者",
+      "x": 2117,
+      "y": 2397,
+      "fontSize": 32,
+      "maxWidth": 240
+    }
+  }
+}

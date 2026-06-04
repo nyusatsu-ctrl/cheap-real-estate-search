@@ -1,0 +1,1550 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f8;
+        --panel: #ffffff;
+        --line: #d9dee5;
+        --text: #20242a;
+        --muted: #667085;
+        --blue: #2563eb;
+        --blue-dark: #1d4ed8;
+        --green: #15803d;
+        --red: #b42318;
+        --amber: #b45309;
+        --shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Arial, "Hiragino Sans", "Yu Gothic", sans-serif;
+        font-size: 14px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      button,
+      select,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 6px;
+        padding: 8px 11px;
+        cursor: pointer;
+      }
+
+      button.primary {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: white;
+      }
+
+      button.primary:hover {
+        background: var(--blue-dark);
+      }
+
+      button.danger {
+        background: #dc2626;
+        border-color: #dc2626;
+        color: #fff;
+      }
+
+      button.danger:hover {
+        background: #b91c1c;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: 1fr 150px 150px 150px auto auto;
+        gap: 10px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfd;
+      }
+
+      .toolbar input,
+      .toolbar select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: white;
+        padding: 8px 10px;
+      }
+
+      .notice {
+        display: none;
+        margin: 12px 18px 0;
+        padding: 10px 12px;
+        border: 1px solid #f3d08a;
+        background: #fff8e8;
+        color: #754d00;
+        border-radius: 6px;
+      }
+
+      .notice.visible {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 28vw);
+        gap: 6px;
+        padding: 8px 6px 10px;
+      }
+
+      .table-wrap,
+      .detail {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+
+      .table-scroll {
+        overflow-y: auto;
+        overflow-x: hidden;
+        max-height: calc(100vh - 158px);
+      }
+
+      table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        min-width: 0;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px 5px;
+        text-align: left;
+        vertical-align: top;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      th:nth-child(1),
+      td:nth-child(1) { width: 11%; }
+
+      th:nth-child(2),
+      td:nth-child(2) { width: 7%; }
+
+      th:nth-child(3),
+      td:nth-child(3) { width: 4%; }
+
+      th:nth-child(4),
+      td:nth-child(4) { width: 12%; }
+
+      th:nth-child(5),
+      td:nth-child(5) { width: 6%; }
+
+      th:nth-child(6),
+      td:nth-child(6) { width: 9%; }
+
+      th:nth-child(7),
+      td:nth-child(7) { width: 12%; }
+
+      th:nth-child(8),
+      td:nth-child(8) { width: 9%; }
+
+      th:nth-child(9),
+      td:nth-child(9) { width: 7%; }
+
+      th:nth-child(10),
+      td:nth-child(10) { width: 7%; }
+
+      th:nth-child(11),
+      td:nth-child(11) { width: 5%; }
+
+      th:nth-child(12),
+      td:nth-child(12) { width: 5%; }
+
+      th {
+        background: #f8fafc;
+        color: #344054;
+        font-weight: 700;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+
+      tr {
+        cursor: pointer;
+      }
+
+      tr:hover td,
+      tr.selected td {
+        background: #eef4ff;
+      }
+
+      tr.result-approved td,
+      tr.result-approved:hover td,
+      tr.result-approved.selected td {
+        background: #d9f99d;
+      }
+
+      tr.result-delivered td,
+      tr.result-delivered:hover td,
+      tr.result-delivered.selected td {
+        background: #fecaca;
+      }
+
+      tr.result-pending td,
+      tr.result-pending:hover td,
+      tr.result-pending.selected td {
+        background-color: #ecfccb;
+        background-image: radial-gradient(#84cc16 1px, transparent 1px);
+        background-size: 8px 8px;
+      }
+
+      tr.result-premium-denied-ast-unrequested td,
+      tr.result-premium-denied-ast-unrequested:hover td,
+      tr.result-premium-denied-ast-unrequested.selected td {
+        background-color: #dbeafe;
+        background-image: radial-gradient(#2563eb 1px, transparent 1px);
+        background-size: 8px 8px;
+      }
+
+      tr.result-guarantor td,
+      tr.result-guarantor:hover td,
+      tr.result-guarantor.selected td {
+        background: repeating-linear-gradient(
+          -45deg,
+          #fecaca 0,
+          #fecaca 4px,
+          #fee2e2 4px,
+          #fee2e2 8px
+        );
+      }
+
+      tr.result-denied td,
+      tr.result-denied:hover td,
+      tr.result-denied.selected td {
+        background: #d1d5db;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 50px;
+        border-radius: 999px;
+        padding: 3px 6px;
+        border: 1px solid var(--line);
+        background: #f9fafb;
+        font-size: 12px;
+      }
+
+      .badge.green {
+        background: #ecfdf3;
+        border-color: #abefc6;
+        color: var(--green);
+      }
+
+      .badge.red {
+        background: #fef3f2;
+        border-color: #fecdca;
+        color: var(--red);
+      }
+
+      .badge.amber {
+        background: #fffaeb;
+        border-color: #fedf89;
+        color: var(--amber);
+      }
+
+      .detail {
+        padding: 12px;
+        max-height: calc(100vh - 158px);
+        overflow: auto;
+      }
+
+      .detail h2 {
+        margin: 0 0 4px;
+        font-size: 17px;
+      }
+
+      .detail-section {
+        border-top: 1px solid var(--line);
+        margin-top: 14px;
+        padding-top: 14px;
+      }
+
+      .field {
+        margin-bottom: 10px;
+      }
+
+      .field label {
+        display: block;
+        color: #344054;
+        font-weight: 700;
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      .field div {
+        overflow-wrap: anywhere;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 9px;
+        background: white;
+      }
+
+      .field textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .empty {
+        padding: 28px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        background: #111827;
+        color: white;
+        padding: 10px 12px;
+        border-radius: 6px;
+        box-shadow: 0 8px 18px rgba(16, 24, 40, 0.25);
+        display: none;
+      }
+
+      .toast.visible {
+        display: block;
+      }
+
+      .history-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .history-item {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px;
+        background: #fbfcfd;
+      }
+
+      .history-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 5px;
+      }
+
+      .calc-preview {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #f8fafc;
+        padding: 10px;
+        margin: 8px 0 12px;
+      }
+
+      .calc-preview div {
+        min-width: 0;
+      }
+
+      .calc-preview label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
+
+      .calc-preview strong {
+        font-size: 14px;
+      }
+
+      .application-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 12px;
+      }
+
+      .application-grid .field {
+        margin-bottom: 0;
+      }
+
+      .application-grid .inquiry-content-field {
+        grid-column: 1 / -1;
+      }
+
+      .application-grid .inquiry-content-field textarea {
+        min-height: 180px;
+        white-space: pre-wrap;
+      }
+
+      .field.important label,
+      .field.important div {
+        color: var(--red);
+      }
+
+      .field.important input {
+        border-color: #fecdca;
+        color: var(--red);
+        background: #fffafa;
+      }
+
+      .prefecture-alert {
+        color: var(--red);
+        font-weight: 700;
+      }
+
+      @media (max-width: 980px) {
+      .toolbar {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .detail {
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>自社ローン審査管理</h1>
+      <button id="refreshButton" type="button">更新</button>
+    </header>
+
+    <section class="toolbar">
+      <input id="searchInput" type="search" placeholder="名前・電話番号・メール・勤務先で検索">
+      <select id="applicationTypeFilter">
+        <option value="">全申込種別</option>
+      </select>
+      <select id="statusFilter">
+        <option value="">全ステータス</option>
+      </select>
+      <select id="requestFilter">
+        <option value="">車・バイクすべて</option>
+        <option value="車">車</option>
+        <option value="バイク">バイク</option>
+      </select>
+      <button id="setupButton" type="button">管理列を作成</button>
+      <button id="fixPhonesButton" type="button">電話番号0補正</button>
+    </section>
+
+    <div id="setupNotice" class="notice">
+      <span>管理列がまだありません。最初に「管理列を作成」を押してください。</span>
+      <button id="setupNoticeButton" type="button">作成</button>
+    </div>
+
+    <main>
+      <section class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>受信日時</th>
+                <th>申込種別</th>
+                <th>希望</th>
+                <th>氏名</th>
+                <th>都道府県</th>
+                <th>電話番号</th>
+                <th>勤務先</th>
+                <th>希望車種</th>
+                <th>支払目安</th>
+                <th>ステータス</th>
+                <th>架電</th>
+                <th>プレミア</th>
+                <th>アスト</th>
+              </tr>
+            </thead>
+            <tbody id="customerRows">
+              <tr>
+                <td colspan="12" class="empty">読み込み中です</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="detail" id="detailPane">
+        <div class="empty">左の一覧から顧客を選択してください。</div>
+      </aside>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+      const state = {
+        customers: [],
+        filtered: [],
+        selected: null,
+        applicationTypeOptions: [],
+        assigneeOptions: [],
+        statusOptions: [],
+        reviewOptions: [],
+        callResultOptions: [],
+        saving: false
+      };
+      const PREMIUM_PRINT_CONFIG = {
+        page: { dpi: 300, widthPx: 3508, heightPx: 2480, offsetX: 0, offsetY: 0 },
+        whiteouts: [
+          { x: 1605, y: 404, width: 120, height: 24 },
+          { x: 1378, y: 260, width: 365, height: 88 }
+        ],
+        fields: {
+          addressPrefecture: { x: 319, y: 559, fontSize: 40, maxWidth: 120 },
+          addressDetail: { x: 644, y: 555, fontSize: 40, maxWidth: 1225 },
+          addressKana: { x: 640, y: 477, fontSize: 24, maxWidth: 1225 },
+          phone: { x: 393, y: 426, fontSize: 38, maxWidth: 296, backgroundWhite: true },
+          mobile: { x: 915, y: 432, fontSize: 38, maxWidth: 315, backgroundWhite: true },
+          email: { x: 1416, y: 429, fontSize: 36, maxWidth: 425, backgroundWhite: true },
+          birthDate: { x: 1398, y: 305, fontSize: 38, maxWidth: 302, backgroundWhite: true },
+          age: { x: 1572, y: 355, fontSize: 38, maxWidth: 60 },
+          workplace: { x: 766, y: 977, fontSize: 42, maxWidth: 620 },
+          workplaceKana: { x: 760, y: 894, fontSize: 24, maxWidth: 620 },
+          workAddressPrefecture: { x: 688, y: 1220, fontSize: 30, maxWidth: 120 },
+          workAddressCity: { x: 917, y: 1219, fontSize: 30, maxWidth: 343 },
+          workAddressStreet: { x: 699, y: 1300, fontSize: 38, maxWidth: 540 },
+          workPhone: { x: 789, y: 1094, fontSize: 38, maxWidth: 414, backgroundWhite: true },
+          businessContent: { x: 1656, y: 1041, fontSize: 33, maxWidth: 206 },
+          yearsEmployed: { x: 1379, y: 1100, fontSize: 38, maxWidth: 168 },
+          payday: { x: 1760, y: 1102, fontSize: 38, maxWidth: 90 },
+          annualIncome: { x: 407, y: 1077, fontSize: 38, maxWidth: 180 },
+          companyName: { x: 2046, y: 2094, fontSize: 45, maxWidth: 520 },
+          companyRepresentative: { x: 2044, y: 2152, fontSize: 40, maxWidth: 520 },
+          companyAddress: { x: 2044, y: 2212, fontSize: 40, maxWidth: 620 },
+          companyPhone: { x: 2043, y: 2271, fontSize: 40, maxWidth: 260 },
+          companyFax: { x: 2041, y: 2336, fontSize: 40, maxWidth: 260 },
+          salesStaff: { x: 2117, y: 2397, fontSize: 32, maxWidth: 240 }
+        },
+        order: [
+          'addressPrefecture', 'addressDetail', 'addressKana', 'phone', 'mobile', 'email',
+          'birthDate', 'age', 'workplace', 'workplaceKana', 'workAddressPrefecture',
+          'workAddressCity', 'workAddressStreet', 'workPhone', 'businessContent',
+          'yearsEmployed', 'payday', 'annualIncome', 'companyName', 'companyRepresentative',
+          'companyAddress', 'companyPhone', 'companyFax', 'salesStaff'
+        ]
+      };
+
+      const els = {
+        rows: document.getElementById('customerRows'),
+        detail: document.getElementById('detailPane'),
+        search: document.getElementById('searchInput'),
+        applicationTypeFilter: document.getElementById('applicationTypeFilter'),
+        statusFilter: document.getElementById('statusFilter'),
+        requestFilter: document.getElementById('requestFilter'),
+        setupButton: document.getElementById('setupButton'),
+        fixPhonesButton: document.getElementById('fixPhonesButton'),
+        setupNotice: document.getElementById('setupNotice'),
+        setupNoticeButton: document.getElementById('setupNoticeButton'),
+        refreshButton: document.getElementById('refreshButton'),
+        toast: document.getElementById('toast')
+      };
+
+      els.search.addEventListener('input', applyFilters);
+      els.applicationTypeFilter.addEventListener('change', applyFilters);
+      els.statusFilter.addEventListener('change', applyFilters);
+      els.requestFilter.addEventListener('change', applyFilters);
+      els.setupButton.addEventListener('click', setupColumns);
+      els.fixPhonesButton.addEventListener('click', fixPhoneNumbers);
+      els.setupNoticeButton.addEventListener('click', setupColumns);
+      els.refreshButton.addEventListener('click', loadDashboard);
+
+      loadDashboard();
+
+      function loadDashboard() {
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((data) => {
+            const selectedKey = state.selected ? state.selected.rowKey : '';
+            state.customers = data.customers || [];
+            state.selected = selectedKey
+              ? state.customers.find((customer) => customer.rowKey === selectedKey) || null
+              : null;
+            state.applicationTypeOptions = data.applicationTypeOptions || [];
+            state.assigneeOptions = data.assigneeOptions || [];
+            state.statusOptions = data.statusOptions || [];
+            state.reviewOptions = data.reviewOptions || [];
+            state.customerRateOptions = data.customerRateOptions || ['13.9'];
+            state.callResultOptions = data.callResultOptions || [];
+            renderApplicationTypeFilter();
+            renderStatusFilter();
+            els.setupNotice.classList.toggle('visible', Boolean(data.needsSetup));
+            applyFilters();
+            if (state.selected) {
+              renderDetail(state.selected);
+            }
+            setBusy(false);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .getDashboardData();
+      }
+
+      function setupColumns() {
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .setupManagementColumns();
+      }
+
+      function fixPhoneNumbers() {
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .fixPhoneNumbersFromWeb();
+      }
+
+      function renderApplicationTypeFilter() {
+        const current = els.applicationTypeFilter.value;
+        els.applicationTypeFilter.innerHTML = '<option value="">全申込種別</option>';
+        state.applicationTypeOptions.forEach((type) => {
+          const option = document.createElement('option');
+          option.value = type;
+          option.textContent = type;
+          els.applicationTypeFilter.appendChild(option);
+        });
+        els.applicationTypeFilter.value = current;
+      }
+
+      function renderStatusFilter() {
+        const current = els.statusFilter.value;
+        els.statusFilter.innerHTML = '<option value="">全ステータス</option>';
+        state.statusOptions.forEach((status) => {
+          const option = document.createElement('option');
+          option.value = status;
+          option.textContent = status;
+          els.statusFilter.appendChild(option);
+        });
+        els.statusFilter.value = current;
+      }
+
+      function applyFilters() {
+        const keyword = normalizeText(els.search.value);
+        const applicationType = els.applicationTypeFilter.value;
+        const status = els.statusFilter.value;
+        const requestType = els.requestFilter.value;
+
+        state.filtered = state.customers.filter((customer) => {
+          const searchable = normalizeText([
+            customer.name,
+            customer.kana,
+            customer.phone,
+            customer.email,
+            customer.workplace,
+            customer.desiredCar
+          ].join(' '));
+
+          return (!keyword || searchable.includes(keyword))
+            && (!applicationType || customer.applicationType === applicationType)
+            && (!status || customer.status === status)
+            && (!requestType || customer.requestType === requestType);
+        });
+
+        renderTable();
+      }
+
+      function renderTable() {
+        if (state.filtered.length === 0) {
+          els.rows.innerHTML = '<tr><td colspan="12" class="empty">該当する申込はありません。</td></tr>';
+          return;
+        }
+
+        els.rows.innerHTML = '';
+        state.filtered.forEach((customer) => {
+          const tr = document.createElement('tr');
+          const rowClasses = [];
+          if (state.selected && state.selected.rowKey === customer.rowKey) rowClasses.push('selected');
+          if (isDelivered(customer)) rowClasses.push('result-delivered');
+          else if (isCustomerApproved(customer)) rowClasses.push('result-approved');
+          else if (isGuarantorReview(customer)) rowClasses.push('result-guarantor');
+          else if (isPendingReview(customer)) rowClasses.push('result-pending');
+          else if (isPremiumDeniedAstUnrequested(customer)) rowClasses.push('result-premium-denied-ast-unrequested');
+          else if (isCustomerDeniedForDisplay(customer)) rowClasses.push('result-denied');
+          tr.className = rowClasses.join(' ');
+          const showAstReview = isAstTargetPrefecture(customer.prefecture);
+          tr.innerHTML = `
+            <td>${escapeHtml(customer.receivedAt)}</td>
+            <td>${escapeHtml(customer.applicationType)}</td>
+            <td>${escapeHtml(customer.requestType)}</td>
+            <td><strong>${escapeHtml(customer.name)}</strong><br><span class="muted">${escapeHtml(customer.kana)}</span></td>
+            <td>${prefectureCell(customer.prefecture)}</td>
+            <td>${escapeHtml(customer.phone)}</td>
+            <td>${escapeHtml(customer.workplace)}</td>
+            <td>${escapeHtml(customer.desiredCar)}</td>
+            <td>${escapeHtml(customer.monthlyPayment || customer.maxMonthlyPayment)}</td>
+            <td>${badge(customer.status)}</td>
+            <td>${escapeHtml(customer.callCount || 0)}回<br><span class="muted">${escapeHtml(customer.latestCallResult || '')}</span></td>
+            <td>${badge(customer.review1)}</td>
+            <td>${showAstReview ? badge(customer.review2) : ''}</td>
+          `;
+          tr.addEventListener('click', () => selectCustomer(customer));
+          els.rows.appendChild(tr);
+        });
+      }
+
+      function selectCustomer(customer) {
+        state.selected = customer;
+        renderTable();
+        renderDetail(customer);
+      }
+
+      function renderDetail(customer) {
+        els.detail.className = 'detail';
+        const showAstReview = isAstTargetPrefecture(customer.prefecture);
+        els.detail.innerHTML = `
+          <h2>${escapeHtml(customer.name || '名前未入力')}</h2>
+          <div class="muted">${escapeHtml(customer.receivedAt)} / ${escapeHtml(customer.applicationType)} / ${escapeHtml(customer.requestType)}</div>
+
+          <div class="detail-section">
+            ${readonlyField('電話番号', customer.phone)}
+            ${readonlyField('メールアドレス', customer.email)}
+            ${readonlyField('住所', customer.address)}
+            ${readonlyField('勤務先', customer.workplace)}
+            ${readonlyField('税込年収', customer.annualIncome)}
+            <div class="actions">
+              <button type="button" id="premiumPdfButton" class="primary">プレミア申込書を作成</button>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h3>申込内容</h3>
+            <div class="application-grid">
+              ${applicationFieldsHtml(customer.applicationFields || [])}
+            </div>
+          </div>
+
+          <div class="detail-section">
+            ${readonlyField('希望車種', customer.desiredCar)}
+            ${readonlyField('審査申込金額', customer.applicationAmount)}
+            ${readonlyField('支払い回数', customer.paymentCount)}
+            ${readonlyField('お客様提示金利(%)', customer.customerRate)}
+            ${readonlyField('1回目支払額', customer.firstPayment)}
+            ${readonlyField('2回目〜毎月', customer.monthlyPayment)}
+            ${readonlyField('総支払額', customer.totalPayment)}
+            ${readonlyField('実際の金利(%)', customer.actualRate)}
+            ${readonlyField('実コスト総額', customer.actualCostTotal)}
+            ${readonlyField('キックバック差額', customer.kickbackDiff)}
+          </div>
+
+          <form id="managementForm" class="detail-section">
+            ${selectField('申込種別', 'applicationType', customer.applicationType, state.applicationTypeOptions)}
+            ${customer.applicationType === 'お問い合わせ' ? '<div class="actions"><button type="button" id="fetchInquiryButton">お問い合わせ内容をGmailから取得</button></div>' : ''}
+            ${inputField('審査申込金額', 'applicationAmount', customer.applicationAmount, '例: 1000000')}
+            ${inputField('支払い回数', 'paymentCount', customer.paymentCount, '例: 36')}
+            ${customerRateField('お客様提示金利(%)', 'customerRate', customer.customerRate || '13.9')}
+            ${inputField('実際の金利(%)', 'actualRate', customer.actualRate, '例: 7.9')}
+            <div id="loanPreview" class="calc-preview">
+            ${loanPreviewHtml(customer)}
+            </div>
+            ${selectField('対応状況', 'status', customer.status, statusOptionsForCustomer(customer))}
+            ${assigneeField('担当者', 'assignee', customer.assignee)}
+            ${selectField('プレミアファイナンス審査結果', 'review1', customer.review1, state.reviewOptions)}
+            ${showAstReview ? selectField('アスト審査結果', 'review2', customer.review2, state.reviewOptions) : hiddenField('review2', customer.review2)}
+            ${textareaField('対応メモ', 'memo', customer.memo)}
+            <div class="muted">最終更新: ${escapeHtml(customer.updatedAt || '-')} ${escapeHtml(customer.updatedBy || '')}</div>
+            <div class="actions">
+              <button type="button" id="saveButton" class="primary">保存</button>
+              <button type="button" id="deleteCustomerButton" class="danger">この顧客を削除</button>
+            </div>
+          </form>
+
+          <form id="callForm" class="detail-section">
+            <h3>架電記録</h3>
+            ${inputField('架電した日時', 'callAt', '', '例: 2026/06/01 14:30')}
+            ${selectField('結果', 'callResult', '不在', state.callResultOptions)}
+            ${assigneeField('対応した従業員名', 'staffName', customer.assignee)}
+            ${textareaField('話した内容のメモ', 'callMemo', '')}
+            <div class="actions">
+              <button type="button" id="addCallButton" class="primary">架電履歴を追加</button>
+            </div>
+          </form>
+
+          <div class="detail-section">
+            <h3>架電履歴 ${escapeHtml(customer.callCount || 0)}回</h3>
+            ${callHistoryHtml(customer.callHistory || [])}
+          </div>
+        `;
+
+        document.getElementById('saveButton').addEventListener('click', saveSelected);
+        document.getElementById('deleteCustomerButton').addEventListener('click', deleteSelectedCustomer);
+        document.getElementById('premiumPdfButton').addEventListener('click', createPremiumApplicationPdf);
+        const fetchInquiryButton = document.getElementById('fetchInquiryButton');
+        if (fetchInquiryButton) {
+          fetchInquiryButton.addEventListener('click', fetchInquiryContentForSelected);
+        }
+        document.getElementById('addCallButton').addEventListener('click', addCallForSelected);
+        bindLoanPreviewEvents();
+        bindAssigneeFields();
+        bindCustomerRateFields();
+      }
+
+      async function createPremiumApplicationPdf() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+
+        const button = document.getElementById('premiumPdfButton');
+        const originalText = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = '作成中...';
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          showToast('印刷画面を開けませんでした。ポップアップ許可を確認してください。');
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalText;
+          }
+          return;
+        }
+        printWindow.document.write('<p style="font-family:sans-serif;padding:20px;">申込書を作成中です...</p>');
+
+        google.script.run
+          .withSuccessHandler((templateDataUrl) => {
+            const html = buildPremiumPrintHtml(buildPremiumPdfPayload(state.selected), templateDataUrl);
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
+            if (button) {
+              button.disabled = false;
+              button.textContent = originalText;
+            }
+          })
+          .withFailureHandler((error) => {
+            const message = error.message || String(error);
+            printWindow.document.open();
+            printWindow.document.write(`<p style="font-family:sans-serif;padding:20px;color:#b91c1c;">申込書の作成に失敗しました。<br>${escapeHtml(message)}</p>`);
+            printWindow.document.close();
+            showToast(message);
+            if (button) {
+              button.disabled = false;
+              button.textContent = originalText;
+            }
+          })
+          .getPremiumTemplateDataUrl();
+      }
+
+      function buildPremiumPdfPayload(customer) {
+        const addressParts = splitJapaneseAddress(customer.address || '');
+        const workAddressParts = splitJapaneseAddress(customer.workAddress || '');
+        const addressKana = customer.addressKana || getApplicationFieldValue(customer, '住所(カナ)');
+
+        return {
+          addressPrefecture: addressParts.prefecture,
+          addressDetail: [addressParts.city, addressParts.street].filter(Boolean).join(''),
+          addressKana: addressKana || '',
+          phone: customer.phone || '',
+          mobile: customer.phone || '',
+          email: customer.email || '',
+          birthDate: customer.birthDate || '',
+          age: customer.age || '',
+          workplace: customer.workplace || '',
+          workplaceKana: customer.workplaceKana || '',
+          workAddressPrefecture: workAddressParts.prefecture,
+          workAddressCity: workAddressParts.city,
+          workAddressStreet: workAddressParts.street,
+          workPhone: customer.workPhone || '',
+          businessContent: getApplicationFieldValue(customer, '業務内容'),
+          yearsEmployed: customer.yearsEmployed || '',
+          payday: getApplicationFieldValue(customer, '給料日'),
+          annualIncome: customer.annualIncome || '',
+          companyName: '株式会社エコループ',
+          companyRepresentative: '代表取締役　嶋本耕力',
+          companyAddress: '熊本県熊本市東区長嶺東５丁目8-8',
+          companyPhone: '096-201-7191',
+          companyFax: '096-202-6933',
+          salesStaff: '高山　康則'
+        };
+      }
+
+      function buildPremiumPrintHtml(values, templateDataUrl) {
+        const config = PREMIUM_PRINT_CONFIG;
+        const dpi = config.page.dpi;
+        const pxToMm = (px) => ((px / dpi) * 25.4).toFixed(4);
+        const measureTextUnits = (text) => {
+          return Array.from(String(text || '')).reduce((total, char) => {
+            if (/[ -~]/.test(char)) return total + 0.56;
+            if (/[｡-ﾟ]/.test(char)) return total + 0.72;
+            return total + 1;
+          }, 0);
+        };
+        const fitFontSize = (value, baseSize, maxWidth) => {
+          const units = measureTextUnits(value);
+          if (!units || !maxWidth) return baseSize;
+          const estimatedWidth = units * baseSize;
+          if (estimatedWidth <= maxWidth) return baseSize;
+          return Math.max(13, Math.floor(baseSize * (maxWidth / estimatedWidth)));
+        };
+        const normalizePrintValue = (key, rawValue) => {
+          const value = String(rawValue || '').trim();
+          if (['phone', 'mobile', 'workPhone'].includes(key)) return formatPrintPhone(value);
+          if (key === 'age') return value.replace(/歳/g, '').trim();
+          if (key === 'yearsEmployed') return value.replace(/\D/g, '').trim();
+          if (key === 'payday') return value.includes('月末') ? '月末' : value.replace(/\D/g, '').trim();
+          if (key === 'annualIncome') return value.replace(/万円/g, '').trim();
+          return value;
+        };
+
+        const whiteouts = (config.whiteouts || []).map((item) => `
+          <div class="whiteout" style="left:${pxToMm(item.x)}mm;top:${pxToMm(item.y)}mm;width:${pxToMm(item.width)}mm;height:${pxToMm(item.height)}mm;"></div>
+        `).join('');
+
+        const fields = config.order.map((key) => {
+          const field = config.fields[key];
+          const value = normalizePrintValue(key, values[key]);
+          if (!field || !value) return '';
+          const bgClass = field.backgroundWhite ? ' field-bg' : '';
+          const fontSize = fitFontSize(value, field.fontSize || 20, field.maxWidth || 500);
+          const topPx = field.y + config.page.offsetY - fontSize * 0.90;
+          return `
+            <div class="print-field${bgClass}" style="left:${pxToMm(field.x + config.page.offsetX)}mm;top:${pxToMm(topPx)}mm;font-size:${pxToMm(fontSize)}mm;max-width:${pxToMm(field.maxWidth || 500)}mm;">
+              ${escapeHtml(value)}
+            </div>
+          `;
+        }).join('');
+
+        return `<!doctype html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>プレミア申込書</title>
+              <style>
+                @page { size: A4 landscape; margin: 0; }
+                html, body { margin: 0; padding: 0; background: #e5e7eb; font-family: Arial, "Helvetica Neue", sans-serif; }
+                .toolbar { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: #111827; color: #fff; }
+                .toolbar button { border: 0; border-radius: 4px; padding: 8px 14px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
+                .hint { font-size: 12px; opacity: .85; }
+                .sheet { position: relative; width: 297mm; height: 210mm; margin: 12px auto; background: #fff; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
+                .sheet img { position: absolute; left: 0; top: 0; width: 297mm; height: 210mm; }
+                .whiteout { position: absolute; background: #fff; z-index: 2; }
+                .print-field { position: absolute; z-index: 3; color: #111; font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+                .field-bg { background: transparent; padding: 0; }
+                @media print {
+                  html, body { background: #fff; }
+                  .toolbar { display: none; }
+                  .sheet { margin: 0; box-shadow: none; page-break-after: avoid; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="toolbar">
+                <button onclick="window.print()">印刷</button>
+                <span class="hint">印刷設定は「実際のサイズ」または倍率100%、余白なしを選んでください。</span>
+              </div>
+              <div class="sheet">
+                <img src="${templateDataUrl}" alt="">
+                ${whiteouts}
+                ${fields}
+              </div>
+            </body>
+          </html>`;
+      }
+
+      function formatPrintPhone(value) {
+        const digits = String(value || '').replace(/\D/g, '');
+        if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+        if (digits.length === 10 && (digits.startsWith('03') || digits.startsWith('06'))) return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
+        if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+        return value;
+      }
+
+      function statusOptionsForCustomer(customer) {
+        if (isAstTargetPrefecture(customer.prefecture)) {
+          return state.statusOptions;
+        }
+        return state.statusOptions.filter((status) => status.indexOf('アスト') === -1);
+      }
+
+      function isPremiumApproved(customer) {
+        return customer && (customer.status === 'プレミア可決' || customer.review1 === '可決');
+      }
+
+      function isAstApproved(customer) {
+        return customer && (customer.status === 'アスト可決' || customer.review2 === '可決');
+      }
+
+      function isDelivered(customer) {
+        return customer && customer.status === '納車完了';
+      }
+
+      function isPremiumDenied(customer) {
+        return customer && (customer.status === 'プレミア否決' || customer.review1 === '否決');
+      }
+
+      function isAstDenied(customer) {
+        return customer && (customer.status === 'アスト否決' || customer.review2 === '否決');
+      }
+
+      function isCustomerApproved(customer) {
+        return isPremiumApproved(customer) || isAstApproved(customer);
+      }
+
+      function isCustomerDeniedForDisplay(customer) {
+        if (!customer) {
+          return false;
+        }
+        if (isAstTargetPrefecture(customer.prefecture)) {
+          return isPremiumDenied(customer) && isAstDenied(customer);
+        }
+        return isPremiumDenied(customer);
+      }
+
+      function isGuarantorReview(customer) {
+        return customer && (
+          customer.review1 === '審査中（要保証人）' || customer.review2 === '審査中（要保証人）'
+        );
+      }
+
+      function isPendingReview(customer) {
+        return customer && (customer.review1 === '審査中' || customer.review2 === '審査中');
+      }
+
+      function isPremiumDeniedAstUnrequested(customer) {
+        return customer
+          && isAstTargetPrefecture(customer.prefecture)
+          && isPremiumDenied(customer)
+          && String(customer.review2 || '') === '未依頼';
+      }
+
+      function getApplicationFieldValue(customer, fieldName) {
+        const fields = customer && Array.isArray(customer.applicationFields) ? customer.applicationFields : [];
+        const matched = fields.find((field) => field.name === fieldName);
+        return matched ? matched.value || '' : '';
+      }
+
+      function splitJapaneseAddress(address) {
+        const text = String(address || '').trim();
+        const prefectures = [
+          '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+          '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+          '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県',
+          '岐阜県', '静岡県', '愛知県', '三重県',
+          '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県',
+          '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+          '徳島県', '香川県', '愛媛県', '高知県',
+          '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'
+        ];
+        const prefecture = prefectures.find((item) => text.indexOf(item) === 0) || '';
+        const rest = prefecture ? text.slice(prefecture.length).trim() : text;
+        const match =
+          rest.match(/^(.+?市.+?区)(.+)$/) ||
+          rest.match(/^(.+?郡.+?[町村])(.+)$/) ||
+          rest.match(/^(.+?[市区町村])(.+)$/);
+        if (!match) {
+          return { prefecture, city: rest, street: '' };
+        }
+        return {
+          prefecture,
+          city: match[1].trim(),
+          street: match[2].trim()
+        };
+      }
+
+      function saveSelected() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+
+        const form = document.getElementById('managementForm');
+        const payload = {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey,
+          applicationType: form.elements.applicationType.value,
+          applicationAmount: form.elements.applicationAmount.value,
+          paymentCount: form.elements.paymentCount.value,
+          customerRate: getCustomerRateFieldValue(form, 'customerRate'),
+          actualRate: form.elements.actualRate.value,
+          status: form.elements.status.value,
+          assignee: getAssigneeFieldValue(form, 'assignee'),
+          review1: form.elements.review1.value,
+          review2: form.elements.review2.value,
+          memo: form.elements.memo.value,
+          applicationFields: collectApplicationFieldValues()
+        };
+
+        state.saving = true;
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            state.saving = false;
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            state.saving = false;
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .updateCustomerManagement(payload);
+      }
+
+      function fetchInquiryContentForSelected() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+
+        const payload = {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey
+        };
+
+        state.saving = true;
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            state.saving = false;
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            state.saving = false;
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .backfillInquiryContentForCustomer(payload);
+      }
+
+      function deleteSelectedCustomer() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+
+        const customerName = state.selected.name || 'この顧客';
+        const confirmed = window.confirm(`${customerName}の申込行をスプレッドシートから削除します。\n架電履歴も削除されます。\nこの操作は元に戻せません。削除してよろしいですか？`);
+        if (!confirmed) {
+          return;
+        }
+
+        const payload = {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey
+        };
+
+        state.saving = true;
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            state.saving = false;
+            state.selected = null;
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            state.saving = false;
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .deleteCustomerApplication(payload);
+      }
+
+      function bindLoanPreviewEvents() {
+        const form = document.getElementById('managementForm');
+        if (!form) {
+          return;
+        }
+
+        ['applicationAmount', 'paymentCount', 'customerRate', 'customerRateCustom', 'actualRate'].forEach((name) => {
+          if (!form.elements[name]) return;
+          form.elements[name].addEventListener('input', updateLoanPreview);
+          form.elements[name].addEventListener('change', updateLoanPreview);
+        });
+        updateLoanPreview();
+      }
+
+      function updateLoanPreview() {
+        const form = document.getElementById('managementForm');
+        const preview = document.getElementById('loanPreview');
+        if (!form || !preview) {
+          return;
+        }
+
+        const values = calculateLoanValues(
+          form.elements.applicationAmount.value,
+          form.elements.paymentCount.value,
+          getCustomerRateFieldValue(form, 'customerRate'),
+          form.elements.actualRate.value
+        );
+        preview.innerHTML = loanPreviewHtml(values);
+      }
+
+      function calculateLoanValues(applicationAmountValue, paymentCountValue, customerRateValue, actualRateValue) {
+        const applicationAmount = parseNumber(applicationAmountValue);
+        const paymentCount = parseNumber(paymentCountValue);
+        const customerRate = parseNumber(customerRateValue) || 13.9;
+        const actualRate = parseNumber(actualRateValue);
+        const result = {
+          firstPayment: '',
+          monthlyPayment: '',
+          totalPayment: '',
+          actualCostTotal: '',
+          kickbackDiff: ''
+        };
+
+        if (applicationAmount > 0 && paymentCount > 0) {
+          const customerMonthlyRate = customerRate / 100 / 12;
+          const exactMonthly = applicationAmount * customerMonthlyRate / (1 - Math.pow(1 + customerMonthlyRate, -paymentCount));
+          const monthlyPayment = Math.ceil(exactMonthly / 10) * 10;
+          const totalPayment = Math.round(exactMonthly) * paymentCount;
+          const firstPayment = totalPayment - monthlyPayment * (paymentCount - 1);
+
+          result.firstPayment = firstPayment;
+          result.monthlyPayment = monthlyPayment;
+          result.totalPayment = totalPayment;
+
+          if (actualRate > 0) {
+            const actualMonthlyRate = actualRate / 100 / 12;
+            const exactActualMonthly = applicationAmount * actualMonthlyRate / (1 - Math.pow(1 + actualMonthlyRate, -paymentCount));
+            const actualCostTotal = Math.round(exactActualMonthly) * paymentCount;
+
+            result.actualCostTotal = actualCostTotal;
+            result.kickbackDiff = totalPayment - actualCostTotal;
+          }
+        }
+
+        return result;
+      }
+
+      function loanPreviewHtml(source) {
+        const values = source && Object.prototype.hasOwnProperty.call(source, 'firstPayment')
+          ? source
+          : {
+              firstPayment: source.firstPayment,
+              monthlyPayment: source.monthlyPayment,
+              totalPayment: source.totalPayment,
+              actualCostTotal: source.actualCostTotal,
+              kickbackDiff: source.kickbackDiff
+            };
+
+        return `
+          <div><label>1回目支払額</label><strong>${formatYen(values.firstPayment)}</strong></div>
+          <div><label>2回目〜毎月</label><strong>${formatYen(values.monthlyPayment)}</strong></div>
+          <div><label>総支払額</label><strong>${formatYen(values.totalPayment)}</strong></div>
+          <div><label>実コスト総額</label><strong>${formatYen(values.actualCostTotal)}</strong></div>
+          <div><label>キックバック差額</label><strong>${formatYen(values.kickbackDiff)}</strong></div>
+        `;
+      }
+
+      function parseNumber(value) {
+        const normalized = String(value || '')
+          .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
+          .replace(/[，,円回％%¥￥\s]/g, '');
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : 0;
+      }
+
+      function formatYen(value) {
+        if (value === '' || value === null || value === undefined) {
+          return '-';
+        }
+        const number = parseNumber(value);
+        if (!number) {
+          return '-';
+        }
+        return Math.round(number).toLocaleString('ja-JP') + '円';
+      }
+
+      function addCallForSelected() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+
+        const form = document.getElementById('callForm');
+        const payload = {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey,
+          callAt: form.elements.callAt.value,
+          callResult: form.elements.callResult.value,
+          staffName: getAssigneeFieldValue(form, 'staffName'),
+          callMemo: form.elements.callMemo.value
+        };
+
+        state.saving = true;
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            state.saving = false;
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            state.saving = false;
+            setBusy(false);
+            showToast(error.message || String(error));
+          })
+          .addCallHistory(payload);
+      }
+
+      function readonlyField(label, value) {
+        return `<div class="field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value || '-')}</div></div>`;
+      }
+
+      function selectField(label, name, value, options) {
+        const opts = options.map((option) => (
+          `<option value="${escapeHtml(option)}" ${option === value ? 'selected' : ''}>${escapeHtml(option)}</option>`
+        )).join('');
+        return `<div class="field"><label>${escapeHtml(label)}</label><select name="${name}">${opts}</select></div>`;
+      }
+
+      function hiddenField(name, value) {
+        return `<input type="hidden" name="${name}" value="${escapeHtml(value || '')}">`;
+      }
+
+      function assigneeField(label, name, value) {
+        const isPreset = state.assigneeOptions.indexOf(value) !== -1;
+        const selectedValue = isPreset ? value : '直接入力';
+        const opts = state.assigneeOptions.map((option) => (
+          `<option value="${escapeHtml(option)}" ${option === selectedValue ? 'selected' : ''}>${escapeHtml(option)}</option>`
+        )).join('');
+        const customStyle = selectedValue === '直接入力' ? '' : 'display:none';
+        const customValue = selectedValue === '直接入力' ? value : '';
+        return `
+          <div class="field">
+            <label>${escapeHtml(label)}</label>
+            <select name="${name}" data-assignee-select="${name}">${opts}</select>
+            <input name="${name}Custom" data-assignee-custom="${name}" value="${escapeHtml(customValue || '')}" placeholder="担当者名を入力" style="${customStyle}; margin-top:6px;">
+          </div>
+        `;
+      }
+
+      function customerRateField(label, name, value) {
+        const options = (state.customerRateOptions || ['13.9']).concat(['直接入力']);
+        const isPreset = (state.customerRateOptions || ['13.9']).indexOf(value) !== -1;
+        const selectedValue = isPreset ? value : '直接入力';
+        const opts = options.map((option) => (
+          `<option value="${escapeHtml(option)}" ${option === selectedValue ? 'selected' : ''}>${escapeHtml(option)}</option>`
+        )).join('');
+        const customStyle = selectedValue === '直接入力' ? '' : 'display:none';
+        const customValue = selectedValue === '直接入力' ? value : '';
+        return `
+          <div class="field">
+            <label>${escapeHtml(label)}</label>
+            <select name="${name}" data-customer-rate-select="${name}">${opts}</select>
+            <input name="${name}Custom" data-customer-rate-custom="${name}" value="${escapeHtml(customValue || '')}" placeholder="例: 11.5" style="${customStyle}; margin-top:6px;">
+          </div>
+        `;
+      }
+
+      function inputField(label, name, value, placeholder) {
+        return `<div class="field"><label>${escapeHtml(label)}</label><input name="${name}" value="${escapeHtml(value || '')}" placeholder="${escapeHtml(placeholder || '')}"></div>`;
+      }
+
+      function textareaField(label, name, value) {
+        return `<div class="field"><label>${escapeHtml(label)}</label><textarea name="${name}">${escapeHtml(value || '')}</textarea></div>`;
+      }
+
+      function applicationFieldsHtml(fields) {
+        return fields.map((field) => {
+          if (field.editable) {
+            if (field.name === 'お問い合わせ内容') {
+              return `<div class="field inquiry-content-field"><label>${escapeHtml(field.name)}</label><textarea data-application-field="${escapeHtml(field.name)}" placeholder="未入力">${escapeHtml(field.value || '')}</textarea></div>`;
+            }
+            return `<div class="field ${field.important ? 'important' : ''}"><label>${escapeHtml(field.name)}</label><input data-application-field="${escapeHtml(field.name)}" value="${escapeHtml(field.value || '')}" placeholder="未入力"></div>`;
+          }
+          return `<div class="field ${field.important ? 'important' : ''}"><label>${escapeHtml(field.name)}</label><div>${escapeHtml(field.value || '-')}</div></div>`;
+        }).join('');
+      }
+
+      function collectApplicationFieldValues() {
+        const values = {};
+        document.querySelectorAll('[data-application-field]').forEach((input) => {
+          values[input.dataset.applicationField] = input.value;
+        });
+        return values;
+      }
+
+      function bindAssigneeFields() {
+        document.querySelectorAll('[data-assignee-select]').forEach((select) => {
+          const name = select.dataset.assigneeSelect;
+          const custom = document.querySelector(`[data-assignee-custom="${name}"]`);
+          const sync = () => {
+            if (!custom) return;
+            custom.style.display = select.value === '直接入力' ? '' : 'none';
+          };
+          select.addEventListener('change', sync);
+          sync();
+        });
+      }
+
+      function bindCustomerRateFields() {
+        document.querySelectorAll('[data-customer-rate-select]').forEach((select) => {
+          const name = select.dataset.customerRateSelect;
+          const custom = document.querySelector(`[data-customer-rate-custom="${name}"]`);
+          const sync = () => {
+            if (!custom) return;
+            custom.style.display = select.value === '直接入力' ? '' : 'none';
+          };
+          select.addEventListener('change', sync);
+          sync();
+        });
+      }
+
+      function getAssigneeFieldValue(form, name) {
+        const value = form.elements[name].value;
+        if (value !== '直接入力') {
+          return value;
+        }
+        return form.elements[`${name}Custom`].value;
+      }
+
+      function getCustomerRateFieldValue(form, name) {
+        const value = form.elements[name].value;
+        if (value !== '直接入力') {
+          return value;
+        }
+        return form.elements[`${name}Custom`].value;
+      }
+
+      function callHistoryHtml(history) {
+        if (!history.length) {
+          return '<div class="muted">架電履歴はまだありません。</div>';
+        }
+
+        return `<div class="history-list">${history.slice().reverse().map((call) => `
+          <div class="history-item">
+            <div class="history-head">
+              <strong>${escapeHtml(call.callNumber)}回目 / ${escapeHtml(call.result)}</strong>
+              <span class="muted">${escapeHtml(call.callAt)}</span>
+            </div>
+            <div>${escapeHtml(call.memo || '-')}</div>
+            <div class="muted">担当: ${escapeHtml(call.staffName || '-')} / 記録: ${escapeHtml(call.recordedBy || '-')}</div>
+          </div>
+        `).join('')}</div>`;
+      }
+
+      function badge(value) {
+        const text = value || '-';
+        let color = '';
+        if (text.indexOf('可決') !== -1 || text.indexOf('成約') !== -1) color = 'green';
+        if (text.indexOf('否決') !== -1 || text.indexOf('終了') !== -1) color = 'red';
+        if (text.indexOf('審査中') !== -1 || text.indexOf('架電中') !== -1) color = 'amber';
+        return `<span class="badge ${color}">${escapeHtml(text)}</span>`;
+      }
+
+      function prefectureCell(prefecture) {
+        const text = prefecture || '';
+        return `<span class="${isAlertPrefecture(text) ? 'prefecture-alert' : ''}">${escapeHtml(text)}</span>`;
+      }
+
+      function isAlertPrefecture(prefecture) {
+        return isAstTargetPrefecture(prefecture);
+      }
+
+      function isAstTargetPrefecture(prefecture) {
+        return [
+          '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+          '徳島県', '香川県', '愛媛県', '高知県',
+          '山口県', '鳥取県', '島根県', '岡山県'
+        ].includes(prefecture);
+      }
+
+      function setBusy(isBusy) {
+        [els.refreshButton, els.setupButton, els.setupNoticeButton, els.fixPhonesButton].forEach((button) => {
+          button.disabled = isBusy;
+        });
+      }
+
+      function showToast(message) {
+        els.toast.textContent = message;
+        els.toast.classList.add('visible');
+        window.setTimeout(() => els.toast.classList.remove('visible'), 3500);
+      }
+
+      function normalizeText(value) {
+        return String(value || '').replace(/\s+/g, '').toLowerCase();
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+    </script>
+  </body>
+</html>

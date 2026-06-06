@@ -62,6 +62,139 @@
     ]
   },
   {
+    "id": "zenkoku-zero-fudosan",
+    "enabled": true,
+    "kind": "zenkokuZeroPage",
+    "name": "全国0円不動産",
+    "websiteUrl": "https://zenkokuzeroen-fudosan.com",
+    "listUrl": "https://zenkokuzeroen-fudosan.com/pages/25/",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "defaultPages": 1,
+    "titleRemovePatterns": [
+      "\\s*-全国０円不動産.*$",
+      "\\s*全国０円不動産.*$"
+    ]
+  },
+  {
+    "id": "ieichiba",
+    "enabled": true,
+    "kind": "ieichibaIndex",
+    "name": "家いちば",
+    "websiteUrl": "https://www.ieichiba.com",
+    "listUrl": "https://www.ieichiba.com/",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "defaultPages": 1,
+    "titleRemovePatterns": [
+      "\\s*\\|\\s*家いちば.*$"
+    ]
+  },
+  {
+    "id": "furusato-net",
+    "enabled": true,
+    "kind": "sitemap",
+    "name": "ふるさと情報館",
+    "websiteUrl": "https://furusato-net.co.jp",
+    "listUrl": "https://furusato-net.co.jp/bukken-sitemap.xml",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "detailUrlPattern": "^/bukken/[0-9a-z]+/?$",
+    "itemsPerPage": 30,
+    "defaultPages": 2,
+    "titleRemovePatterns": [
+      "\\s*\\|\\s*ふるさと情報館.*$"
+    ]
+  },
+  {
+    "id": "yamaichiba",
+    "enabled": true,
+    "name": "山いちば",
+    "websiteUrl": "https://yamaichiba.com",
+    "listUrl": "https://yamaichiba.com/forest-brokerage/",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "detailUrlPattern": "/[a-z]+-[a-z0-9-]+[0-9]{3}/$",
+    "pagination": {
+      "type": "none"
+    },
+    "titleRemovePatterns": [
+      "\\s*\\|\\s*山いちば.*$"
+    ]
+  },
+  {
+    "id": "homes-akiyabank",
+    "enabled": false,
+    "name": "LIFULL HOME'S 空き家バンク",
+    "websiteUrl": "https://www.homes.co.jp/akiyabank/",
+    "listUrl": "https://www.homes.co.jp/akiyabank/",
+    "prefecture": "全国",
+    "disabledReason": "取得時にWAF/チャレンジ応答になるため、安定取得を保留"
+  },
+  {
+    "id": "bit-courts",
+    "enabled": false,
+    "name": "裁判所 不動産競売物件情報",
+    "websiteUrl": "https://www.bit.courts.go.jp/app/",
+    "listUrl": "https://www.bit.courts.go.jp/app/",
+    "prefecture": "全国",
+    "disabledReason": "検索アプリ型でrobots/画面遷移/APIの追加確認が必要"
+  },
+  {
+    "id": "nta-koubai",
+    "enabled": false,
+    "name": "国税庁 公売情報",
+    "websiteUrl": "https://www.koubai.nta.go.jp/",
+    "listUrl": "https://www.koubai.nta.go.jp/",
+    "prefecture": "全国",
+    "disabledReason": "公売検索条件と詳細ページ構造の追加確認が必要"
+  },
+  {
+    "id": "kankocho",
+    "enabled": false,
+    "name": "官公庁オークション",
+    "websiteUrl": "https://kankocho.jp/",
+    "listUrl": "https://kankocho.jp/",
+    "prefecture": "全国",
+    "disabledReason": "Nuxtアプリ型で公開API/規約確認が必要"
+  },
+  {
+    "id": "kokuyuzaisan-athome",
+    "enabled": false,
+    "name": "国有財産物件情報",
+    "websiteUrl": "https://kokuyuzaisan.akiya-athome.jp/",
+    "listUrl": "https://kokuyuzaisan.akiya-athome.jp/",
+    "prefecture": "全国",
+    "disabledReason": "robots.txtが403のため取得方法の確認が必要"
+  },
+  {
+    "id": "jmty-estate",
+    "enabled": false,
+    "name": "ジモティー 不動産",
+    "websiteUrl": "https://jmty.jp/all/est",
+    "listUrl": "https://jmty.jp/all/est",
+    "prefecture": "全国",
+    "disabledReason": "投稿サイトのため規約・転載範囲・取得頻度を追加確認するまで保留"
+  },
+  {
+    "id": "inakanet",
+    "enabled": false,
+    "name": "田舎ねっと.日本",
+    "websiteUrl": "https://www.inakanet.jp/",
+    "listUrl": "https://www.inakanet.jp/",
+    "prefecture": "全国",
+    "disabledReason": "旧式HTML/文字コードと掲載状態の確認が必要"
+  },
+  {
+    "id": "fudousan-or-jp",
+    "enabled": false,
+    "name": "不動産ジャパン",
+    "websiteUrl": "https://www.fudousan.or.jp/",
+    "listUrl": "https://www.fudousan.or.jp/",
+    "prefecture": "全国",
+    "disabledReason": "robots.txtが403で、0円・激安特化の一覧取得口も未確認"
+  },
+  {
     "id": "kumamoto",
     "enabled": true,
     "name": "熊本県空き家バンク",

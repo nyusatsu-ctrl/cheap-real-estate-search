@@ -38,6 +38,13 @@ export type Property = {
   longitude: number | null;
   source_id: string | null;
   source_url: string;
+  transaction_type?: string | null;
+  listed_at?: string | null;
+  source_updated_at?: string | null;
+  scraped_at?: string | null;
+  price_band?: string | null;
+  risk_tags?: string[];
+  remarks?: string | null;
   publication_permission: PublicationPermission;
   status: PropertyStatus;
   published_at: string | null;

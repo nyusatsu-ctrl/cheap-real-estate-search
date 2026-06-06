@@ -6,6 +6,15 @@ const DEFAULT_MAX_PRICE = 30000000;
 const DEFAULT_PAGES = 3;
 const DEFAULT_LIMIT = 5000;
 const SOURCE_FILE = "data/property-import-sources.json";
+const IMPORT_METADATA_COLUMNS = [
+  "transaction_type",
+  "listed_at",
+  "source_updated_at",
+  "scraped_at",
+  "price_band",
+  "risk_tags",
+  "remarks"
+];
 const PREFECTURE_CODES = [
   ["01", "北海道"],
   ["02", "青森県"],
@@ -71,6 +80,7 @@ loadEnvFile(".env.local");
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = commit ? createSupabaseClient(supabaseUrl, serviceRoleKey) : null;
+let propertyImportMetadataColumnsAvailable = null;
 
 main().catch((error) => {
   console.error(`Import failed: ${error.message}`);
@@ -142,6 +152,12 @@ async function importSource(source) {
         ? await collectZeroEstateProperties(source, getSourcePages(source))
       : source.kind === "lifullTownIndex"
         ? await collectLifullProperties(source, getSourcePages(source))
+      : source.kind === "sitemap"
+        ? await collectSitemapProperties(source, getSourcePages(source))
+      : source.kind === "ieichibaIndex"
+        ? await collectIeichibaProperties(source, getSourcePages(source))
+      : source.kind === "zenkokuZeroPage"
+        ? await collectZenkokuZeroProperties(source, getSourcePages(source))
         : await collectDetailProperties(source, getSourcePages(source));
   result.found = collected.found;
   result.skipped += collected.skipped;
@@ -160,17 +176,20 @@ async function importSource(source) {
   if (!commit) return result;
 
   const sourceId = await ensureSource(source);
+  const canSaveImportMetadata = await hasPropertyImportMetadataColumns();
   for (const property of candidates) {
-    const existing = await findExistingProperty(property.source_url);
+    const existing = await findExistingProperty(property);
     const status = existing?.status === "sold" ? "sold" : publish ? "published" : "draft";
     const publishedAt = status === "published" ? existing?.published_at ?? new Date().toISOString() : null;
-    const payload = {
+    const payload = stripRuntimeFields(
+      stripUnsupportedImportMetadata({
       ...property,
       source_id: sourceId,
       publication_permission: "unknown",
       status,
       published_at: publishedAt
-    };
+      }, canSaveImportMetadata)
+    );
 
     if (existing?.id) {
       const { error } = await supabase.from("properties").update(payload).eq("id", existing.id);
@@ -198,7 +217,7 @@ async function collectDetailProperties(source, pages) {
   for (const url of detailUrls) {
     try {
       const html = await fetchHtml(url);
-      const property = parseProperty(source, html, url);
+      const property = enrichProperty(source, parseProperty(source, html, url), htmlToText(html));
       if (shouldSkipProperty(property, url, result)) continue;
       result.properties.push(property);
     } catch (error) {
@@ -208,6 +227,145 @@ async function collectDetailProperties(source, pages) {
   }
 
   return result;
+}
+
+async function collectSitemapProperties(source, pages) {
+  const detailUrls = await collectSitemapUrls(source, pages);
+  const result = {
+    found: detailUrls.length,
+    properties: [],
+    skipped: 0,
+    failed: 0
+  };
+
+  for (const url of detailUrls) {
+    try {
+      const html = await fetchHtml(url);
+      const property = enrichProperty(source, parseProperty(source, html, url), htmlToText(html));
+      if (shouldSkipProperty(property, url, result)) continue;
+      result.properties.push(property);
+    } catch (error) {
+      result.failed += 1;
+      console.log(`FAIL sitemap detail: ${url} (${error.message})`);
+    }
+  }
+
+  return result;
+}
+
+async function collectSitemapUrls(source, pages) {
+  const xml = await fetchHtml(source.listUrl);
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => decodeEntities(match[1]));
+  const detailPattern = source.detailUrlPattern ? new RegExp(source.detailUrlPattern) : null;
+  return locs
+    .filter((url) => !detailPattern || detailPattern.test(new URL(url).pathname))
+    .slice(0, pages * (source.itemsPerPage ?? 30));
+}
+
+async function collectIeichibaProperties(source, pages) {
+  const detailUrls = await collectIeichibaProjectUrls(source, pages);
+  const result = {
+    found: detailUrls.length,
+    properties: [],
+    skipped: 0,
+    failed: 0
+  };
+
+  for (const url of detailUrls) {
+    try {
+      const html = await fetchHtml(url);
+      const property = enrichProperty(source, parseProperty(source, html, url), htmlToText(html));
+      if (shouldSkipProperty(property, url, result)) continue;
+      result.properties.push(property);
+    } catch (error) {
+      result.failed += 1;
+      console.log(`FAIL ieichiba detail: ${url} (${error.message})`);
+    }
+  }
+
+  return result;
+}
+
+async function collectIeichibaProjectUrls(source, pages) {
+  const urls = new Set();
+  for (const pageUrl of buildListPageUrls(source, pages)) {
+    const html = await fetchHtml(pageUrl);
+    for (const url of extractIeichibaProjectUrls(source, html)) urls.add(url);
+  }
+  return [...urls];
+}
+
+function extractIeichibaProjectUrls(source, html) {
+  const urls = new Set();
+  for (const match of html.matchAll(/href=["'](\/project\/[^"']+)["']/g)) {
+    urls.add(new URL(match[1], source.websiteUrl).toString());
+  }
+  for (const match of html.matchAll(/url:"\\u002Fproject\\u002F([^"]+)"/g)) {
+    urls.add(new URL(`/project/${decodeEscapedPath(match[1])}`, source.websiteUrl).toString());
+  }
+  return [...urls];
+}
+
+async function collectZenkokuZeroProperties(source, pages) {
+  const itemsByUrl = new Map();
+  for (const pageUrl of buildListPageUrls(source, pages)) {
+    const html = await fetchHtml(pageUrl);
+    for (const item of extractZenkokuZeroItems(source, html)) itemsByUrl.set(item.url, item);
+  }
+
+  const result = {
+    found: itemsByUrl.size,
+    properties: [],
+    skipped: 0,
+    failed: 0
+  };
+
+  for (const [url, item] of itemsByUrl) {
+    try {
+      const html = await fetchHtml(url);
+      const text = htmlToText(html);
+      if (/成約済み|成約済/.test(text)) {
+        result.skipped += 1;
+        continue;
+      }
+      const property = enrichProperty(
+        source,
+        {
+          ...parseProperty(source, html, url),
+          title: cleanupText(item.title).replace(/^※?(成約済み|商談中)\s*/, "").slice(0, 90),
+          price_yen: 0,
+          transaction_type: "無償譲渡",
+          remarks: "全国0円不動産の公開ページから取得。詳細確認は元サイトへ送客。"
+        },
+        text
+      );
+      if (shouldSkipProperty(property, url, result)) continue;
+      result.properties.push(property);
+    } catch (error) {
+      result.failed += 1;
+      console.log(`FAIL zenkoku zero detail: ${url} (${error.message})`);
+    }
+  }
+
+  return result;
+}
+
+function extractZenkokuZeroItems(source, html) {
+  const urls = new Set();
+  const items = [];
+  for (const match of html.matchAll(/"headline":\s*"([^"]+)"[\s\S]{0,900}?"url":\s*"([^"]+\/pages\/[0-9]+\?detail=1&b_id=[0-9]+&r_id=[0-9]+#[^"]+)"/g)) {
+    const url = new URL(match[2], source.websiteUrl).toString();
+    if (urls.has(url)) continue;
+    urls.add(url);
+    items.push({ title: decodeEntities(match[1]), url });
+  }
+  for (const match of html.matchAll(/"url":\s*"([^"]+\/pages\/[0-9]+\?detail=1&b_id=[0-9]+&r_id=[0-9]+#[^"]+)"/g)) {
+    const url = new URL(match[1], source.websiteUrl).toString();
+    if (urls.has(url)) continue;
+    urls.add(url);
+    items.push({ title: "全国0円不動産の0円物件", url });
+  }
+  return items;
 }
 
 async function collectDetailUrls(source, pages) {
@@ -321,7 +479,7 @@ async function collectZeroEstateProperties(source, pages) {
           continue;
         }
 
-        const property = parseZeroEstateProperty(item);
+        const property = enrichProperty(source, parseZeroEstateProperty(item), `${item.title ?? ""}\n${item.address ?? ""}\n${item.propertyType ?? ""}`);
         if (shouldSkipProperty(property, property.source_url, result)) continue;
         result.properties.push(property);
       }
@@ -408,7 +566,7 @@ function extractAthomeProperties(source, html, pageUrl, fallbackPrefecture) {
     const title = extractAthomeTitle(block, prefecture, city);
     const sourceUrl = extractAthomeSectionDetailUrl(section, pageUrl) ?? `${pageUrl}#property-${index + 1}`;
 
-    properties.push({
+    properties.push(enrichProperty(source, {
       title,
       property_type: inferPropertyType(block, landArea, buildingArea),
       price_yen: price,
@@ -421,7 +579,7 @@ function extractAthomeProperties(source, html, pageUrl, fallbackPrefecture) {
       latitude: null,
       longitude: null,
       source_url: sourceUrl
-    });
+    }, block));
   }
 
   return properties;
@@ -529,7 +687,7 @@ function extractLifullTownProperties(source, html, townUrl) {
     const title = cleanupText(block.split("\n")[0]).slice(0, 90);
     const detailUrl = extractLifullDetailUrl(html, townUrl, saleIndex) ?? `${townUrl}#property-${saleIndex + 1}`;
 
-    properties.push({
+    properties.push(enrichProperty(source, {
       title,
       property_type: inferPropertyType(block, landArea, buildingArea),
       price_yen: price,
@@ -542,7 +700,7 @@ function extractLifullTownProperties(source, html, townUrl) {
       latitude: null,
       longitude: null,
       source_url: detailUrl
-    });
+    }, block));
     saleIndex += 1;
   }
 
@@ -616,6 +774,90 @@ function parseProperty(source, html, sourceUrl) {
   };
 }
 
+function enrichProperty(source, property, text = "") {
+  const combined = `${source.name}\n${property.title}\n${property.address_display}\n${text}`;
+  return {
+    ...property,
+    transaction_type: property.transaction_type ?? inferTransactionType(combined),
+    listed_at: property.listed_at ?? extractDate(text, ["掲載日", "登録日", "公開日"]),
+    source_updated_at: property.source_updated_at ?? extractDate(text, ["更新日", "最終更新日"]),
+    scraped_at: new Date().toISOString(),
+    price_band: buildPriceBand(property.price_yen),
+    risk_tags: property.risk_tags ?? inferRiskTags(combined),
+    remarks: cleanupText(property.remarks ?? buildRemarks(source, combined)).slice(0, 160)
+  };
+}
+
+function inferTransactionType(text) {
+  if (/競売/.test(text)) return "競売";
+  if (/公売/.test(text)) return "公売";
+  if (/国有地|国有財産/.test(text)) return "国有地";
+  if (/市有地|町有地|村有地|自治体/.test(text)) return "公有地";
+  if (/無償|0円|０円|譲渡/.test(text)) return "無償譲渡";
+  return "売買";
+}
+
+function inferRiskTags(text) {
+  const tags = [];
+  const rules = [
+    ["農地", /農地|田|畑/],
+    ["山林", /山林|森林|立木/],
+    ["別荘地", /別荘地|管理費/],
+    ["再建築注意", /再建築不可|未接道|接道なし|道路なし/],
+    ["境界注意", /境界未確定|境界不明|境界/],
+    ["残置物", /残置物|家財|片付け/],
+    ["解体前提", /解体|取り壊し|倒壊/],
+    ["借地", /借地|地上権/],
+    ["公売", /公売/],
+    ["競売", /競売/],
+    ["国有地", /国有地|国有財産/],
+    ["収益物件", /収益|賃貸中|家賃|利回り/]
+  ];
+
+  for (const [tag, pattern] of rules) {
+    if (pattern.test(text)) tags.push(tag);
+  }
+
+  return [...new Set(tags)];
+}
+
+function buildRemarks(source, text) {
+  const notes = [];
+  if (/商談中|交渉中/.test(text)) notes.push("商談中の可能性あり");
+  if (/成約済み|売却済み|受付終了/.test(text)) notes.push("成約済み表示の可能性あり");
+  if (/詳細|問い合わせ|資料/.test(text)) notes.push("詳細確認は元サイトで実施");
+  return notes.length > 0 ? notes.join("。") : `${source.name}から取得。詳細本文は保存せず元URLへ送客。`;
+}
+
+function buildPriceBand(priceYen) {
+  if (priceYen === null || priceYen === undefined) return "価格未確認";
+  if (priceYen === 0) return "0円";
+  if (priceYen <= 1000000) return "100万円以下";
+  if (priceYen <= 3000000) return "300万円以下";
+  if (priceYen <= 5000000) return "500万円以下";
+  if (priceYen <= 10000000) return "1000万円以下";
+  if (priceYen <= 30000000) return "1000万円超3000万円以下";
+  return "3000万円超";
+}
+
+function extractDate(text, labels) {
+  const line = findLine(text, labels);
+  const value = line?.match(/(20[0-9]{2}[\/.-][0-9]{1,2}[\/.-][0-9]{1,2}|令和\s*[0-9０-９]+年\s*[0-9０-９]+月\s*[0-9０-９]+日)/)?.[1];
+  if (!value) return null;
+
+  const normalized = toHalfWidth(value).replace(/[年月]/g, "/").replace(/日/g, "").replace(/[.-]/g, "/").replace(/\s/g, "");
+  if (normalized.startsWith("令和")) {
+    const parts = normalized.replace("令和", "").split("/").map((part) => Number.parseInt(part, 10));
+    if (parts.length >= 3 && parts.every(Number.isFinite)) {
+      return new Date(Date.UTC(2018 + parts[0], parts[1] - 1, parts[2])).toISOString();
+    }
+    return null;
+  }
+
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function shouldSkipProperty(property, url, result) {
   if (prefectureFilter && property.prefecture !== prefectureFilter) {
     result.skipped += 1;
@@ -653,6 +895,9 @@ function extractTitle(source, html, text) {
 function extractPriceYen(html, text) {
   const htmlPrice = html.match(/<span[^>]*class=["'][^"']*badge[^"']*["'][^>]*>\s*価格\s*<\/span>[\s\S]{0,500}?<span[^>]*>\s*([0-9０-９,.，．]+)\s*<\/span>\s*万円/i)?.[1];
   if (htmlPrice) return parseYen(`${htmlPrice}万円`);
+
+  const htmlLabelPrice = html.match(/(?:価格|希望価格|販売価格|売買価格)[\s\S]{0,300}?<span[^>]*>\s*(無料|無償|応相談|相談|0\s*円|[0-9０-９,.，．]+\s*万円|[0-9０-９,，]+\s*円)\s*<\/span>/i)?.[1];
+  if (htmlLabelPrice) return parseYen(htmlLabelPrice);
 
   const nextLinePrice = text.match(/(?:価格|売却価格|売買価格|希望価格|販売価格|代金)\s*\n\s*(無料|無償|応相談|相談|0\s*円|[0-9０-９,.，．]+\s*万円|[0-9０-９,，]+\s*円)/);
   if (nextLinePrice) return parseYen(nextLinePrice[1]);
@@ -764,16 +1009,63 @@ async function ensureSource(source) {
   return data.id;
 }
 
-async function findExistingProperty(sourceUrl) {
+async function findExistingProperty(property) {
   const { data, error } = await supabase
     .from("properties")
     .select("id,status,published_at")
-    .eq("source_url", sourceUrl)
+    .eq("source_url", property.source_url)
     .limit(1)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return data ?? null;
+  if (data) return data;
+
+  let query = supabase
+    .from("properties")
+    .select("id,status,published_at")
+    .eq("address_display", property.address_display)
+    .eq("price_yen", property.price_yen);
+
+  if (property.land_area_m2 !== null && property.land_area_m2 !== undefined) {
+    query = query.eq("land_area_m2", property.land_area_m2);
+  }
+
+  if (property.building_area_m2 !== null && property.building_area_m2 !== undefined) {
+    query = query.eq("building_area_m2", property.building_area_m2);
+  }
+
+  const { data: duplicates, error: duplicateError } = await query.limit(1);
+  if (duplicateError) throw new Error(duplicateError.message);
+  return duplicates?.[0] ?? null;
+}
+
+async function hasPropertyImportMetadataColumns() {
+  if (propertyImportMetadataColumnsAvailable !== null) return propertyImportMetadataColumnsAvailable;
+
+  const { error } = await supabase
+    .from("properties")
+    .select(IMPORT_METADATA_COLUMNS.join(","))
+    .limit(1);
+
+  propertyImportMetadataColumnsAvailable = !error;
+  if (error) {
+    console.log("WARN import metadata columns not found. Run supabase/property-import-metadata.sql to save extra import fields.");
+  }
+
+  return propertyImportMetadataColumnsAvailable;
+}
+
+function stripUnsupportedImportMetadata(payload, canSaveImportMetadata) {
+  if (canSaveImportMetadata) return payload;
+  const stripped = { ...payload };
+  for (const column of IMPORT_METADATA_COLUMNS) delete stripped[column];
+  return stripped;
+}
+
+function stripRuntimeFields(payload) {
+  const stripped = { ...payload };
+  delete stripped.raw_text;
+  return stripped;
 }
 
 async function fetchHtml(url) {
@@ -852,6 +1144,14 @@ function decodeEntities(value) {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, "\"")
     .replace(/&#39;/g, "'");
+}
+
+function decodeEscapedPath(value) {
+  return decodeURIComponent(
+    value
+      .replace(/\\u002F/g, "/")
+      .replace(/\\\//g, "/")
+  );
 }
 
 function parseNumber(value) {

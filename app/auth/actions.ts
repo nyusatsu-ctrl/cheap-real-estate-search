@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -33,6 +34,17 @@ function getAuthErrorMessage(message: string) {
   }
 
   return message;
+}
+
+async function getAppOrigin() {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  }
+
+  const headersList = await headers();
+  const host = headersList.get("host");
+  const protocol = headersList.get("x-forwarded-proto") ?? "https";
+  return host ? `${protocol}://${host}` : "http://localhost:3000";
 }
 
 export async function signUpMemberAction(formData: FormData) {
@@ -70,6 +82,42 @@ export async function signInMemberAction(formData: FormData) {
   if (error) redirect(`/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
 
   redirect("/dashboard");
+}
+
+export async function sendPasswordResetAction(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/forgot-password?error=Supabase 環境変数が未設定です。");
+
+  const email = requiredString(formData, "email");
+  const origin = await getAppOrigin();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/reset-password`
+  });
+
+  if (error) redirect(`/forgot-password?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+
+  redirect("/forgot-password?message=パスワード再設定メールを送信しました。メール内のリンクを開いてください。");
+}
+
+export async function updatePasswordAction(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/reset-password?error=Supabase 環境変数が未設定です。");
+
+  const password = requiredString(formData, "password");
+  const passwordConfirmation = requiredString(formData, "password_confirmation");
+
+  if (password.length < 8) {
+    redirect("/reset-password?error=パスワードは8文字以上で入力してください。");
+  }
+
+  if (password !== passwordConfirmation) {
+    redirect("/reset-password?error=確認用パスワードが一致しません。");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) redirect(`/reset-password?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+
+  redirect("/admin/login?message=パスワードを変更しました。新しいパスワードでログインしてください。");
 }
 
 export async function signOutMemberAction() {

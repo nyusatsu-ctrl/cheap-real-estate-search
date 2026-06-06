@@ -1,7 +1,8 @@
 import { signInAction } from "@/app/admin/actions";
 import { hasSupabaseEnv } from "@/lib/supabase/server";
+import Link from "next/link";
 
-export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
   const resolvedSearchParams = await searchParams;
   return (
     <div className="mx-auto max-w-md px-4 py-10">
@@ -18,6 +19,11 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
             {resolvedSearchParams.error}
           </p>
         ) : null}
+        {resolvedSearchParams.message ? (
+          <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">
+            {resolvedSearchParams.message}
+          </p>
+        ) : null}
         <form action={signInAction} className="mt-5 grid gap-4">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             メールアドレス
@@ -29,6 +35,11 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
           </label>
           <button className="rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">ログイン</button>
         </form>
+        <p className="mt-4 text-sm text-slate-600">
+          <Link href="/forgot-password" className="font-bold text-brand-700">
+            パスワードを忘れた方
+          </Link>
+        </p>
       </div>
     </div>
   );

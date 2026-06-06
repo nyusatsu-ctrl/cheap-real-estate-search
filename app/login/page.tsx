@@ -24,6 +24,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <button className="rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">ログイン</button>
         </form>
         <p className="mt-4 text-sm text-slate-600">
+          <Link href="/forgot-password" className="font-bold text-brand-700">
+            パスワードを忘れた方
+          </Link>
+        </p>
+        <p className="mt-2 text-sm text-slate-600">
           初めての方は{" "}
           <Link href="/signup" className="font-bold text-brand-700">
             無料トライアル登録

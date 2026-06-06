@@ -34,6 +34,34 @@
     ]
   },
   {
+    "id": "zero-estate",
+    "enabled": true,
+    "kind": "zeroEstateApi",
+    "name": "みんなの0円物件",
+    "websiteUrl": "https://zero.estate",
+    "listUrl": "https://zero.estate/properties",
+    "apiUrl": "https://zeroestate-prod-api-production.up.railway.app/api/trpc/property.list",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "defaultPages": 154
+  },
+  {
+    "id": "akisol-zero",
+    "enabled": true,
+    "name": "アキソル 0円物件",
+    "websiteUrl": "https://akisol.jp",
+    "listUrl": "https://akisol.jp/zero-bukken/properties?status%5B0%5D=receiving",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "detailUrlPattern": "/zero-bukken/properties/[A-Za-z0-9_-]+",
+    "pagination": {
+      "type": "none"
+    },
+    "titleRemovePatterns": [
+      "\\s*\\|\\s*アキソル.*$"
+    ]
+  },
+  {
     "id": "kumamoto",
     "enabled": true,
     "name": "熊本県空き家バンク",

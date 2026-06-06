@@ -11,7 +11,9 @@
     "import:properties": "node scripts/import-properties.mjs",
     "import:nationwide": "node scripts/import-properties.mjs --source=all",
     "import:athome": "node scripts/import-properties.mjs --source=athome-akiyabank",
-    "import:kumamoto": "node scripts/import-properties.mjs --source=kumamoto"
+    "import:kumamoto": "node scripts/import-properties.mjs --source=kumamoto",
+    "import:zero-estate": "node scripts/import-properties.mjs --source=zero-estate",
+    "import:akisol": "node scripts/import-properties.mjs --source=akisol-zero"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

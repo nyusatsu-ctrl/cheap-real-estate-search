@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_MAX_PRICE = 30000000;
 const DEFAULT_PAGES = 3;
-const DEFAULT_LIMIT = 1000;
+const DEFAULT_LIMIT = 5000;
 const SOURCE_FILE = "data/property-import-sources.json";
 const PREFECTURE_CODES = [
   ["01", "北海道"],
@@ -138,6 +138,8 @@ async function importSource(source) {
   const collected =
     source.kind === "athomePrefectureBuy"
       ? await collectAthomeProperties(source, getSourcePages(source))
+      : source.kind === "zeroEstateApi"
+        ? await collectZeroEstateProperties(source, getSourcePages(source))
       : source.kind === "lifullTownIndex"
         ? await collectLifullProperties(source, getSourcePages(source))
         : await collectDetailProperties(source, getSourcePages(source));
@@ -297,6 +299,86 @@ async function collectAthomeProperties(source, pages) {
   }
 
   return result;
+}
+
+async function collectZeroEstateProperties(source, pages) {
+  const result = {
+    found: 0,
+    properties: [],
+    skipped: 0,
+    failed: 0
+  };
+
+  for (let page = 1; page <= pages; page += 1) {
+    try {
+      const data = await fetchZeroEstatePage(source, page);
+      const items = data.items ?? [];
+      result.found += items.length;
+
+      for (const item of items) {
+        if (item.isSuspended || !String(item.publicStatus ?? item.status ?? "").includes("募集中")) {
+          result.skipped += 1;
+          continue;
+        }
+
+        const property = parseZeroEstateProperty(item);
+        if (shouldSkipProperty(property, property.source_url, result)) continue;
+        result.properties.push(property);
+      }
+
+      if (!data.totalPages || page >= data.totalPages || items.length === 0) break;
+    } catch (error) {
+      result.failed += 1;
+      console.log(`FAIL zero estate page: ${page} (${error.message})`);
+      if (page === 1) throw error;
+      break;
+    }
+  }
+
+  return result;
+}
+
+async function fetchZeroEstatePage(source, page) {
+  const input = encodeURIComponent(JSON.stringify({ 0: { json: { page } } }));
+  const url = `${source.apiUrl}?batch=1&input=${input}`;
+  const response = await fetch(url, {
+    headers: {
+      "accept": "application/json",
+      "accept-language": "ja,en-US;q=0.9,en;q=0.8",
+      "user-agent": "Mozilla/5.0 (compatible; cheap-real-estate-search/0.1; +https://cheap-real-estate-search.vercel.app)"
+    }
+  });
+
+  if (!response.ok) throw new Error(`Fetch failed ${response.status}: ${url}`);
+
+  const payload = await response.json();
+  const data = payload?.[0]?.result?.data?.json;
+  if (!data || !Array.isArray(data.items)) throw new Error("Invalid zero estate response");
+  return data;
+}
+
+function parseZeroEstateProperty(item) {
+  const address = cleanupText(item.address ?? `${item.prefecture ?? ""}${item.city ?? ""}`) || "所在地未確認";
+  const prefecture = item.prefecture ?? extractPrefecture(address) ?? "都道府県未確認";
+  const city = item.city ?? extractCity({ prefecture, cityFallback: "市町村未確認" }, address);
+  const title = cleanupText(item.title ?? `${prefecture}${city}の0円物件`).slice(0, 90);
+  const landArea = extractArea(title, ["土地面積", "土地", "敷地面積", "宅地面積"]) ?? extractFirstArea(title);
+  const buildingArea = /家|戸建|建物|住宅|マンション/.test(`${item.propertyType ?? ""}${title}`) ? extractFirstArea(title) : null;
+
+  return {
+    title,
+    property_type: inferPropertyType(`${item.propertyType ?? ""}\n${title}`, landArea, buildingArea),
+    price_yen: 0,
+    prefecture,
+    city,
+    address_display: address,
+    land_area_m2: landArea,
+    building_area_m2: buildingArea,
+    construction_year: item.builtYear ? Number.parseInt(String(item.builtYear), 10) || null : null,
+    latitude: item.approximateLatitude ? Number.parseFloat(item.approximateLatitude) : null,
+    longitude: item.approximateLongitude ? Number.parseFloat(item.approximateLongitude) : null,
+    source_url: `https://zero.estate/properties/${item.id}`
+  };
 }
 
 function buildAthomePrefectureUrl(source, code, page) {
@@ -513,7 +595,8 @@ function parseProperty(source, html, sourceUrl) {
   const title = extractTitle(source, html, text);
   const priceYen = extractPriceYen(html, text);
   const address = extractAddress(source, text);
-  const city = extractCity(source, address);
+  const prefecture = source.prefecture === "全国" ? extractPrefecture(address) ?? extractPrefecture(text) ?? "都道府県未確認" : source.prefecture;
+  const city = extractCity({ ...source, prefecture }, address);
   const landArea = extractArea(text, ["土地面積", "土地", "敷地面積", "宅地面積"]);
   const buildingArea = extractArea(text, ["建物面積", "延床面積", "延べ床面積", "建物"]);
 
@@ -521,7 +604,7 @@ function parseProperty(source, html, sourceUrl) {
     title,
     property_type: inferPropertyType(`${title}\n${text}`, landArea, buildingArea),
     price_yen: priceYen,
-    prefecture: source.prefecture,
+    prefecture,
     city,
     address_display: address,
     land_area_m2: landArea,
@@ -558,7 +641,7 @@ function extractTitle(source, html, text) {
   const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
-  let value = cleanupText(ogTitle ?? h1 ?? title ?? text.split("\n").find(Boolean) ?? `${source.prefecture}の格安物件`);
+  let value = cleanupText(h1 ?? title ?? ogTitle ?? text.split("\n").find(Boolean) ?? `${source.prefecture}の格安物件`);
 
   for (const pattern of source.titleRemovePatterns ?? []) {
     value = value.replace(new RegExp(pattern), "");
@@ -594,11 +677,18 @@ function parseYen(value) {
 }
 
 function extractAddress(source, text) {
+  const labelAddress = findValueAfterLabel(text, ["所在地", "住所", "所在", "所在地番"]);
+  if (source.prefecture === "全国") {
+    const fromLabel = labelAddress && extractPrefecture(labelAddress) ? labelAddress : null;
+    const fromText = text.match(/(北海道|青森県|岩手県|宮城県|秋田県|山形県|福島県|東京都|神奈川県|埼玉県|千葉県|茨城県|栃木県|群馬県|新潟県|富山県|石川県|福井県|山梨県|長野県|愛知県|岐阜県|静岡県|三重県|大阪府|兵庫県|京都府|滋賀県|奈良県|和歌山県|鳥取県|島根県|岡山県|広島県|山口県|徳島県|香川県|愛媛県|高知県|福岡県|佐賀県|長崎県|熊本県|大分県|宮崎県|鹿児島県|沖縄県)[^\n]+/)?.[0];
+    return cleanupText(fromLabel ?? fromText ?? "所在地未確認").slice(0, 120);
+  }
+
   const tableAddress = text.match(new RegExp(`所在地\\s*${source.prefecture}\\s*([\\s\\S]{1,100}?)(?:建物構造|建物面積|土地面積|敷地面積|価格|築年月|間取り)`))?.[1];
   if (tableAddress) return cleanupText(`${source.prefecture} ${tableAddress}`).slice(0, 120);
 
   const locationLine = findLine(text, ["所在地", "住所", "所在", "所在地番"]);
-  const fromLocation = locationLine?.match(new RegExp(`${source.prefecture}[^\\n]+`))?.[0];
+  const fromLocation = locationLine?.match(new RegExp(`${source.prefecture}[^\\n]+`))?.[0] ?? (labelAddress?.startsWith(source.prefecture) ? labelAddress : null);
   const fromText = text.match(new RegExp(`${source.prefecture}[^\\n]+`))?.[0];
   const fallback = `${source.prefecture}${source.cityFallback ?? ""} 所在地未確認`;
   return cleanupText(fromLocation ?? fromText ?? fallback).slice(0, 120);
@@ -623,6 +713,11 @@ function extractArea(text, labels) {
   }
 
   return null;
+}
+
+function extractFirstArea(text) {
+  const area = text.match(/([0-9０-９,.，．]+)\s*(?:㎡|m2|m²|平方メートル)/i)?.[1];
+  return area ? parseNumber(area) : null;
 }
 
 function extractConstructionYear(text) {
@@ -726,6 +821,21 @@ function getSourcePages(source) {
 
 function findLine(text, labels) {
   return text.split("\n").find((line) => labels.some((label) => line.includes(label)));
+}
+
+function findValueAfterLabel(text, labels) {
+  const lines = text.split("\n").map(cleanupText).filter(Boolean);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const label = labels.find((candidate) => line === candidate || line.startsWith(candidate));
+    if (!label) continue;
+
+    const inline = cleanupText(line.replace(label, ""));
+    if (inline) return inline;
+    if (lines[index + 1]) return lines[index + 1];
+  }
+
+  return null;
 }
 
 function cleanupText(value) {

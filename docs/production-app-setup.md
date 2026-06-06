@@ -46,7 +46,7 @@ STRIPE_WEBHOOK_SECRET=
 - `/signup`: 14日間無料トライアル登録
 - `/login`: 会員ログイン
 - `/dashboard`: 会員ダッシュボード
-- `/billing`: Stripe Checkout
+- `/billing`: 有料プラン申込用の Stripe Checkout
 - `/properties`: 物件一覧
 - `/estimate`: お客様の見積もり依頼
 - `/partners/register`: 業者登録申請
@@ -57,7 +57,7 @@ STRIPE_WEBHOOK_SECRET=
 ## 現在の実装状態
 
 - Supabase 接続時は会員登録、ログイン、見積依頼、業者登録、業者見積をDB保存
-- Stripe 環境変数設定時は Checkout セッション作成
+- Stripe 環境変数設定時は有料プラン申込用の Checkout セッション作成
 - Stripe Webhook で契約状態を `profiles` に反映
 - Supabase/Stripe 未設定時はローカルプレビュー用のデモ表示
 

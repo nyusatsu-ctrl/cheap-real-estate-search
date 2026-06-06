@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
       await supabase.from("profiles").update({
         stripe_customer_id: typeof session.customer === "string" ? session.customer : null,
         stripe_subscription_id: typeof session.subscription === "string" ? session.subscription : null,
-        subscription_status: "trialing"
+        subscription_status: "active",
+        trial_ends_at: null
       }).eq("id", userId);
     }
   }

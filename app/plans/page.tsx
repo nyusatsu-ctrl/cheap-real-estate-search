@@ -4,7 +4,7 @@ import { Bell, Bookmark, Check, Database, Search, ShieldCheck } from "lucide-rea
 const features = [
   "公開中物件の一覧閲覧",
   "都道府県、価格、物件種別で検索",
-  "0円、100万円以下、300万円以下の絞り込み",
+  "0円物件、300万円以下の絞り込み",
   "物件詳細と元ページURLの確認",
   "保存リスト",
   "詳細条件検索",
@@ -21,13 +21,13 @@ export default function PlansPage() {
           <div>
             <p className="inline-flex items-center gap-2 rounded bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700">
               <ShieldCheck className="h-4 w-4" />
-              14日間無料、その後は月額2,980円
+              14日間無料、その後は手動で有料登録
             </p>
             <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight text-slate-950 md:text-5xl">
               まずは全機能を試してから、継続利用へ。
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
-              格安不動産探しは、実際に検索、保存、比較してみないと価値が分かりにくいサービスです。無料期間中は全機能を開放し、15日目から月額2,980円の有料プランに自動移行する設計にします。
+              格安不動産探しは、実際に検索、保存、比較してみないと価値が分かりにくいサービスです。無料期間中は全機能を開放し、15日目以降は必要な人だけ月額2,980円の有料プランに申し込む設計にします。
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link href="/signup" className="inline-flex items-center justify-center rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
@@ -47,10 +47,10 @@ export default function PlansPage() {
               <p className="pb-1 text-sm font-semibold text-slate-500">税込想定</p>
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              登録から14日間は0円。無料期間終了後、解約していなければ自動的に月額2,980円の有料プランへ移行します。
+              登録から14日間は0円。無料期間終了後は自動課金されず、継続利用する場合だけ有料プランへ申し込みます。
             </p>
             <div className="mt-5 rounded border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-              課金開始日、月額料金、解約方法は登録前に明記します。課金開始前の通知と、いつでも解約できる導線を用意する前提です。
+              無料登録時にカード情報は不要です。有料プランに申し込む画面で、月額料金、解約方法、返金条件を明記します。
             </div>
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function PlansPage() {
               <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">無料期間終了後</dt>
                 <dd className="mt-1 text-2xl font-black text-brand-700">月額2,980円</dd>
-                <p className="mt-2 text-sm leading-6 text-slate-700">15日目から自動移行。終了前に通知を送る想定。</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">15日目以降は利用を停止し、継続する人だけ有料登録。</p>
               </div>
               <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">プラン数</dt>

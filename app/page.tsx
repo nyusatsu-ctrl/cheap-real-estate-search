@@ -63,7 +63,7 @@ export default async function HomePage() {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black text-slate-950">14日間無料で全機能を体験</h2>
-              <p className="mt-1 text-sm text-slate-600">無料期間後は月額2,980円。物件検索、見積もり相談、業者見積管理までつなげます。</p>
+              <p className="mt-1 text-sm text-slate-600">無料期間後は自動課金されません。継続する場合だけ月額2,980円の有料プランに申し込みます。</p>
             </div>
             <Link href="/plans" className="text-sm font-bold text-brand-700">
               プランを見る

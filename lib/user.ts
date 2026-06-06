@@ -7,16 +7,24 @@ export type CurrentMember = {
   role: string;
   subscriptionStatus: string;
   trialEndsAt: string | null;
+  isTrialExpired: boolean;
 };
+
+export function isTrialExpired(subscriptionStatus: string, trialEndsAt: string | null) {
+  if (subscriptionStatus !== "trialing" || !trialEndsAt) return false;
+  return new Date(trialEndsAt).getTime() <= Date.now();
+}
 
 export async function getCurrentMember(): Promise<CurrentMember | null> {
   if (!hasSupabaseEnv()) {
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     return {
       id: "demo-user",
       email: "demo@example.com",
       role: "viewer",
       subscriptionStatus: "trialing",
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      trialEndsAt,
+      isTrialExpired: false
     };
   }
 
@@ -35,17 +43,27 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
     .eq("id", user.id)
     .single();
 
+  const subscriptionStatus = profile?.subscription_status ?? "trialing";
+  const trialEndsAt = profile?.trial_ends_at ?? null;
+
   return {
     id: user.id,
     email: profile?.email ?? user.email ?? "",
     role: profile?.role ?? "viewer",
-    subscriptionStatus: profile?.subscription_status ?? "trialing",
-    trialEndsAt: profile?.trial_ends_at ?? null
+    subscriptionStatus,
+    trialEndsAt,
+    isTrialExpired: isTrialExpired(subscriptionStatus, trialEndsAt)
   };
 }
 
 export async function requireMember() {
   const member = await getCurrentMember();
   if (!member) redirect("/login");
+  return member;
+}
+
+export async function requireActiveMember() {
+  const member = await requireMember();
+  if (member.isTrialExpired) redirect("/billing?trial=expired");
   return member;
 }

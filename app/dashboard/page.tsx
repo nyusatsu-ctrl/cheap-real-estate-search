@@ -3,10 +3,10 @@ import { Bell, Bookmark, Calculator, CreditCard, LogOut, Search } from "lucide-r
 import { signOutMemberAction } from "@/app/auth/actions";
 import { formatDate } from "@/lib/format";
 import { getPublishedProperties } from "@/lib/properties";
-import { requireMember } from "@/lib/user";
+import { requireActiveMember } from "@/lib/user";
 
 export default async function DashboardPage() {
-  const member = await requireMember();
+  const member = await requireActiveMember();
   const properties = await getPublishedProperties({ maxPrice: 3000000 });
   const zeroYenCount = properties.filter((property) => property.price_yen === 0).length;
 
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm font-bold text-slate-500">月額プラン</p>
           <p className="mt-2 text-2xl font-black text-brand-700">2,980円</p>
-          <p className="mt-2 text-sm text-slate-700">14日間無料、その後自動移行</p>
+          <p className="mt-2 text-sm text-slate-700">無料期間後は手動で有料登録</p>
         </div>
       </section>
 

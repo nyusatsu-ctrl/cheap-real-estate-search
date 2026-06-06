@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createStripeClient, hasStripeEnv, TRIAL_DAYS } from "@/lib/billing/stripe";
+import { createStripeClient, hasStripeEnv } from "@/lib/billing/stripe";
 
 export async function startCheckoutAction() {
   if (!hasStripeEnv()) redirect("/billing?demo=1");
@@ -24,7 +24,6 @@ export async function startCheckoutAction() {
     customer_email: user.email,
     line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
     subscription_data: {
-      trial_period_days: TRIAL_DAYS,
       metadata: { user_id: user.id }
     },
     metadata: { user_id: user.id },

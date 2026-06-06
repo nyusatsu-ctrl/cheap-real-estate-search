@@ -4,7 +4,7 @@ import { startCheckoutAction } from "@/app/billing/actions";
 import { hasStripeEnv, MONTHLY_PRICE_YEN, TRIAL_DAYS } from "@/lib/billing/stripe";
 import { requireMember } from "@/lib/user";
 
-export default async function BillingPage({ searchParams }: { searchParams: Promise<{ demo?: string; checkout?: string; error?: string }> }) {
+export default async function BillingPage({ searchParams }: { searchParams: Promise<{ demo?: string; checkout?: string; error?: string; trial?: string }> }) {
   const params = await searchParams;
   const member = await requireMember();
   const stripeReady = hasStripeEnv();
@@ -19,7 +19,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <CreditCard className="h-4 w-4" />
           課金設定
         </p>
-        <h1 className="mt-4 text-2xl font-black text-slate-950">14日間無料、その後月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円</h1>
+        <h1 className="mt-4 text-2xl font-black text-slate-950">月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円の有料プランに申し込む</h1>
         <p className="mt-3 text-sm leading-6 text-slate-700">
           会員: {member.email} / 状態: {member.subscriptionStatus}
         </p>
@@ -35,10 +35,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         {params.error ? (
           <div className="mt-5 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">決済セッションを作成できませんでした。</div>
         ) : null}
+        {params.trial === "expired" ? (
+          <div className="mt-5 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900">
+            14日間の無料期間が終了しました。継続して使う場合だけ、有料プランに申し込んでください。
+          </div>
+        ) : null}
 
         <dl className="mt-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded border border-slate-200 p-3">
-            <dt className="text-xs font-bold text-slate-500">無料期間</dt>
+            <dt className="text-xs font-bold text-slate-500">無料登録</dt>
             <dd className="mt-1 text-2xl font-black text-slate-950">{TRIAL_DAYS}日</dd>
           </div>
           <div className="rounded border border-slate-200 p-3">
@@ -53,13 +58,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
         <form action={startCheckoutAction} className="mt-6">
           <button className="w-full rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
-            Stripeで無料トライアルを開始
+            有料プランに申し込む
           </button>
         </form>
 
         <div className="mt-5 rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
           <ShieldCheck className="mr-1 inline h-4 w-4 text-brand-700" />
-          課金開始日、解約方法、返金条件は登録前に明記します。課金開始前の通知導線も本番実装で追加します。
+          無料登録だけでは自動課金されません。この画面で有料プランに申し込んだ場合のみ、Stripeで月額課金が始まります。
         </div>
       </div>
     </div>

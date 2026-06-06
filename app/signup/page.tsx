@@ -9,7 +9,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-2xl font-black text-slate-950">無料トライアル登録</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          14日間は0円。期間終了後は月額2,980円に自動移行する設計です。決済の本稼働には Stripe 設定が必要です。
+          14日間は0円。期間終了後は自動課金されず、継続する場合だけ有料プランに申し込みます。
         </p>
         {params.error ? (
           <p className="mt-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{params.error}</p>

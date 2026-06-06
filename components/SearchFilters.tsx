@@ -18,11 +18,7 @@ export function SearchFilters({ prefecture, minPrice, maxPrice, propertyType }: 
 
   const priceButtons = [
     { label: "0円物件", minPrice: "", maxPrice: "0" },
-    { label: "100万円以下", minPrice: "", maxPrice: "1000000" },
-    { label: "300万円以下", minPrice: "", maxPrice: "3000000" },
-    { label: "500万円以下", minPrice: "", maxPrice: "5000000" },
-    { label: "1000万円以下", minPrice: "", maxPrice: "10000000" },
-    { label: "1000万円以上3000万円以下", minPrice: "10000000", maxPrice: "30000000" }
+    { label: "300万円以下", minPrice: "", maxPrice: "3000000" }
   ];
 
   return (

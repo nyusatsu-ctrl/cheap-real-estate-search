@@ -1,0 +1,71 @@
+[
+  {
+    "id": "athome-akiyabank",
+    "enabled": true,
+    "kind": "athomePrefectureBuy",
+    "name": "アットホーム 空き家バンク",
+    "websiteUrl": "https://www.akiya-athome.jp",
+    "listUrl": "https://www.akiya-athome.jp/buy/",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "defaultPages": 1,
+    "itemCount": 100,
+    "titleRemovePatterns": [
+      "\\s*【アットホーム 空き家バンク】.*$"
+    ]
+  },
+  {
+    "id": "lifull-akiyabank",
+    "enabled": false,
+    "kind": "lifullTownIndex",
+    "name": "LIFULL HOME'S 空き家バンク",
+    "websiteUrl": "https://www.homes.co.jp",
+    "listUrl": "https://www.homes.co.jp/akiyabank/towns/",
+    "prefecture": "全国",
+    "cityFallback": "市町村未確認",
+    "pagination": {
+      "type": "query",
+      "param": "page"
+    },
+    "defaultPages": 27,
+    "titleRemovePatterns": [
+      "\\s*【ホームズ】.*$",
+      "\\s*〖ホームズ〗.*$"
+    ]
+  },
+  {
+    "id": "kumamoto",
+    "enabled": true,
+    "name": "熊本県空き家バンク",
+    "websiteUrl": "https://kumamoto-akiya360.jp",
+    "listUrl": "https://kumamoto-akiya360.jp/sale/",
+    "prefecture": "熊本県",
+    "cityFallback": "市町村未確認",
+    "detailUrlPattern": "/property/p[0-9]+/",
+    "pagination": {
+      "type": "path",
+      "pathTemplate": "page/{page}/"
+    },
+    "titleRemovePatterns": [
+      "^熊本県空き家バンクプラットフォーム\\s*[|｜]\\s*物件詳細\\s*[|｜]\\s*",
+      "\\s*[\\-|｜]\\s*熊本県空き家バンク.*$"
+    ]
+  },
+  {
+    "id": "rumoi",
+    "enabled": true,
+    "name": "留萌市空き家情報バンク",
+    "websiteUrl": "https://www.e-rumoi.jp/rumoilife/estate/",
+    "listUrl": "https://www.e-rumoi.jp/rumoilife/estate/",
+    "prefecture": "北海道",
+    "cityFallback": "留萌市",
+    "detailUrlPattern": "/rumoilife/estate/id_[0-9]+/",
+    "pagination": {
+      "type": "none"
+    },
+    "titleRemovePatterns": [
+      "\\s*｜\\s*留萌市.*$",
+      "\\s*-\\s*留萌市.*$"
+    ]
+  }
+]

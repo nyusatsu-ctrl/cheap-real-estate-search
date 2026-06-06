@@ -48,6 +48,7 @@ export type Property = {
 
 export type PropertyFilters = {
   prefecture?: string;
+  minPrice?: number;
   maxPrice?: number;
   propertyType?: PropertyType;
 };

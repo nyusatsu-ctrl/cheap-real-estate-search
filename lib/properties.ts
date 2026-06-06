@@ -16,6 +16,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
     .order("published_at", { ascending: false });
 
   if (filters.prefecture) query = query.eq("prefecture", filters.prefecture);
+  if (filters.minPrice !== undefined) query = query.gte("price_yen", filters.minPrice);
   if (filters.maxPrice !== undefined) query = query.lte("price_yen", filters.maxPrice);
   if (filters.propertyType) query = query.eq("property_type", filters.propertyType);
 
@@ -73,6 +74,7 @@ export async function getAdminProperty(id: string) {
 function filterProperties(properties: Property[], filters: PropertyFilters) {
   return properties.filter((property) => {
     if (filters.prefecture && property.prefecture !== filters.prefecture) return false;
+    if (filters.minPrice !== undefined && property.price_yen < filters.minPrice) return false;
     if (filters.maxPrice !== undefined && property.price_yen > filters.maxPrice) return false;
     if (filters.propertyType && property.property_type !== filters.propertyType) return false;
     return true;

@@ -5,15 +5,18 @@ import type { PropertyType } from "@/lib/types";
 
 type SearchParams = {
   prefecture?: string;
+  minPrice?: string;
   maxPrice?: string;
   propertyType?: string;
 };
 
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const resolvedSearchParams = await searchParams;
+  const minPrice = resolvedSearchParams.minPrice ? Number(resolvedSearchParams.minPrice) : undefined;
   const maxPrice = resolvedSearchParams.maxPrice ? Number(resolvedSearchParams.maxPrice) : undefined;
   const properties = await getPublishedProperties({
     prefecture: resolvedSearchParams.prefecture || undefined,
+    minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
     maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
     propertyType: (resolvedSearchParams.propertyType || undefined) as PropertyType | undefined
   });

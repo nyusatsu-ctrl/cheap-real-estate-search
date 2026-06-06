@@ -1,0 +1,31 @@
+name: Daily property import
+
+on:
+  schedule:
+    # 06:00 JST every day. GitHub Actions cron uses UTC.
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+jobs:
+  import-properties:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import nationwide properties
+        run: npm run import:nationwide -- --max-price=30000000 --commit
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

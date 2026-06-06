@@ -24,7 +24,7 @@ create table if not exists public.properties (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   property_type text not null check (property_type in ('land', 'old_house_land', 'detached_house', 'warehouse', 'store', 'other')),
-  price_yen integer not null check (price_yen >= 0 and price_yen <= 3000000),
+  price_yen integer not null check (price_yen >= 0 and price_yen <= 30000000),
   prefecture text not null,
   city text not null,
   address_display text not null,
@@ -366,6 +366,17 @@ grant select, insert, update, delete on public.estimate_requests to authenticate
 grant select, insert, update, delete on public.contractor_applications to authenticated;
 grant select, insert, update, delete on public.estimate_quotes to authenticated;
 grant select, insert, delete on public.saved_properties to authenticated;
+
+grant usage on schema public to service_role;
+grant all on public.profiles to service_role;
+grant all on public.property_sources to service_role;
+grant all on public.properties to service_role;
+grant all on public.property_images to service_role;
+grant all on public.admin_notes to service_role;
+grant all on public.estimate_requests to service_role;
+grant all on public.contractor_applications to service_role;
+grant all on public.estimate_quotes to service_role;
+grant all on public.saved_properties to service_role;
 
 grant insert on public.estimate_requests to anon;
 grant insert on public.contractor_applications to anon;

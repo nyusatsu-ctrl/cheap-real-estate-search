@@ -4,6 +4,7 @@ import { ArrowLeft, Calculator, ExternalLink, MapPin } from "lucide-react";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatArea, formatDate, formatPrice } from "@/lib/format";
 import { getPublishedProperty } from "@/lib/properties";
+import { ViewedPropertyTracker } from "@/components/ViewedPropertyTracker";
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,6 +13,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
+      <ViewedPropertyTracker propertyId={property.id} />
       <Link href="/properties" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-brand-700">
         <ArrowLeft className="h-4 w-4" />
         一覧に戻る

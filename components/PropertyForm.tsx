@@ -9,7 +9,7 @@ export function PropertyForm({ property }: { property?: Property | null }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="タイトル" name="title" defaultValue={property?.title} required className="md:col-span-2" />
         <Select label="物件種別" name="property_type" defaultValue={property?.property_type} options={PROPERTY_TYPE_LABELS} />
-        <Field label="価格（円）" name="price_yen" type="number" min={0} max={3000000} defaultValue={property?.price_yen ?? 0} required />
+        <Field label="価格（円）" name="price_yen" type="number" min={0} max={30000000} defaultValue={property?.price_yen ?? 0} required />
         <Select label="都道府県" name="prefecture" defaultValue={property?.prefecture} options={Object.fromEntries(PREFECTURES.map((name) => [name, name]))} />
         <Field label="市区町村" name="city" defaultValue={property?.city} required />
         <Field label="表示住所" name="address_display" defaultValue={property?.address_display} required className="md:col-span-2" />

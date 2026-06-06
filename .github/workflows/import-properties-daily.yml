@@ -25,7 +25,7 @@ jobs:
         run: npm ci
 
       - name: Import nationwide properties
-        run: npm run import:nationwide -- --max-price=30000000 --commit
+        run: npm run import:nationwide -- --max-price=3000000 --commit
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

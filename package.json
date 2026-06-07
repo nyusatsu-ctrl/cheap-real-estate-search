@@ -17,7 +17,17 @@
     "import:zenkoku-zero": "node scripts/import-properties.mjs --source=zenkoku-zero-fudosan",
     "import:ieichiba": "node scripts/import-properties.mjs --source=ieichiba",
     "import:furusato-net": "node scripts/import-properties.mjs --source=furusato-net",
-    "import:yamaichiba": "node scripts/import-properties.mjs --source=yamaichiba"
+    "import:yamaichiba": "node scripts/import-properties.mjs --source=yamaichiba",
+    "crawl:tenders": "node scripts/crawl-tenders.mjs",
+    "crawl:tenders:local": "node scripts/crawl-tenders.mjs --no-db",
+    "crawl:tenders:portal": "node scripts/crawl-tenders.mjs --no-db --all-portal --limit=10000",
+    "discover:defense": "node scripts/defense-crawler.mjs discover --group=all",
+    "crawl:defense": "node scripts/defense-crawler.mjs crawl --group=all",
+    "crawl:gsdf": "node scripts/defense-crawler.mjs crawl --group=gsdf",
+    "crawl:msdf": "node scripts/defense-crawler.mjs crawl --group=msdf",
+    "crawl:asdf": "node scripts/defense-crawler.mjs crawl --group=asdf",
+    "crawl:defense-bureaus": "node scripts/defense-crawler.mjs crawl --group=defense-bureaus",
+    "normalize:defense-tenders": "node scripts/normalize-defense-tenders.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

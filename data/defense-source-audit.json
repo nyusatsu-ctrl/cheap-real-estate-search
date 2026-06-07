@@ -1,0 +1,777 @@
+{
+  "generated_at": "2026-06-07T13:54:44.545Z",
+  "source_count": 96,
+  "candidate_count": 1235,
+  "error_count": 67,
+  "success_zero_count": 11,
+  "sources": [
+    {
+      "organization_name": "美保基地",
+      "url": "https://www.mod.go.jp/asdf/miho/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/miho/"
+    },
+    {
+      "organization_name": "防府北基地",
+      "url": "https://www.mod.go.jp/asdf/hofukita/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/hofukita/"
+    },
+    {
+      "organization_name": "防府南基地",
+      "url": "https://www.mod.go.jp/asdf/hofuminami/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/hofuminami/"
+    },
+    {
+      "organization_name": "小松基地",
+      "url": "https://www.mod.go.jp/asdf/komatsu/6/third/62.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/komatsu/6/third/62.html"
+    },
+    {
+      "organization_name": "小牧基地",
+      "url": "https://www.mod.go.jp/asdf/komaki/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/komaki/"
+    },
+    {
+      "organization_name": "岐阜基地",
+      "url": "https://www.mod.go.jp/asdf/gifu/acd/sub1.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/gifu/acd/sub1.html"
+    },
+    {
+      "organization_name": "新潟分屯基地",
+      "url": "https://www.mod.go.jp/asdf/niigata/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/niigata/"
+    },
+    {
+      "organization_name": "浜松基地",
+      "url": "https://www.mod.go.jp/asdf/hamamatsu/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/hamamatsu/"
+    },
+    {
+      "organization_name": "静浜基地",
+      "url": "https://www.mod.go.jp/asdf/shizuhama/choutatsu/choutatsu.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/shizuhama/choutatsu/choutatsu.html"
+    },
+    {
+      "organization_name": "新田原基地",
+      "url": "https://www.mod.go.jp/asdf/nyutabaru/08cyoutatsu/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/nyutabaru/08cyoutatsu/"
+    },
+    {
+      "organization_name": "新田原基地 公共調達の適正化",
+      "url": "https://www.mod.go.jp/asdf/nyutabaru/08cyoutatsu/tekiseika.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/nyutabaru/08cyoutatsu/tekiseika.html"
+    },
+    {
+      "organization_name": "春日基地",
+      "url": "https://www.mod.go.jp/asdf/kasuga/second/bosyu.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/kasuga/second/bosyu.html"
+    },
+    {
+      "organization_name": "築城基地",
+      "url": "https://www.mod.go.jp/asdf/tsuiki/choutatsu.html",
+      "fetch_success": true,
+      "fetched_count": 9,
+      "latest_fetched_at": "2026-06-07T13:53:48.004Z",
+      "error": null
+    },
+    {
+      "organization_name": "築城基地 入札情報",
+      "url": "https://www.mod.go.jp/asdf/tsuiki/choutatsu/nyuusatujyouhou/nyuusatsujyouhou.html",
+      "fetch_success": true,
+      "fetched_count": 14,
+      "latest_fetched_at": "2026-06-07T13:53:48.003Z",
+      "error": null
+    },
+    {
+      "organization_name": "芦屋基地",
+      "url": "https://www.mod.go.jp/asdf/ashiya/choutatsu/index.html",
+      "fetch_success": true,
+      "fetched_count": 17,
+      "latest_fetched_at": "2026-06-07T13:53:47.999Z",
+      "error": null
+    },
+    {
+      "organization_name": "航空自衛隊 調達情報",
+      "url": "https://www.mod.go.jp/asdf/choutatsu/index.html",
+      "fetch_success": true,
+      "fetched_count": 1,
+      "latest_fetched_at": "2026-06-07T13:53:48.010Z",
+      "error": null
+    },
+    {
+      "organization_name": "千歳基地",
+      "url": "https://www.mod.go.jp/asdf/chitose/acs/",
+      "fetch_success": true,
+      "fetched_count": 2,
+      "latest_fetched_at": "2026-06-07T13:53:48.014Z",
+      "error": null
+    },
+    {
+      "organization_name": "三沢基地",
+      "url": "https://www.mod.go.jp/asdf/misawa/offer/public_offering/public_offering.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/misawa/offer/public_offering/public_offering.html"
+    },
+    {
+      "organization_name": "三沢基地 オープンカウンター",
+      "url": "https://www.mod.go.jp/asdf/misawa/offer/public_offering/opencounter.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/misawa/offer/public_offering/opencounter.html"
+    },
+    {
+      "organization_name": "松島基地",
+      "url": "https://www.mod.go.jp/asdf/matsushima/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/matsushima/"
+    },
+    {
+      "organization_name": "秋田分屯基地",
+      "url": "https://www.mod.go.jp/asdf/akita/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/akita/"
+    },
+    {
+      "organization_name": "宮古島分屯基地 調達情報",
+      "url": "https://www.mod.go.jp/asdf/miyako/tyoutatu/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/miyako/tyoutatu/index.html"
+    },
+    {
+      "organization_name": "那覇基地",
+      "url": "https://www.mod.go.jp/asdf/naha/acs/custom1.html",
+      "fetch_success": true,
+      "fetched_count": 11,
+      "latest_fetched_at": "2026-06-07T13:53:48.302Z",
+      "error": null
+    },
+    {
+      "organization_name": "奈良基地",
+      "url": "https://www.mod.go.jp/asdf/nara/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/nara/"
+    },
+    {
+      "organization_name": "入間基地",
+      "url": "https://www.mod.go.jp/asdf/iruma/bosyu/raising/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/iruma/bosyu/raising/index.html"
+    },
+    {
+      "organization_name": "十条基地",
+      "url": "https://www.mod.go.jp/asdf/jujo/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/jujo/"
+    },
+    {
+      "organization_name": "市ヶ谷基地",
+      "url": "https://www.mod.go.jp/asdf/ichigaya/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/ichigaya/"
+    },
+    {
+      "organization_name": "府中基地",
+      "url": "https://www.mod.go.jp/asdf/fuchu/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/fuchu/"
+    },
+    {
+      "organization_name": "木更津分屯基地",
+      "url": "https://www.mod.go.jp/asdf/kisarazu/acs/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/kisarazu/acs/index.html"
+    },
+    {
+      "organization_name": "横田基地",
+      "url": "https://www.mod.go.jp/asdf/yokota/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/yokota/"
+    },
+    {
+      "organization_name": "熊谷基地",
+      "url": "https://www.mod.go.jp/asdf/kumagaya/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/kumagaya/"
+    },
+    {
+      "organization_name": "百里基地",
+      "url": "https://www.mod.go.jp/asdf/hyakuri/acs/2-7_procurement/2-7_procurement.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/hyakuri/acs/2-7_procurement/2-7_procurement.html"
+    },
+    {
+      "organization_name": "目黒基地",
+      "url": "https://www.mod.go.jp/asdf/meguro/choutatsu/choutatsu.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/asdf/meguro/choutatsu/choutatsu.html"
+    },
+    {
+      "organization_name": "航空自衛隊第3補給処 調達部",
+      "url": "https://www.mod.go.jp/asdf/3dep/prd/menu/menu1.html",
+      "fetch_success": true,
+      "fetched_count": 3,
+      "latest_fetched_at": "2026-06-07T13:53:48.691Z",
+      "error": null
+    },
+    {
+      "organization_name": "航空自衛隊補給本部 入札情報等",
+      "url": "https://www.mod.go.jp/asdf/amc/choutatsu/nyuusatsu/index.html",
+      "fetch_success": true,
+      "fetched_count": 4,
+      "latest_fetched_at": "2026-06-07T13:53:48.705Z",
+      "error": null
+    },
+    {
+      "organization_name": "中国四国防衛局",
+      "url": "https://www.mod.go.jp/rdb/chushi/contract/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "Blocked by anti-bot challenge: https://www.mod.go.jp/rdb/chushi/contract/"
+    },
+    {
+      "organization_name": "東海防衛支局",
+      "url": "https://www.mod.go.jp/rdb/tokai/contract/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/tokai/contract/"
+    },
+    {
+      "organization_name": "九州防衛局",
+      "url": "https://www.mod.go.jp/rdb/kyushu/contract/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/kyushu/contract/"
+    },
+    {
+      "organization_name": "北海道防衛局",
+      "url": "https://www.mod.go.jp/rdb/hokkaido/keiyaku/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/hokkaido/keiyaku/index.html"
+    },
+    {
+      "organization_name": "東北防衛局",
+      "url": "https://www.mod.go.jp/rdb/tohoku/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/tohoku/index.html"
+    },
+    {
+      "organization_name": "沖縄防衛局",
+      "url": "https://www.mod.go.jp/rdb/okinawa/contract/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/okinawa/contract/"
+    },
+    {
+      "organization_name": "近畿中部防衛局",
+      "url": "https://www.mod.go.jp/rdb/kinchu/contract/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/kinchu/contract/"
+    },
+    {
+      "organization_name": "北関東防衛局",
+      "url": "https://www.mod.go.jp/rdb/n-kanto/nyusatsu-keiyaku/nyusatsu-keiyaku.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/n-kanto/nyusatsu-keiyaku/nyusatsu-keiyaku.html"
+    },
+    {
+      "organization_name": "南関東防衛局",
+      "url": "https://www.mod.go.jp/rdb/s-kanto/contract/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/rdb/s-kanto/contract/"
+    },
+    {
+      "organization_name": "中央調達（調達事業部）",
+      "url": "https://www.mod.go.jp/atla/choutatsuchuuou.html",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "地方調達（会計官及び施設等機関）",
+      "url": "https://www.mod.go.jp/atla/data/info/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/atla/data/info/index.html"
+    },
+    {
+      "organization_name": "防衛装備庁 調達・公募情報",
+      "url": "https://www.mod.go.jp/atla/choutatsu.html",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "&emsp;&emsp;医用工学",
+      "url": "https://www.ndmc.ac.jp/med/subject/kougaku/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "2025年度",
+      "url": "https://www.ndmc.ac.jp/news/2025/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "2026年1月23日更新",
+      "url": "https://www.ndmc.ac.jp/information/puboffer/puboffer_school/",
+      "fetch_success": true,
+      "fetched_count": 21,
+      "latest_fetched_at": "2026-06-07T13:53:49.242Z",
+      "error": null
+    },
+    {
+      "organization_name": "2026年1月30日更新",
+      "url": "https://www.ndmc.ac.jp/government/announce/announce_school_ResearchFunding/",
+      "fetch_success": true,
+      "fetched_count": 4,
+      "latest_fetched_at": "2026-06-07T13:53:49.280Z",
+      "error": null
+    },
+    {
+      "organization_name": "2026年2月10日更新",
+      "url": "https://www.ndmc.ac.jp/government/announce/announce_school/",
+      "fetch_success": true,
+      "fetched_count": 12,
+      "latest_fetched_at": "2026-06-07T13:53:49.355Z",
+      "error": null
+    },
+    {
+      "organization_name": "2026年3月2日更新",
+      "url": "https://www.ndmc.ac.jp/government/bidder/bidder_school/",
+      "fetch_success": true,
+      "fetched_count": 4,
+      "latest_fetched_at": "2026-06-07T13:53:49.662Z",
+      "error": null
+    },
+    {
+      "organization_name": "2026年6月2日更新",
+      "url": "https://www.ndmc.ac.jp/information/general/general_school/",
+      "fetch_success": true,
+      "fetched_count": 21,
+      "latest_fetched_at": "2026-06-07T13:53:49.783Z",
+      "error": null
+    },
+    {
+      "organization_name": "2026年度",
+      "url": "https://www.ndmc.ac.jp/news/2026/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "オープンキャンパス",
+      "url": "https://www.ndmc.ac.jp/sh_test000%e5%85%a5%e8%a9%a6%e6%83%85%e5%a0%b1/sh_test005open_campus/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "入札及び契約心得",
+      "url": "https://www.ndmc.ac.jp/info/know-how/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "契約状況に係る情報の公開",
+      "url": "https://www.ndmc.ac.jp/info/contract/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "調達総合案内",
+      "url": "https://www.ndmc.ac.jp/info/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "防衛医科大学校 調達情報",
+      "url": "https://www.ndmc.ac.jp/info/information/",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "情報本部 調達情報",
+      "url": "https://www.mod.go.jp/dih/supply/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/dih/supply/"
+    },
+    {
+      "organization_name": "統合幕僚監部 調達情報",
+      "url": "https://www.mod.go.jp/js/supply/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/js/supply/index.html"
+    },
+    {
+      "organization_name": "防衛省 調達機関リンク集",
+      "url": "https://www.mod.go.jp/j/budget/chotatsu/ichiran.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/j/budget/chotatsu/ichiran.html"
+    },
+    {
+      "organization_name": "防衛省・自衛隊 公告・公示・公募",
+      "url": "https://www.mod.go.jp/j/budget/chotatsu/index.html",
+      "fetch_success": true,
+      "fetched_count": 3,
+      "latest_fetched_at": "2026-06-07T13:53:50.728Z",
+      "error": null
+    },
+    {
+      "organization_name": "オープンカウンター方式による見積依頼",
+      "url": "https://www.nids.mod.go.jp/procurement/opencounter/opencounter.html",
+      "fetch_success": true,
+      "fetched_count": 12,
+      "latest_fetched_at": "2026-06-07T13:53:52.812Z",
+      "error": null
+    },
+    {
+      "organization_name": "一般競争入札（政府調達以外）",
+      "url": "https://www.nids.mod.go.jp/procurement/ippan/ippan.html",
+      "fetch_success": true,
+      "fetched_count": 435,
+      "latest_fetched_at": "2026-06-07T13:53:53.974Z",
+      "error": null
+    },
+    {
+      "organization_name": "公募に関する公示",
+      "url": "https://www.nids.mod.go.jp/procurement/kouji/kouji.html",
+      "fetch_success": true,
+      "fetched_count": 14,
+      "latest_fetched_at": "2026-06-07T13:53:53.893Z",
+      "error": null
+    },
+    {
+      "organization_name": "各種様式はこちら",
+      "url": "https://www.nids.mod.go.jp/procurement/format/index.html",
+      "fetch_success": true,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": null
+    },
+    {
+      "organization_name": "防衛研究所 調達情報",
+      "url": "https://www.nids.mod.go.jp/procurement/index.html",
+      "fetch_success": true,
+      "fetched_count": 1,
+      "latest_fetched_at": "2026-06-07T13:53:53.903Z",
+      "error": null
+    },
+    {
+      "organization_name": "中部方面隊",
+      "url": "https://www.mod.go.jp/gsdf/mae/mafin/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/mae/mafin/"
+    },
+    {
+      "organization_name": "西部方面会計隊 オープンカウンター",
+      "url": "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/open/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/open/"
+    },
+    {
+      "organization_name": "西部方面会計隊 物品・役務",
+      "url": "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/kou/R8ippan.htm",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/kou/R8ippan.htm"
+    },
+    {
+      "organization_name": "西部方面会計隊 物品・役務 Excel表",
+      "url": "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/kou/R8ippan.files/sheet001.htm",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/kou/R8ippan.files/sheet001.htm"
+    },
+    {
+      "organization_name": "西部方面隊",
+      "url": "https://www.mod.go.jp/gsdf/wae/nyusatu/wa-fin/index.htm",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/wae/nyusatu/wa-fin/index.htm"
+    },
+    {
+      "organization_name": "陸上自衛隊 調達情報",
+      "url": "https://www.mod.go.jp/gsdf/procurement/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/procurement/"
+    },
+    {
+      "organization_name": "北部方面会計隊 令和7年度入札公告",
+      "url": "https://www.mod.go.jp/gsdf/nae/fin/nafin/R7koukoku.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/nae/fin/nafin/R7koukoku.html"
+    },
+    {
+      "organization_name": "北部方面会計隊 令和8年度オープンカウンター",
+      "url": "https://www.mod.go.jp/gsdf/nae/fin/nafin/R8open.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/nae/fin/nafin/R8open.html"
+    },
+    {
+      "organization_name": "北部方面会計隊 公共調達一覧",
+      "url": "https://www.mod.go.jp/gsdf/nae/fin/nafin/ppR7.htm",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/nae/fin/nafin/ppR7.htm"
+    },
+    {
+      "organization_name": "北部方面隊",
+      "url": "https://www.mod.go.jp/gsdf/nae/fin/nafin/kokoku-index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/nae/fin/nafin/kokoku-index.html"
+    },
+    {
+      "organization_name": "東北方面隊",
+      "url": "https://www.mod.go.jp/gsdf/neae/koukoku/fin/index_l.htm",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/neae/koukoku/fin/index_l.htm"
+    },
+    {
+      "organization_name": "中央会計隊",
+      "url": "https://www.mod.go.jp/gsdf/dc/cfin/html/fee.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/dc/cfin/html/fee.html"
+    },
+    {
+      "organization_name": "中央会計隊 公共工事",
+      "url": "https://www.mod.go.jp/gsdf/dc/cfin/html/system.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/dc/cfin/html/system.html"
+    },
+    {
+      "organization_name": "中央輸送隊",
+      "url": "https://www.mod.go.jp/gsdf/yokohama/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/yokohama/"
+    },
+    {
+      "organization_name": "久里浜駐屯地 入札情報",
+      "url": "https://www.mod.go.jp/gsdf/sigsch/fin/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/sigsch/fin/index.html"
+    },
+    {
+      "organization_name": "東部方面会計隊 工事発注予定・結果",
+      "url": "https://www.mod.go.jp/gsdf/eae/kaikei/eafin/kouji.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/eae/kaikei/eafin/kouji.html"
+    },
+    {
+      "organization_name": "東部方面会計隊 物品・役務入札",
+      "url": "https://www.mod.go.jp/gsdf/eae/kaikei/eafin/nyusatsu_ekimu.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/eae/kaikei/eafin/nyusatsu_ekimu.html"
+    },
+    {
+      "organization_name": "東部方面隊",
+      "url": "https://www.mod.go.jp/gsdf/eae/kaikei/eafin/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/eae/kaikei/eafin/index.html"
+    },
+    {
+      "organization_name": "補給本部",
+      "url": "https://www.mod.go.jp/gsdf/gmcc/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/gmcc/"
+    },
+    {
+      "organization_name": "関東補給処 調達会計部",
+      "url": "https://www.mod.go.jp/gsdf/eae/eadep/tyokai/honsyo/honsyo.index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/gsdf/eae/eadep/tyokai/honsyo/honsyo.index.html"
+    },
+    {
+      "organization_name": "海上自衛隊 呉地方総監部 入札情報",
+      "url": "https://www.mod.go.jp/msdf/kure/choutatu/link.htm",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/kure/choutatu/link.htm"
+    },
+    {
+      "organization_name": "海上自衛隊 呉地方総監部 契約情報",
+      "url": "https://www.mod.go.jp/msdf/bukei/k0/keiyakukeka_main_K0.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/bukei/k0/keiyakukeka_main_K0.html"
+    },
+    {
+      "organization_name": "海上自衛隊 佐世保地方総監部 工事発注実績",
+      "url": "https://www.mod.go.jp/msdf/bukei/s0/kk_jiseki.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/bukei/s0/kk_jiseki.html"
+    },
+    {
+      "organization_name": "海上自衛隊 調達情報",
+      "url": "https://www.mod.go.jp/msdf/supply/",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/supply/"
+    },
+    {
+      "organization_name": "海上自衛隊 調達情報詳細",
+      "url": "https://www.mod.go.jp/msdf/bukei/index.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/bukei/index.html"
+    },
+    {
+      "organization_name": "海上自衛隊 横須賀地方総監部 入札公告",
+      "url": "https://www.mod.go.jp/msdf/bukei/y0/nyusatsu_s.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/bukei/y0/nyusatsu_s.html"
+    },
+    {
+      "organization_name": "海上自衛隊 横須賀地方総監部 契約結果",
+      "url": "https://www.mod.go.jp/msdf/bukei/y0/kg_jiseki.html",
+      "fetch_success": false,
+      "fetched_count": 0,
+      "latest_fetched_at": null,
+      "error": "HTTP 403: https://www.mod.go.jp/msdf/bukei/y0/kg_jiseki.html"
+    }
+  ]
+}

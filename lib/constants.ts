@@ -1,4 +1,19 @@
-import type { PropertyStatus, PropertyType, PublicationPermission } from "@/lib/types";
+import type {
+  FavoriteTenderStatus,
+  PropertyStatus,
+  PropertyType,
+  PublicationPermission,
+  TenderCandidateReviewStatus,
+  TenderCandidateType,
+  TenderCrawlFrequency,
+  TenderCrawlPriority,
+  TenderCrawlerDifficulty,
+  TenderCrawlerType,
+  TenderSourceFormat,
+  TenderSourceOrganizationType,
+  TenderStatus,
+  TenderType
+} from "@/lib/types";
 
 export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   land: "土地",
@@ -71,3 +86,144 @@ export const PREFECTURES = [
   "鹿児島県",
   "沖縄県"
 ];
+
+export const REGIONS = ["全国", "北海道", "東北", "関東", "中部", "近畿", "中国", "四国", "九州", "沖縄"];
+
+export const TENDER_TYPE_LABELS: Record<TenderType, string> = {
+  goods: "物品",
+  service: "役務",
+  open_counter: "オープンカウンター",
+  unified_qualification: "全省庁統一資格必要案件"
+};
+
+export const TENDER_CANDIDATE_TYPE_LABELS: Record<TenderCandidateType, string> = {
+  goods: "物品",
+  services: "役務",
+  open_counter: "オープンカウンター",
+  small_discretionary: "少額随意契約",
+  qualification_required: "資格必要案件",
+  construction: "工事",
+  unknown: "不明"
+};
+
+export const TENDER_CANDIDATE_REVIEW_STATUS_LABELS: Record<TenderCandidateReviewStatus, string> = {
+  pending: "確認待ち",
+  approved: "承認済み",
+  rejected: "却下",
+  duplicate: "重複"
+};
+
+export const TENDER_SOURCE_ORGANIZATION_TYPE_LABELS: Record<TenderSourceOrganizationType, string> = {
+  national_government: "国",
+  ministry: "省庁",
+  defense_ministry: "防衛省",
+  defense_equipment_agency: "防衛装備庁",
+  ground_self_defense_force: "陸上自衛隊",
+  maritime_self_defense_force: "海上自衛隊",
+  air_self_defense_force: "航空自衛隊",
+  defense_bureau: "地方防衛局",
+  defense_school: "防衛学校",
+  defense_hospital: "防衛医療機関",
+  defense_research: "防衛研究機関",
+  other_defense: "その他防衛機関",
+  local_branch: "地方支分部局",
+  prefecture: "都道府県",
+  designated_city: "政令指定都市",
+  municipality: "市区町村",
+  independent_agency: "独立行政法人",
+  national_university: "国立大学法人",
+  hospital_organization: "病院機構",
+  other: "その他"
+};
+
+export const TENDER_SOURCE_FORMAT_LABELS: Record<TenderSourceFormat, string> = {
+  html: "HTML",
+  pdf: "PDF",
+  excel: "Excel",
+  word: "Word",
+  search_form: "検索フォーム",
+  javascript: "JavaScript",
+  mixed: "混在"
+};
+
+export const TENDER_CRAWLER_TYPE_LABELS: Record<TenderCrawlerType, string> = {
+  p_portal: "調達ポータル",
+  kkj_portal: "官公需情報ポータル",
+  generic_html: "汎用HTML",
+  generic_pdf_list: "PDF一覧",
+  defense_mod: "防衛省",
+  defense_unit: "自衛隊・防衛機関",
+  ministry_page: "省庁ページ",
+  local_government: "自治体",
+  e_procurement_system: "電子調達システム",
+  manual_only: "手動管理"
+};
+
+export const TENDER_CRAWLER_DIFFICULTY_LABELS: Record<TenderCrawlerDifficulty, string> = {
+  low: "低",
+  medium: "中",
+  high: "高"
+};
+
+export const TENDER_CRAWL_PRIORITY_LABELS: Record<TenderCrawlPriority, string> = {
+  A: "A",
+  B: "B",
+  C: "C",
+  D: "D"
+};
+
+export const TENDER_CRAWL_FREQUENCY_LABELS: Record<TenderCrawlFrequency, string> = {
+  daily: "毎日",
+  weekly: "毎週",
+  manual: "手動"
+};
+
+export const OPEN_COUNTER_LABELS = [
+  "オープンカウンター",
+  "オープンカウンタ",
+  "公開見積",
+  "公開見積合せ",
+  "公開見積合わせ",
+  "公募型見積",
+  "公募型見積合せ",
+  "公募型見積合わせ",
+  "定例見積",
+  "物品定例見積",
+  "見積依頼",
+  "見積合わせ",
+  "見積書提出",
+  "少額調達",
+  "少額随意契約"
+];
+
+export const TENDER_STATUS_LABELS: Record<TenderStatus, string> = {
+  draft: "下書き",
+  published: "公開中",
+  archived: "アーカイブ"
+};
+
+export const FAVORITE_TENDER_STATUS_LABELS: Record<FavoriteTenderStatus, string> = {
+  unchecked: "未確認",
+  reviewing: "内容確認中",
+  preparing_quote: "見積準備中",
+  planning: "参加予定",
+  declined: "見送り",
+  bid_submitted: "入札済み",
+  won: "落札",
+  lost: "不落"
+};
+
+export const QUALIFICATION_STATUS_LABELS = {
+  not_started: "未取得",
+  preparing: "申請準備中",
+  submitted: "申請済み",
+  acquired: "取得済み",
+  renewal: "更新したい"
+};
+
+export const SCRIVENER_REQUEST_LABELS = {
+  self_apply_steps: "自分で申請したいので手順を知りたい",
+  ask_scrivener: "行政書士に依頼したい",
+  check_documents: "必要書類を確認したい",
+  after_acquisition: "取得後の案件参加方法を知りたい"
+};

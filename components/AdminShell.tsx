@@ -11,11 +11,26 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
           <p className="mt-1 text-xs text-slate-500">{email}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/tenders" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+            案件管理
+          </Link>
+          <Link href="/admin/tender-sources" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+            取得元
+          </Link>
+          <Link href="/admin/tender-candidates" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+            候補確認
+          </Link>
+          <Link href="/admin/defense-crawl" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+            防衛省取得
+          </Link>
+          <Link href="/admin/scrivener-inquiries" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+            行政書士相談
+          </Link>
           <Link href="/admin/estimates" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
             見積管理
           </Link>
-          <Link href="/admin/properties/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
-            新規登録
+          <Link href="/admin/tenders/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+            案件登録
           </Link>
           <form action={signOutAction}>
             <button className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">

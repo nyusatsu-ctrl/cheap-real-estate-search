@@ -21,6 +21,8 @@
     "crawl:tenders": "node scripts/crawl-tenders.mjs",
     "crawl:tenders:local": "node scripts/crawl-tenders.mjs --no-db",
     "crawl:tenders:portal": "node scripts/crawl-tenders.mjs --no-db --all-portal --limit=10000",
+    "crawl:past-awards": "node scripts/crawl-past-awards.mjs crawl",
+    "audit:past-awards": "node scripts/crawl-past-awards.mjs audit",
     "discover:defense": "node scripts/defense-crawler.mjs discover --group=all",
     "crawl:defense": "node scripts/defense-crawler.mjs crawl --group=all",
     "crawl:gsdf": "node scripts/defense-crawler.mjs crawl --group=gsdf",

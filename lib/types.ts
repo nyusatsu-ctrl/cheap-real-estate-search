@@ -239,6 +239,46 @@ export type TenderCrawlLog = {
   created_at: string;
 };
 
+export type PastAwardReviewStatus = "pending" | "approved" | "rejected";
+
+export type PastAwardResult = {
+  id: string;
+  agency_name: string;
+  title: string;
+  region: string;
+  prefecture: string | null;
+  business_type: string | null;
+  tender_type: TenderType | "construction" | "other" | null;
+  winner_name: string | null;
+  award_amount_yen: number | null;
+  planned_price_yen: number | null;
+  win_rate: number | null;
+  published_at: string | null;
+  opened_at: string | null;
+  source_url: string;
+  pdf_url: string | null;
+  raw_text: string | null;
+  source_name: string | null;
+  fetched_at: string | null;
+  review_status: PastAwardReviewStatus;
+  dedupe_key: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SimilarPastAwardResult = PastAwardResult & {
+  similarity_score: number;
+  similarity_reasons: string[];
+};
+
+export type PastAwardStats = {
+  count: number;
+  averageAwardAmount: number | null;
+  minAwardAmount: number | null;
+  maxAwardAmount: number | null;
+  averageWinRate: number | null;
+};
+
 export type TenderFilters = {
   region?: string;
   prefecture?: string;

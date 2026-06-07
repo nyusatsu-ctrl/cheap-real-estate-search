@@ -335,6 +335,35 @@ create table if not exists public.tender_crawl_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.past_award_results (
+  id uuid primary key default gen_random_uuid(),
+  agency_name text not null,
+  title text not null,
+  region text not null default '全国',
+  prefecture text,
+  business_type text,
+  tender_type text check (tender_type in ('goods', 'service', 'open_counter', 'unified_qualification', 'construction', 'other')),
+  winner_name text,
+  award_amount_yen bigint check (award_amount_yen is null or award_amount_yen >= 0),
+  planned_price_yen bigint check (planned_price_yen is null or planned_price_yen >= 0),
+  win_rate numeric(6,2),
+  published_at timestamptz,
+  opened_at timestamptz,
+  source_url text not null,
+  pdf_url text,
+  raw_text text,
+  source_name text,
+  fetched_at timestamptz,
+  review_status text not null default 'pending' check (review_status in ('pending', 'approved', 'rejected')),
+  dedupe_key text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.past_award_results
+alter column award_amount_yen type bigint using award_amount_yen::bigint,
+alter column planned_price_yen type bigint using planned_price_yen::bigint;
+
 create table if not exists public.user_favorites (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -512,6 +541,11 @@ create trigger tender_candidates_set_updated_at
 before update on public.tender_candidates
 for each row execute function public.set_updated_at();
 
+drop trigger if exists past_award_results_set_updated_at on public.past_award_results;
+create trigger past_award_results_set_updated_at
+before update on public.past_award_results
+for each row execute function public.set_updated_at();
+
 drop trigger if exists user_favorites_set_updated_at on public.user_favorites;
 create trigger user_favorites_set_updated_at
 before update on public.user_favorites
@@ -638,6 +672,7 @@ alter table public.tender_sources enable row level security;
 alter table public.tenders enable row level security;
 alter table public.tender_candidates enable row level security;
 alter table public.tender_crawl_logs enable row level security;
+alter table public.past_award_results enable row level security;
 alter table public.user_favorites enable row level security;
 alter table public.user_notifications enable row level security;
 alter table public.user_keywords enable row level security;
@@ -861,6 +896,19 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "past_award_results_approved_read" on public.past_award_results;
+create policy "past_award_results_approved_read"
+on public.past_award_results for select
+to anon, authenticated
+using (review_status = 'approved');
+
+drop policy if exists "past_award_results_admin_all" on public.past_award_results;
+create policy "past_award_results_admin_all"
+on public.past_award_results for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 drop policy if exists "user_favorites_owner_read" on public.user_favorites;
 create policy "user_favorites_owner_read"
 on public.user_favorites for select
@@ -967,6 +1015,7 @@ grant select on public.property_images to anon, authenticated;
 grant select on public.tender_categories to anon, authenticated;
 grant select on public.tender_sources to anon, authenticated;
 grant select on public.tenders to anon, authenticated;
+grant select on public.past_award_results to anon, authenticated;
 grant select on public.qualification_guides to anon, authenticated;
 grant select on public.partner_scriveners to anon, authenticated;
 grant select on public.support_products to anon, authenticated;
@@ -987,6 +1036,7 @@ grant select, insert, update, delete on public.tender_sources to authenticated;
 grant select, insert, update, delete on public.tenders to authenticated;
 grant select, insert, update, delete on public.tender_candidates to authenticated;
 grant select, insert, update, delete on public.tender_crawl_logs to authenticated;
+grant select, insert, update, delete on public.past_award_results to authenticated;
 grant select, insert, update, delete on public.user_favorites to authenticated;
 grant select, insert, update, delete on public.user_notifications to authenticated;
 grant select, insert, update, delete on public.user_keywords to authenticated;
@@ -1013,6 +1063,7 @@ grant all on public.tender_sources to service_role;
 grant all on public.tenders to service_role;
 grant all on public.tender_candidates to service_role;
 grant all on public.tender_crawl_logs to service_role;
+grant all on public.past_award_results to service_role;
 grant all on public.user_favorites to service_role;
 grant all on public.user_notifications to service_role;
 grant all on public.user_keywords to service_role;
@@ -1076,6 +1127,23 @@ on public.tender_candidates (title, agency_name, deadline_at);
 
 create index if not exists tender_crawl_logs_source_idx
 on public.tender_crawl_logs (source_id, started_at desc);
+
+create index if not exists past_award_results_search_idx
+on public.past_award_results (review_status, region, prefecture, tender_type, business_type, opened_at desc);
+
+create index if not exists past_award_results_agency_idx
+on public.past_award_results (agency_name, opened_at desc);
+
+create index if not exists past_award_results_amount_idx
+on public.past_award_results (award_amount_yen, planned_price_yen, win_rate);
+
+create unique index if not exists past_award_results_dedupe_idx
+on public.past_award_results (dedupe_key)
+where dedupe_key is not null;
+
+create unique index if not exists past_award_results_agency_title_opened_idx
+on public.past_award_results (agency_name, title, opened_at)
+where opened_at is not null;
 
 create index if not exists user_favorites_user_idx
 on public.user_favorites (user_id, updated_at desc);

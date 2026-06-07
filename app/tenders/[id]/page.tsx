@@ -4,8 +4,10 @@ import { ArrowLeft, ExternalLink, FileText, Star } from "lucide-react";
 import { saveFavoriteTenderAction } from "@/app/tenders/actions";
 import { FAVORITE_TENDER_STATUS_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
+import { getSimilarPastAwardResults, summarizePastAwards } from "@/lib/past-awards";
 import { canUseMemberFeatures, getPublishedTender } from "@/lib/tenders";
 import { getCurrentMember } from "@/lib/user";
+import type { SimilarPastAwardResult } from "@/lib/types";
 
 export default async function TenderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,6 +28,9 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
       </div>
     );
   }
+
+  const similarAwards = await getSimilarPastAwardResults(tender, 10);
+  const similarAwardStats = summarizePastAwards(similarAwards);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -70,6 +75,54 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
           <h2 className="font-black text-slate-950">案件詳細メモ</h2>
           <p className="mt-2 text-sm leading-7 text-slate-700">{tender.detail_memo ?? "詳細メモは未登録です。"}</p>
         </div>
+
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">過去類似案件</h2>
+              <p className="mt-1 text-sm text-slate-600">発注機関、地域、種別、案件名キーワードから近い落札結果を表示します。</p>
+            </div>
+            <span className="rounded bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">{similarAwardStats.count}件</span>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <Stat label="平均落札額" value={formatYen(similarAwardStats.averageAwardAmount)} />
+            <Stat label="最低落札額" value={formatYen(similarAwardStats.minAwardAmount)} />
+            <Stat label="最高落札額" value={formatYen(similarAwardStats.maxAwardAmount)} />
+            <Stat label="平均落札率" value={formatRate(similarAwardStats.averageWinRate)} />
+          </div>
+
+          {similarAwards.length ? (
+            <div className="mt-4 overflow-hidden rounded border border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3">類似度</th>
+                      <th className="px-3 py-3">案件</th>
+                      <th className="px-3 py-3">発注機関</th>
+                      <th className="px-3 py-3">業種</th>
+                      <th className="px-3 py-3">落札業者</th>
+                      <th className="px-3 py-3">落札額</th>
+                      <th className="px-3 py-3">予定価格</th>
+                      <th className="px-3 py-3">落札率</th>
+                      <th className="px-3 py-3">開札日</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {similarAwards.map((award) => (
+                      <SimilarAwardRow key={award.id} award={award} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">
+              類似する過去落札案件はまだ登録されていません。
+            </div>
+          )}
+        </section>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <a href={tender.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">
@@ -118,4 +171,52 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
 function organizationLabel(value?: string | null) {
   if (!value) return "-";
   return TENDER_SOURCE_ORGANIZATION_TYPE_LABELS[value as keyof typeof TENDER_SOURCE_ORGANIZATION_TYPE_LABELS] ?? value;
+}
+
+function SimilarAwardRow({ award }: { award: SimilarPastAwardResult }) {
+  return (
+    <tr>
+      <td className="px-3 py-3">
+        <p className="font-black text-slate-950">{award.similarity_score}</p>
+        <p className="mt-1 max-w-40 text-xs leading-5 text-slate-500">{award.similarity_reasons.join(" / ")}</p>
+      </td>
+      <td className="px-3 py-3">
+        <a href={award.source_url} target="_blank" rel="noreferrer" className="font-bold text-slate-950 hover:text-brand-700">{award.title}</a>
+        <p className="mt-1 text-xs text-slate-500">{award.region}{award.prefecture ? ` / ${award.prefecture}` : ""}</p>
+      </td>
+      <td className="px-3 py-3 text-slate-700">{award.agency_name}</td>
+      <td className="px-3 py-3 text-slate-700">{award.business_type ?? awardTypeLabel(award.tender_type)}</td>
+      <td className="px-3 py-3 text-slate-700">{award.winner_name ?? "-"}</td>
+      <td className="px-3 py-3 font-semibold text-slate-950">{formatYen(award.award_amount_yen)}</td>
+      <td className="px-3 py-3 text-slate-700">{formatYen(award.planned_price_yen)}</td>
+      <td className="px-3 py-3 text-slate-700">{formatRate(award.win_rate)}</td>
+      <td className="px-3 py-3 text-slate-700">{formatDate(award.opened_at)}</td>
+    </tr>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function formatYen(value: number | null) {
+  if (value === null) return "-";
+  return `${value.toLocaleString("ja-JP")}円`;
+}
+
+function formatRate(value: number | null) {
+  if (value === null) return "-";
+  return `${value.toLocaleString("ja-JP", { maximumFractionDigits: 2 })}%`;
+}
+
+function awardTypeLabel(value: SimilarPastAwardResult["tender_type"]) {
+  if (!value) return "-";
+  if (value === "construction") return "工事";
+  if (value === "other") return "その他";
+  return TENDER_TYPE_LABELS[value];
 }

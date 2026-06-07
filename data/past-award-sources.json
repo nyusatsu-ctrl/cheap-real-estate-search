@@ -1,0 +1,86 @@
+[
+  {
+    "source_name": "調達ポータル 落札実績オープンデータ",
+    "url": "https://www.p-portal.go.jp/pps-web-biz/UAB02/OAB0201",
+    "source_type": "p_portal_open_data",
+    "organization_group": "all_ministries",
+    "priority": "A"
+  },
+  {
+    "source_name": "防衛省 公共調達の適正化",
+    "url": "https://www.mod.go.jp/j/budget/release/jouhou.html",
+    "source_type": "defense_award_index",
+    "organization_group": "defense",
+    "priority": "A"
+  },
+  {
+    "source_name": "防衛省 内部部局 契約に係る情報の公表",
+    "url": "https://www.mod.go.jp/j/budget/chotatsu/naikyoku/keiyaku/index.html",
+    "source_type": "defense_award_html",
+    "organization_group": "defense",
+    "priority": "A"
+  },
+  {
+    "source_name": "防衛装備庁 契約に係る情報の公表",
+    "url": "https://www.mod.go.jp/atla/souhon/supply/jisseki/rakusatu/index.html",
+    "source_type": "defense_award_html",
+    "organization_group": "defense_equipment_agency",
+    "priority": "A"
+  },
+  {
+    "source_name": "陸上自衛隊 中央会計隊 契約に係る情報の公開",
+    "url": "https://www.mod.go.jp/gsdf/dc/cfin/html/concept.html",
+    "source_type": "defense_award_html",
+    "organization_group": "ground_self_defense_force",
+    "priority": "A"
+  },
+  {
+    "source_name": "航空自衛隊 三沢基地 公共調達の適正化",
+    "url": "https://www.mod.go.jp/asdf/misawa/offer/public_offering/kouhyou.html",
+    "source_type": "defense_award_html",
+    "organization_group": "air_self_defense_force",
+    "priority": "B"
+  },
+  {
+    "source_name": "航空自衛隊 小松基地 情報の公開",
+    "url": "https://www.mod.go.jp/asdf/komatsu/6/third/63.html",
+    "source_type": "defense_award_html",
+    "organization_group": "air_self_defense_force",
+    "priority": "B"
+  },
+  {
+    "source_name": "航空自衛隊 第2補給処 契約情報",
+    "url": "https://www.mod.go.jp/asdf/2dep/index6.html",
+    "source_type": "defense_award_html",
+    "organization_group": "air_self_defense_force",
+    "priority": "B"
+  },
+  {
+    "source_name": "防衛大学校 公共調達の適正化に基づく情報公開",
+    "url": "https://www.mod.go.jp/nda/procurement/information/",
+    "source_type": "defense_award_html",
+    "organization_group": "defense_school",
+    "priority": "B"
+  },
+  {
+    "source_name": "東京都 入札情報サービス",
+    "url": "https://www.e-procurement.metro.tokyo.lg.jp/indexPbiFrSp.jsp",
+    "source_type": "local_government_award_search",
+    "organization_group": "local_government",
+    "priority": "B"
+  },
+  {
+    "source_name": "大阪市 入札契約情報",
+    "url": "https://www.city.osaka.lg.jp/shisei/category/3047-0-0-0-0-0-0-0-0-0.html",
+    "source_type": "local_government_award_html",
+    "organization_group": "local_government",
+    "priority": "B"
+  },
+  {
+    "source_name": "大阪市 電子調達システム",
+    "url": "https://www.keiyaku.city.osaka.lg.jp/",
+    "source_type": "local_government_award_search",
+    "organization_group": "local_government",
+    "priority": "B"
+  }
+]

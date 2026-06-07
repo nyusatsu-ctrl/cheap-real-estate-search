@@ -6,3 +6,12 @@ node_modules
 *.log
 tsconfig.tsbuildinfo
 .DS_Store
+
+# Crawled data artifacts
+data/past-award-results.json
+data/past-award-crawl-summary.json
+data/defense-candidates.json
+data/defense-crawl-summary.json
+data/tender-imports.json
+data/defense-html/
+data/**/*.html

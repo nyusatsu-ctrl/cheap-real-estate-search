@@ -151,6 +151,7 @@ async function main() {
 async function crawlProcurementPortal(source) {
   const html = await fetchText(source.url);
   const files = choosePortalFiles(extractPortalZipFiles(html));
+  const recordLimit = numberArg("--max-records") || numberArg("--limit") || numberArg("--max-docs");
   const awards = [];
   const fileResults = [];
 
@@ -160,10 +161,18 @@ async function crawlProcurementPortal(source) {
     let fileRows = 0;
     for (const file of csvFiles) {
       const rows = parseCsv(file.content.toString("utf8").replace(/^\uFEFF/, ""), { headerless: true });
-      fileRows += rows.length;
-      awards.push(...rows.map((row) => pPortalRowToAward(row, fileName)).filter(Boolean));
+      for (const row of rows) {
+        if (recordLimit && awards.length >= recordLimit) break;
+        const award = pPortalRowToAward(row, fileName);
+        if (award) {
+          awards.push(award);
+          fileRows += 1;
+        }
+      }
+      if (recordLimit && awards.length >= recordLimit) break;
     }
     fileResults.push({ file_name: fileName, row_count: fileRows });
+    if (recordLimit && awards.length >= recordLimit) break;
   }
 
   return {

@@ -93,7 +93,7 @@
 
       .toolbar {
         display: grid;
-        grid-template-columns: 1fr 150px 150px 150px auto auto;
+        grid-template-columns: 1fr 150px 150px 150px 150px 170px auto auto;
         gap: 10px;
         padding: 12px 18px;
         border-bottom: 1px solid var(--line);
@@ -191,16 +191,22 @@
       td:nth-child(8) { width: 9%; }
 
       th:nth-child(9),
-      td:nth-child(9) { width: 7%; }
+      td:nth-child(9) { width: 6%; }
 
       th:nth-child(10),
-      td:nth-child(10) { width: 7%; }
+      td:nth-child(10) { width: 10%; }
 
       th:nth-child(11),
-      td:nth-child(11) { width: 5%; }
+      td:nth-child(11) { width: 7%; }
 
       th:nth-child(12),
       td:nth-child(12) { width: 5%; }
+
+      th:nth-child(13),
+      td:nth-child(13) { width: 5%; }
+
+      th:nth-child(14),
+      td:nth-child(14) { width: 5%; }
 
       th {
         background: #f8fafc;
@@ -298,6 +304,186 @@
         background: #fffaeb;
         border-color: #fedf89;
         color: var(--amber);
+      }
+
+      .market-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        padding: 3px 7px;
+        border: 1px solid var(--line);
+        font-size: 12px;
+        font-weight: 700;
+        max-width: 100%;
+      }
+
+      .market-badge.done {
+        background: #ecfdf3;
+        border-color: #abefc6;
+        color: var(--green);
+      }
+
+      .market-badge.none {
+        background: #f2f4f7;
+        border-color: #d0d5dd;
+        color: #475467;
+      }
+
+      .market-badge.error {
+        background: #fef3f2;
+        border-color: #fecdca;
+        color: var(--red);
+      }
+
+      .market-badge.refresh {
+        background: #fffaeb;
+        border-color: #fedf89;
+        color: var(--amber);
+      }
+
+      .market-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfd;
+        padding: 10px;
+      }
+
+      .market-card h3 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 0 0 10px;
+      }
+
+      .market-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+      }
+
+      .market-summary {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .market-summary-status {
+        font-weight: 700;
+        color: var(--green);
+      }
+
+      .market-summary-warning {
+        color: var(--amber);
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .market-summary-reference {
+        display: grid;
+        gap: 3px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .market-summary-reference label,
+      .market-summary-row label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .market-summary-reference strong {
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .market-summary-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .market-summary-row strong {
+        text-align: right;
+      }
+
+      .market-note {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .market-candidates {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 10px 0;
+      }
+
+      .market-candidates-title {
+        width: 100%;
+        font-weight: 700;
+      }
+
+      .market-candidate-button {
+        border-color: #b2ddff;
+        background: #eff8ff;
+        color: #175cd3;
+      }
+
+      .market-debug-actions {
+        display: grid;
+        gap: 8px;
+        white-space: normal;
+      }
+
+      .market-debug-candidate {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 6px;
+        border: 1px solid #344054;
+        border-radius: 6px;
+      }
+
+      .market-debug-candidate span {
+        min-width: 160px;
+        font-weight: 700;
+      }
+
+      .market-debug-conclusion {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid #b2ddff;
+        border-radius: 8px;
+        background: #eff8ff;
+        white-space: normal;
+      }
+
+      .market-debug-rerun-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .market-debug-details {
+        margin-top: 10px;
+        white-space: normal;
+      }
+
+      .market-debug-details pre {
+        white-space: pre-wrap;
+        margin: 10px 0 0;
       }
 
       .detail {
@@ -458,6 +644,108 @@
         font-weight: 700;
       }
 
+      .hidden {
+        display: none !important;
+      }
+
+      body.market-admin-mode > header,
+      body.market-admin-mode > .toolbar,
+      body.market-admin-mode > .notice,
+      body.market-admin-mode > main {
+        display: none;
+      }
+
+      .market-admin {
+        display: none;
+        padding: 18px;
+      }
+
+      body.market-admin-mode .market-admin {
+        display: block;
+      }
+
+      .admin-panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+
+      .admin-panel h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+
+      .admin-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .admin-panel textarea {
+        width: 100%;
+        min-height: 160px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .admin-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin: 12px 0;
+      }
+
+      .admin-stat {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #f8fafc;
+      }
+
+      .admin-stat label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      .admin-table-wrap {
+        overflow: auto;
+        max-height: 520px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .admin-table {
+        min-width: 1100px;
+      }
+
+      .admin-table th,
+      .admin-table td {
+        white-space: normal;
+      }
+
+      .market-debug-result {
+        min-height: 180px;
+        max-height: 420px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
       @media (max-width: 980px) {
       .toolbar {
           grid-template-columns: 1fr 1fr;
@@ -473,7 +761,206 @@
       }
     </style>
   </head>
-  <body>
+  <body data-market-admin="<?!= isMarketAdmin ? '1' : '0' ?>">
+    <section id="marketAdminApp" class="market-admin">
+      <div class="admin-panel">
+        <h1>相場データ管理</h1>
+        <p class="muted">管理者用の登録済み相場データ管理画面です。通常スタッフ画面には表示されません。</p>
+        <div class="actions" style="justify-content:flex-start;">
+          <button id="marketAdminBackButton" type="button">スタッフ画面へ戻る</button>
+          <button id="marketAdminReloadButton" type="button">再読み込み</button>
+          <button id="marketAdminDetectAbnormalButton" type="button">異常相場データを検出</button>
+          <button id="marketAdminClearAbnormalButton" type="button" class="danger">異常相場データをクリア</button>
+          <button id="marketAdminRepairSavedButton" type="button">相場保存値を再補正</button>
+          <button id="goobikeModelMasterRefreshButton" type="button">GooBike車種マスタ更新</button>
+          <button id="goobikeModelMasterViewButton" type="button">GooBike車種マスタを見る</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;">
+          <input id="autoFetchMarketOnNewApplication" type="checkbox">
+          <span id="autoFetchMarketOnNewApplicationLabel">新規申込時の自動相場取得：ON</span>
+        </label>
+        <div id="goobikeModelMasterResult" class="market-note"></div>
+      </div>
+
+      <details id="goobikeModelMasterPanel" class="admin-panel">
+        <summary><strong>GooBike車種マスタ</strong></summary>
+        <p class="muted">GooBikeの正式車種名を相場取得の検索語に使います。通常は「GooBike車種マスタ更新」だけ実行してください。</p>
+        <div id="goobikeModelMasterStats" class="admin-stats"></div>
+        <div class="admin-table-wrap" style="margin-top:12px;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>メーカー</th>
+                <th>正式車種名</th>
+                <th>正規化名</th>
+                <th>掲載件数</th>
+                <th>更新日時</th>
+                <th>元ページ</th>
+              </tr>
+            </thead>
+            <tbody id="goobikeModelMasterRows">
+              <tr><td colspan="6" class="empty">未読み込みです。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="admin-panel">
+        <h2>相場データ登録</h2>
+        <p class="muted">1行目は次の列名にしてください。source,bike_name,year,total_price_yen,base_price_yen,mileage_km,shop_name,prefecture,url</p>
+        <textarea id="marketAdminCsvText" placeholder="ここに相場データを貼り付け"></textarea>
+        <div class="actions">
+          <button id="marketAdminImportButton" type="button" class="primary">相場データを登録</button>
+          <button id="marketAdminClearButton" type="button" class="danger">登録済み相場データを全削除</button>
+        </div>
+        <div id="marketAdminImportResult" class="market-note"></div>
+      </div>
+
+      <details class="admin-panel">
+        <summary><strong>詳細設定：車種補正</strong></summary>
+        <div style="margin-top:14px;">
+          <p class="muted">通常は操作不要です。自動補正で解決できない場合だけ編集します。</p>
+          <div class="admin-grid">
+            <div class="field">
+              <label>代表車種名</label>
+              <input id="bikeModelDictCanonical" type="text" placeholder="例: skywave250">
+            </div>
+            <div class="field">
+              <label>優先検索ワード</label>
+              <input id="bikeModelDictPriority" type="text" placeholder="例: スカイウェイブ 250">
+            </div>
+          </div>
+          <div class="admin-grid">
+            <div class="field">
+              <label>同義語</label>
+              <textarea id="bikeModelDictAliases" placeholder="例: スカイウェイブ250, スカイウェイブ250SS, CJ46A"></textarea>
+            </div>
+            <div class="field">
+              <label>除外語</label>
+              <textarea id="bikeModelDictExcludes" placeholder="例: スカイウェイブ400, スカイウェイブ650"></textarea>
+            </div>
+          </div>
+          <div class="actions" style="justify-content:flex-start;">
+            <button id="bikeModelDictSaveButton" type="button" class="primary">保存</button>
+            <button id="bikeModelDictReloadButton" type="button">再読み込み</button>
+          </div>
+          <div id="bikeModelDictResult" class="market-note"></div>
+          <div class="admin-table-wrap" style="margin-top:12px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>操作</th>
+                  <th>代表車種名</th>
+                  <th>同義語</th>
+                  <th>除外語</th>
+                  <th>優先検索ワード</th>
+                  <th>最終更新日</th>
+                  <th>登録件数</th>
+                  <th>種別</th>
+                </tr>
+              </thead>
+              <tbody id="bikeModelDictRows">
+                <tr><td colspan="8" class="empty">読み込み中です</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <div class="admin-panel">
+        <h2>相場取得診断</h2>
+        <p class="muted">本番Google Apps ScriptからGooBike取得・解析・集計まで実行し、失敗理由を確認します。</p>
+        <div class="admin-grid">
+          <div class="field">
+            <label>車種名</label>
+            <input id="marketDebugBikeName" type="text" value="BMW S1000R" placeholder="例: BMW S1000R">
+          </div>
+          <div class="field">
+            <label>年式</label>
+            <input id="marketDebugYear" type="text" value="2017" placeholder="例: 2017 / 平成29年式">
+          </div>
+        </div>
+        <div class="actions" style="justify-content:flex-start; flex-wrap:wrap;">
+          <button id="marketDebugFetchButton" type="button" class="primary">GooBike取得診断</button>
+          <button id="marketDebugMatchButton" type="button">相場マッチング診断</button>
+          <button id="marketDebugCacheButton" type="button">キャッシュ確認</button>
+          <button id="marketDebugCacheClearButton" type="button" class="danger">キャッシュ削除</button>
+          <button id="marketDebugFixedButton" type="button">BMW S1000R / 2017 テスト</button>
+        </div>
+        <pre id="marketDebugResult" class="market-debug-result">診断結果がここに表示されます。</pre>
+      </div>
+
+      <div class="admin-panel">
+        <h2>取得ログ</h2>
+        <div class="actions" style="justify-content:flex-start;">
+          <button id="marketLogReloadButton" type="button">取得ログを再読み込み</button>
+        </div>
+        <div class="admin-table-wrap" style="margin-top:12px;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>日時</th>
+                <th>顧客名</th>
+                <th>車種</th>
+                <th>年式</th>
+                <th>ステータス</th>
+                <th>エラーコード</th>
+                <th>HTTP</th>
+                <th>HTMLサイズ</th>
+                <th>抽出件数</th>
+                <th>価格件数</th>
+                <th>詳細</th>
+              </tr>
+            </thead>
+            <tbody id="marketLogRows">
+              <tr><td colspan="11" class="empty">読み込み中です</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-panel">
+        <h2>登録済み相場データ一覧</h2>
+        <div class="admin-grid">
+          <div class="field">
+            <label>車種名検索</label>
+            <input id="marketAdminBikeNameFilter" type="search" placeholder="例: S1000R">
+          </div>
+          <div class="field">
+            <label>年式検索</label>
+            <input id="marketAdminYearFilter" type="search" placeholder="例: 2017 / 平成29年式">
+          </div>
+        </div>
+        <div id="marketAdminStats" class="admin-stats"></div>
+        <div class="actions" style="justify-content:flex-start;">
+          <button id="marketAdminSearchButton" type="button">検索</button>
+          <button id="marketAdminDeleteSelectedButton" type="button" class="danger">選択行を削除</button>
+        </div>
+        <div class="admin-table-wrap" style="margin-top:12px;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>選択</th>
+                <th>行</th>
+                <th>取得元</th>
+                <th>車種名</th>
+                <th>年式</th>
+                <th>総額</th>
+                <th>本体価格</th>
+                <th>走行距離</th>
+                <th>店舗</th>
+                <th>都道府県</th>
+                <th>URL</th>
+              </tr>
+            </thead>
+            <tbody id="marketAdminRows">
+              <tr><td colspan="11" class="empty">読み込み中です</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <header>
       <h1>自社ローン審査管理</h1>
       <button id="refreshButton" type="button">更新</button>
@@ -491,6 +978,18 @@
         <option value="">車・バイクすべて</option>
         <option value="車">車</option>
         <option value="バイク">バイク</option>
+      </select>
+      <select id="marketFilter">
+        <option value="">全相場</option>
+      </select>
+      <select id="marketSort">
+        <option value="">受信日時が新しい順</option>
+        <option value="marketFetchedDesc">相場取得日時が新しい順</option>
+        <option value="marketFetchedAsc">相場取得日時が古い順</option>
+        <option value="marketAverageDesc">平均総額が高い順</option>
+        <option value="marketAverageAsc">平均総額が安い順</option>
+        <option value="marketListingDesc">掲載台数が多い順</option>
+        <option value="marketListingAsc">掲載台数が少ない順</option>
       </select>
       <button id="setupButton" type="button">管理列を作成</button>
       <button id="fixPhonesButton" type="button">電話番号0補正</button>
@@ -516,6 +1015,7 @@
                 <th>勤務先</th>
                 <th>希望車種</th>
                 <th>支払目安</th>
+                <th>相場</th>
                 <th>ステータス</th>
                 <th>架電</th>
                 <th>プレミア</th>
@@ -524,7 +1024,7 @@
             </thead>
             <tbody id="customerRows">
               <tr>
-                <td colspan="12" class="empty">読み込み中です</td>
+                <td colspan="14" class="empty">読み込み中です</td>
               </tr>
             </tbody>
           </table>
@@ -539,6 +1039,12 @@
     <div id="toast" class="toast"></div>
 
     <script>
+      const IS_MARKET_ADMIN = document.body.dataset.marketAdmin === '1';
+      const MARKET_ADMIN_PASSCODE = <?!= marketAdminPasscodeJson ?>;
+      if (IS_MARKET_ADMIN) {
+        document.body.classList.add('market-admin-mode');
+      }
+
       const state = {
         customers: [],
         filtered: [],
@@ -548,6 +1054,8 @@
         statusOptions: [],
         reviewOptions: [],
         callResultOptions: [],
+        marketFilterOptions: [],
+        marketLogs: [],
         saving: false
       };
       const PREMIUM_PRINT_CONFIG = {
@@ -598,6 +1106,8 @@
         applicationTypeFilter: document.getElementById('applicationTypeFilter'),
         statusFilter: document.getElementById('statusFilter'),
         requestFilter: document.getElementById('requestFilter'),
+        marketFilter: document.getElementById('marketFilter'),
+        marketSort: document.getElementById('marketSort'),
         setupButton: document.getElementById('setupButton'),
         fixPhonesButton: document.getElementById('fixPhonesButton'),
         setupNotice: document.getElementById('setupNotice'),
@@ -610,12 +1120,18 @@
       els.applicationTypeFilter.addEventListener('change', applyFilters);
       els.statusFilter.addEventListener('change', applyFilters);
       els.requestFilter.addEventListener('change', applyFilters);
+      els.marketFilter.addEventListener('change', applyFilters);
+      els.marketSort.addEventListener('change', applyFilters);
       els.setupButton.addEventListener('click', setupColumns);
       els.fixPhonesButton.addEventListener('click', fixPhoneNumbers);
       els.setupNoticeButton.addEventListener('click', setupColumns);
       els.refreshButton.addEventListener('click', loadDashboard);
 
-      loadDashboard();
+      if (IS_MARKET_ADMIN) {
+        initMarketAdmin();
+      } else {
+        loadDashboard();
+      }
 
       function loadDashboard() {
         setBusy(true);
@@ -632,8 +1148,10 @@
             state.reviewOptions = data.reviewOptions || [];
             state.customerRateOptions = data.customerRateOptions || ['13.9'];
             state.callResultOptions = data.callResultOptions || [];
+            state.marketFilterOptions = data.marketFilterOptions || [];
             renderApplicationTypeFilter();
             renderStatusFilter();
+            renderMarketFilter();
             els.setupNotice.classList.toggle('visible', Boolean(data.needsSetup));
             applyFilters();
             if (state.selected) {
@@ -662,6 +1180,10 @@
           .setupManagementColumns();
       }
 
+      function marketAdminAuth() {
+        return { marketAdminPasscode: MARKET_ADMIN_PASSCODE };
+      }
+
       function fixPhoneNumbers() {
         setBusy(true);
         google.script.run
@@ -674,6 +1196,881 @@
             showToast(error.message || String(error));
           })
           .fixPhoneNumbersFromWeb();
+      }
+
+      function initMarketAdmin() {
+        const backButton = document.getElementById('marketAdminBackButton');
+        const reloadButton = document.getElementById('marketAdminReloadButton');
+        const importButton = document.getElementById('marketAdminImportButton');
+        const clearButton = document.getElementById('marketAdminClearButton');
+        const detectAbnormalButton = document.getElementById('marketAdminDetectAbnormalButton');
+        const clearAbnormalButton = document.getElementById('marketAdminClearAbnormalButton');
+        const repairSavedButton = document.getElementById('marketAdminRepairSavedButton');
+        const searchButton = document.getElementById('marketAdminSearchButton');
+        const deleteButton = document.getElementById('marketAdminDeleteSelectedButton');
+        const bikeFilter = document.getElementById('marketAdminBikeNameFilter');
+        const yearFilter = document.getElementById('marketAdminYearFilter');
+        const debugFetchButton = document.getElementById('marketDebugFetchButton');
+        const debugMatchButton = document.getElementById('marketDebugMatchButton');
+        const debugCacheButton = document.getElementById('marketDebugCacheButton');
+        const debugCacheClearButton = document.getElementById('marketDebugCacheClearButton');
+        const debugFixedButton = document.getElementById('marketDebugFixedButton');
+        const dictSaveButton = document.getElementById('bikeModelDictSaveButton');
+        const dictReloadButton = document.getElementById('bikeModelDictReloadButton');
+        const modelMasterRefreshButton = document.getElementById('goobikeModelMasterRefreshButton');
+        const modelMasterViewButton = document.getElementById('goobikeModelMasterViewButton');
+        const autoFetchMarketCheckbox = document.getElementById('autoFetchMarketOnNewApplication');
+        const logReloadButton = document.getElementById('marketLogReloadButton');
+
+        if (backButton) {
+          backButton.addEventListener('click', () => {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('admin');
+            window.location.href = url.toString();
+          });
+        }
+        if (reloadButton) reloadButton.addEventListener('click', loadMarketAdminData);
+        if (importButton) importButton.addEventListener('click', importMarketAdminData);
+        if (clearButton) clearButton.addEventListener('click', clearMarketAdminData);
+        if (detectAbnormalButton) detectAbnormalButton.addEventListener('click', detectAbnormalMarketData);
+        if (clearAbnormalButton) clearAbnormalButton.addEventListener('click', clearAbnormalMarketData);
+        if (repairSavedButton) repairSavedButton.addEventListener('click', repairSavedMarketData);
+        if (searchButton) searchButton.addEventListener('click', loadMarketAdminData);
+        if (debugFetchButton) debugFetchButton.addEventListener('click', () => runMarketDebug('fetch'));
+        if (debugMatchButton) debugMatchButton.addEventListener('click', () => runMarketDebug('match'));
+        if (debugCacheButton) debugCacheButton.addEventListener('click', () => runMarketDebug('cache'));
+        if (debugCacheClearButton) debugCacheClearButton.addEventListener('click', () => runMarketDebug('clearCache'));
+        if (debugFixedButton) debugFixedButton.addEventListener('click', () => {
+          const bikeInput = document.getElementById('marketDebugBikeName');
+          const yearInput = document.getElementById('marketDebugYear');
+          if (bikeInput) bikeInput.value = 'BMW S1000R';
+          if (yearInput) yearInput.value = '2017';
+          runMarketDebug('fetch');
+        });
+        if (dictSaveButton) dictSaveButton.addEventListener('click', saveBikeModelDictionaryEntryFromAdmin);
+        if (dictReloadButton) dictReloadButton.addEventListener('click', loadBikeModelDictionaryData);
+        if (modelMasterRefreshButton) modelMasterRefreshButton.addEventListener('click', refreshGoobikeModelMaster);
+        if (modelMasterViewButton) modelMasterViewButton.addEventListener('click', () => {
+          const panel = document.getElementById('goobikeModelMasterPanel');
+          if (panel) panel.open = true;
+          loadGoobikeModelMasterData();
+        });
+        if (autoFetchMarketCheckbox) {
+          autoFetchMarketCheckbox.addEventListener('change', () => saveBikeMarketAutomationSettings(autoFetchMarketCheckbox.checked));
+        }
+        if (logReloadButton) logReloadButton.addEventListener('click', loadMarketLogs);
+        [bikeFilter, yearFilter].forEach((input) => {
+          if (!input) return;
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') loadMarketAdminData();
+          });
+        });
+        if (deleteButton) deleteButton.addEventListener('click', deleteSelectedMarketAdminRows);
+        loadMarketAdminData();
+        loadBikeMarketAutomationSettings();
+        loadBikeModelDictionaryData();
+        loadGoobikeModelMasterData();
+        loadMarketLogs();
+      }
+
+      function loadBikeMarketAutomationSettings() {
+        const checkbox = document.getElementById('autoFetchMarketOnNewApplication');
+        if (!checkbox) return;
+        google.script.run
+          .withSuccessHandler((settings) => {
+            checkbox.checked = !settings || settings.autoFetchMarketOnNewApplication !== false;
+            updateBikeMarketAutomationSettingLabel(checkbox.checked);
+          })
+          .withFailureHandler((error) => {
+            showToast(error.message || String(error));
+          })
+          .getBikeMarketAutomationSettingsForAdmin(marketAdminAuth());
+      }
+
+      function saveBikeMarketAutomationSettings(enabled) {
+        google.script.run
+          .withSuccessHandler((settings) => {
+            const checkbox = document.getElementById('autoFetchMarketOnNewApplication');
+            const checked = !settings || settings.autoFetchMarketOnNewApplication !== false;
+            if (checkbox) checkbox.checked = checked;
+            updateBikeMarketAutomationSettingLabel(checked);
+            showToast(settings && settings.message ? settings.message : '自動相場取得設定を保存しました。');
+          })
+          .withFailureHandler((error) => {
+            showToast(error.message || String(error));
+            loadBikeMarketAutomationSettings();
+          })
+          .saveBikeMarketAutomationSettingsForAdmin({ autoFetchMarketOnNewApplication: Boolean(enabled) }, marketAdminAuth());
+      }
+
+      function updateBikeMarketAutomationSettingLabel(enabled) {
+        const label = document.getElementById('autoFetchMarketOnNewApplicationLabel');
+        if (label) label.textContent = `新規申込時の自動相場取得：${enabled ? 'ON' : 'OFF'}`;
+      }
+
+      function refreshGoobikeModelMaster() {
+        const pane = document.getElementById('goobikeModelMasterResult');
+        if (pane) pane.textContent = 'GooBike車種マスタを更新中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            renderGoobikeModelMasterData(result || {});
+            const errors = (result && result.errors) || [];
+            if (pane) {
+              pane.textContent = [
+                result && result.message ? result.message : 'GooBike車種マスタを更新しました。',
+                errors.length ? `一部取得できないメーカーがあります：${errors.slice(0, 5).join(' / ')}` : ''
+              ].filter(Boolean).join('\n');
+            }
+            showToast(result && result.message ? result.message : 'GooBike車種マスタを更新しました。');
+          })
+          .withFailureHandler((error) => {
+            if (pane) pane.textContent = error.message || String(error);
+          })
+          .refreshGoobikeModelMasterForAdmin(marketAdminAuth());
+      }
+
+      function loadGoobikeModelMasterData() {
+        const rows = document.getElementById('goobikeModelMasterRows');
+        if (rows) rows.innerHTML = '<tr><td colspan="6" class="empty">読み込み中です</td></tr>';
+        google.script.run
+          .withSuccessHandler(renderGoobikeModelMasterData)
+          .withFailureHandler((error) => {
+            if (rows) rows.innerHTML = `<tr><td colspan="6" class="empty">${escapeHtml(error.message || String(error))}</td></tr>`;
+          })
+          .getGoobikeModelMasterAdminData(300, marketAdminAuth());
+      }
+
+      function renderGoobikeModelMasterData(data) {
+        const rows = document.getElementById('goobikeModelMasterRows');
+        const stats = document.getElementById('goobikeModelMasterStats');
+        const modelRows = (data && data.rows) || [];
+        if (stats) {
+          stats.innerHTML = [
+            adminStatHtml('登録件数', `${formatCount(data && data.totalCount)}件`),
+            adminStatHtml('表示件数', `${formatCount(modelRows.length)}件`)
+          ].join('');
+        }
+        if (!rows) return;
+        if (modelRows.length === 0) {
+          rows.innerHTML = '<tr><td colspan="6" class="empty">GooBike車種マスタは未登録です。</td></tr>';
+          return;
+        }
+        rows.innerHTML = modelRows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.maker || '')}</td>
+            <td>${escapeHtml(row.officialModelName || '')}</td>
+            <td>${escapeHtml(row.normalizedModelName || '')}</td>
+            <td>${formatCount(row.listingCount || 0)}件</td>
+            <td>${escapeHtml(row.updatedAt || '')}</td>
+            <td>${row.sourceUrl ? `<a href="${escapeHtml(row.sourceUrl)}" target="_blank" rel="noopener">開く</a>` : '-'}</td>
+          </tr>
+        `).join('');
+      }
+
+      function loadBikeModelDictionaryData() {
+        const rows = document.getElementById('bikeModelDictRows');
+        if (rows) rows.innerHTML = '<tr><td colspan="6" class="empty">読み込み中です</td></tr>';
+        google.script.run
+          .withSuccessHandler(renderBikeModelDictionaryData)
+          .withFailureHandler((error) => {
+            if (rows) rows.innerHTML = `<tr><td colspan="6" class="empty">${escapeHtml(error.message || String(error))}</td></tr>`;
+          })
+          .getBikeModelDictionaryAdminData(marketAdminAuth());
+      }
+
+      function renderBikeModelDictionaryData(data) {
+        const rows = document.getElementById('bikeModelDictRows');
+        if (!rows) return;
+        const entries = (data && data.entries) || [];
+        if (entries.length === 0) {
+          rows.innerHTML = '<tr><td colspan="8" class="empty">車種名辞書は未登録です。</td></tr>';
+          return;
+        }
+        rows.innerHTML = entries.map((entry, index) => `
+          <tr>
+            <td>
+              <button type="button" data-bike-model-dict-index="${index}">編集</button>
+              <button type="button" data-bike-model-dict-delete="${escapeHtml(entry.canonicalName || '')}" class="danger">削除</button>
+            </td>
+            <td>${escapeHtml(entry.canonicalName || '')}</td>
+            <td>${escapeHtml(entry.aliasesText || '')}</td>
+            <td>${escapeHtml(entry.excludesText || '')}</td>
+            <td>${escapeHtml(entry.prioritySearchWord || '')}</td>
+            <td>${escapeHtml(entry.updatedAt || '')}</td>
+            <td>${escapeHtml(entry.registeredCount || 0)}</td>
+            <td>${escapeHtml(entry.source || '')}</td>
+          </tr>
+        `).join('');
+        rows.querySelectorAll('[data-bike-model-dict-index]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const entry = entries[Number(button.dataset.bikeModelDictIndex)] || {};
+            const canonical = document.getElementById('bikeModelDictCanonical');
+            const aliases = document.getElementById('bikeModelDictAliases');
+            const excludes = document.getElementById('bikeModelDictExcludes');
+            const priority = document.getElementById('bikeModelDictPriority');
+            if (canonical) canonical.value = entry.canonicalName || '';
+            if (aliases) aliases.value = entry.aliasesText || '';
+            if (excludes) excludes.value = entry.excludesText || '';
+            if (priority) priority.value = entry.prioritySearchWord || '';
+          });
+        });
+        rows.querySelectorAll('[data-bike-model-dict-delete]').forEach((button) => {
+          button.addEventListener('click', () => deleteBikeModelDictionaryEntryFromAdmin(button.dataset.bikeModelDictDelete || ''));
+        });
+      }
+
+      function saveBikeModelDictionaryEntryFromAdmin() {
+        const resultPane = document.getElementById('bikeModelDictResult');
+        const payload = {
+          canonicalName: document.getElementById('bikeModelDictCanonical')?.value || '',
+          aliasesText: document.getElementById('bikeModelDictAliases')?.value || '',
+          excludesText: document.getElementById('bikeModelDictExcludes')?.value || '',
+          prioritySearchWord: document.getElementById('bikeModelDictPriority')?.value || ''
+        };
+        if (!payload.canonicalName.trim()) {
+          if (resultPane) resultPane.textContent = '代表車種名を入力してください。';
+          return;
+        }
+        if (resultPane) resultPane.textContent = '辞書を保存中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (resultPane) resultPane.textContent = result.message || '車種名辞書を保存しました。';
+            renderBikeModelDictionaryData(result.data || {});
+            showToast(result.message || '車種名辞書を保存しました。');
+          })
+          .withFailureHandler((error) => {
+            if (resultPane) resultPane.textContent = error.message || String(error);
+          })
+          .saveBikeModelDictionaryEntry(payload, marketAdminAuth());
+      }
+
+      function deleteBikeModelDictionaryEntryFromAdmin(canonicalName) {
+        if (!canonicalName) return;
+        if (!window.confirm(`${canonicalName} の登録辞書を削除します。固定辞書は削除できません。よろしいですか？`)) {
+          return;
+        }
+        const resultPane = document.getElementById('bikeModelDictResult');
+        if (resultPane) resultPane.textContent = '辞書を削除中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (resultPane) resultPane.textContent = result.message || '車種名辞書を削除しました。';
+            renderBikeModelDictionaryData(result.data || {});
+            showToast(result.message || '車種名辞書を削除しました。');
+          })
+          .withFailureHandler((error) => {
+            if (resultPane) resultPane.textContent = error.message || String(error);
+          })
+          .deleteBikeModelDictionaryEntry(canonicalName, marketAdminAuth());
+      }
+
+      function loadMarketAdminData() {
+        const rows = document.getElementById('marketAdminRows');
+        if (rows) {
+          rows.innerHTML = '<tr><td colspan="11" class="empty">読み込み中です</td></tr>';
+        }
+        const filter = {
+          bikeName: document.getElementById('marketAdminBikeNameFilter')?.value || '',
+          year: document.getElementById('marketAdminYearFilter')?.value || ''
+        };
+        google.script.run
+          .withSuccessHandler((data) => {
+            renderMarketAdminData(data || {});
+          })
+          .withFailureHandler((error) => {
+            renderMarketAdminError(error.message || String(error));
+          })
+          .getBikeMarketAdminData(filter, marketAdminAuth());
+      }
+
+      function renderMarketAdminData(data) {
+        const stats = document.getElementById('marketAdminStats');
+        const rows = document.getElementById('marketAdminRows');
+        if (stats) {
+          stats.innerHTML = [
+            adminStatHtml('登録件数', `${formatCount(data.totalCount)}件`),
+            adminStatHtml('表示件数', `${formatCount(data.visibleCount)}件`),
+            adminStatHtml('有効価格件数', `${formatCount(data.validPriceCount)}件`),
+            adminStatHtml('価格未掲載・ASK除外', `${formatCount(data.excludedPriceCount)}件`)
+          ].join('');
+        }
+        const marketRows = data.rows || [];
+        if (!rows) return;
+        if (marketRows.length === 0) {
+          rows.innerHTML = '<tr><td colspan="11" class="empty">登録済み相場データはありません。</td></tr>';
+          return;
+        }
+        rows.innerHTML = marketRows.map((row) => `
+          <tr>
+            <td><input type="checkbox" data-market-row="${escapeHtml(row.rowNumber)}"></td>
+            <td>${escapeHtml(row.rowNumber)}</td>
+            <td>${escapeHtml(row.source)}</td>
+            <td>${escapeHtml(row.bikeName)}</td>
+            <td>${escapeHtml(row.year)}</td>
+            <td>${escapeHtml(row.totalPriceYen)}</td>
+            <td>${escapeHtml(row.basePriceYen)}</td>
+            <td>${escapeHtml(row.mileageKm)}</td>
+            <td>${escapeHtml(row.shopName)}</td>
+            <td>${escapeHtml(row.prefecture)}</td>
+            <td>${row.url ? `<a href="${escapeHtml(row.url)}" target="_blank" rel="noopener">開く</a>` : '-'}</td>
+          </tr>
+        `).join('');
+      }
+
+      function adminStatHtml(label, value) {
+        return `<div class="admin-stat"><label>${escapeHtml(label)}</label><strong>${escapeHtml(value)}</strong></div>`;
+      }
+
+      function renderMarketAdminError(message) {
+        const rows = document.getElementById('marketAdminRows');
+        if (rows) {
+          rows.innerHTML = `<tr><td colspan="11" class="empty">${escapeHtml(message)}</td></tr>`;
+        }
+      }
+
+      function importMarketAdminData() {
+        const textarea = document.getElementById('marketAdminCsvText');
+        const resultPane = document.getElementById('marketAdminImportResult');
+        const text = textarea ? textarea.value : '';
+        if (!text.trim()) {
+          if (resultPane) resultPane.textContent = '登録する相場データを貼り付けてください。';
+          return;
+        }
+        if (resultPane) resultPane.textContent = '相場データを登録中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            showMarketAdminImportResult(result);
+            if (textarea) textarea.value = '';
+            loadMarketAdminData();
+          })
+          .withFailureHandler((error) => {
+            if (resultPane) resultPane.textContent = error.message || String(error);
+          })
+          .importBikeMarketCsv(text, marketAdminAuth());
+      }
+
+      function showMarketAdminImportResult(result) {
+        const pane = document.getElementById('marketAdminImportResult');
+        const invalidRows = (result && result.invalidRows) || [];
+        const lines = [
+          '相場データ取込が完了しました。相場取得を実行できます。',
+          `取込件数：${formatCount(result && result.importedCount)}件`,
+          `有効価格件数：${formatCount(result && result.validPriceCount)}件`,
+          `価格未掲載・ASK除外：${formatCount(result && result.excludedPriceCount)}件`
+        ];
+        if (invalidRows.length > 0) {
+          lines.push('', '不正行：');
+          invalidRows.slice(0, 50).forEach((message) => lines.push(message));
+          if (invalidRows.length > 50) {
+            lines.push(`ほか ${invalidRows.length - 50} 件`);
+          }
+        }
+        if (pane) pane.textContent = lines.join('\n');
+        showToast('相場データ取込が完了しました。');
+      }
+
+      function deleteSelectedMarketAdminRows() {
+        const selected = Array.from(document.querySelectorAll('[data-market-row]:checked'))
+          .map((input) => input.dataset.marketRow);
+        if (selected.length === 0) {
+          showToast('削除する行を選択してください。');
+          return;
+        }
+        if (!window.confirm(`選択した${selected.length}件の相場データを削除します。よろしいですか？`)) {
+          return;
+        }
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            loadMarketAdminData();
+          })
+          .withFailureHandler((error) => {
+            showToast(error.message || String(error));
+          })
+          .deleteBikeMarketAdminRows(selected, marketAdminAuth());
+      }
+
+      function clearMarketAdminData() {
+        if (!window.confirm('登録済み相場データをすべて削除します。よろしいですか？')) {
+          return;
+        }
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message);
+            loadMarketAdminData();
+          })
+          .withFailureHandler((error) => {
+            showToast(error.message || String(error));
+          })
+          .clearBikeMarketAdminData(marketAdminAuth());
+      }
+
+      function detectAbnormalMarketData() {
+        const resultPane = document.getElementById('marketDebugResult');
+        if (resultPane) resultPane.textContent = '異常相場データを検出中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            renderAbnormalMarketResult(result);
+            loadMarketLogs();
+          })
+          .withFailureHandler((error) => {
+            if (resultPane) resultPane.textContent = error.message || String(error);
+          })
+          .detectAbnormalBikeMarketDataForAdmin(marketAdminAuth());
+      }
+
+      function clearAbnormalMarketData() {
+        if (!window.confirm('異常判定された顧客行の相場データをクリアします。よろしいですか？')) {
+          return;
+        }
+        const resultPane = document.getElementById('marketDebugResult');
+        if (resultPane) resultPane.textContent = '異常相場データをクリア中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            renderAbnormalMarketResult(result);
+            loadDashboard();
+            loadMarketLogs();
+          })
+          .withFailureHandler((error) => {
+            if (resultPane) resultPane.textContent = error.message || String(error);
+          })
+          .clearAbnormalBikeMarketDataForAdmin(marketAdminAuth());
+      }
+
+      function repairSavedMarketData() {
+        const resultPane = document.getElementById('marketDebugResult');
+        if (resultPane) resultPane.textContent = '相場保存値を再補正中です...';
+        google.script.run
+          .withSuccessHandler((result) => {
+            renderMarketRepairResult(result);
+            loadDashboard();
+            loadMarketLogs();
+          })
+          .withFailureHandler((error) => {
+            if (resultPane) resultPane.textContent = error.message || String(error);
+          })
+          .repairSavedBikeMarketStatusForAdmin(marketAdminAuth());
+      }
+
+      function renderMarketRepairResult(result) {
+        const pane = document.getElementById('marketDebugResult');
+        if (!pane) return;
+        const rows = (result && result.rows) || [];
+        const lines = [result && result.message ? result.message : '相場保存値を再補正しました。'];
+        rows.slice(0, 80).forEach((row) => {
+          lines.push(
+            '',
+            `行: ${row.rowNumber}`,
+            `顧客名: ${row.customerName || ''}`,
+            `車種: ${row.bikeName || ''}`,
+            `参考相場: ${formatYen(row.referenceMarketPrice)}`,
+            `価格取得: ${formatCount(row.priceAvailableCount)}台`
+          );
+        });
+        if (rows.length > 80) {
+          lines.push('', `ほか ${rows.length - 80} 件`);
+        }
+        pane.textContent = lines.join('\n');
+      }
+
+      function renderAbnormalMarketResult(result) {
+        const pane = document.getElementById('marketDebugResult');
+        if (!pane) return;
+        const rows = (result && result.rows) || [];
+        const lines = [result && result.message ? result.message : '異常相場データを確認しました。'];
+        rows.slice(0, 80).forEach((row) => {
+          lines.push(
+            '',
+            `行: ${row.rowNumber}`,
+            `顧客名: ${row.customerName || ''}`,
+            `車種: ${row.bikeName || ''}`,
+            `理由: ${row.reason || ''}`,
+            `集計: ${JSON.stringify(row.priceAggregation || {})}`
+          );
+        });
+        if (rows.length > 80) {
+          lines.push('', `ほか ${rows.length - 80} 件`);
+        }
+        pane.textContent = lines.join('\n');
+      }
+
+      function getMarketDebugInput() {
+        return {
+          bikeName: document.getElementById('marketDebugBikeName')?.value || '',
+          year: document.getElementById('marketDebugYear')?.value || ''
+        };
+      }
+
+      function runMarketDebug(type) {
+        const resultPane = document.getElementById('marketDebugResult');
+        const input = getMarketDebugInput();
+        if (resultPane) {
+          resultPane.textContent = '診断中です...';
+        }
+        if (type === 'clearCache' && !window.confirm('指定条件の相場キャッシュを削除します。車種名が空の場合は全削除します。よろしいですか？')) {
+          if (resultPane) resultPane.textContent = 'キャンセルしました。';
+          return;
+        }
+        const success = (result) => {
+          renderMarketDebugResult(result);
+          loadMarketLogs();
+        };
+        const failure = (error) => {
+          if (resultPane) resultPane.textContent = error.message || String(error);
+        };
+        if (type === 'match') {
+          google.script.run
+            .withSuccessHandler(success)
+            .withFailureHandler(failure)
+            .debugBikeMarketMatchingForAdmin(input.bikeName, input.year, marketAdminAuth());
+          return;
+        }
+        if (type === 'cache') {
+          google.script.run
+            .withSuccessHandler(success)
+            .withFailureHandler(failure)
+            .getBikeMarketCacheForAdmin(input.bikeName, input.year, marketAdminAuth());
+          return;
+        }
+        if (type === 'clearCache') {
+          google.script.run
+            .withSuccessHandler(success)
+            .withFailureHandler(failure)
+            .clearBikeMarketCacheForAdmin(input.bikeName, input.year, marketAdminAuth());
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(success)
+          .withFailureHandler(failure)
+          .debugBikeMarketFetchForAdmin(input.bikeName, input.year, marketAdminAuth());
+      }
+
+      function renderMarketDebugResult(result) {
+        const pane = document.getElementById('marketDebugResult');
+        if (!pane) return;
+        const data = result || {};
+        const fetchResults = data.fetchResults || (data.goBikeDiagnosis && data.goBikeDiagnosis.fetchResults) || [];
+        const firstFetch = fetchResults[0] || {};
+        const summary = data.summary || (data.goBikeDiagnosis && data.goBikeDiagnosis.summary) || {};
+        const aggregation = summary.priceAggregation || {};
+        const extractedCount = aggregation.extracted_count;
+        const yearMatchedCount = aggregation.year_matched_count;
+        const priceAvailableCount = aggregation.price_available_count;
+        const calculationTargetCount = aggregation.calculation_target_count;
+        const outlierExcludedPrices = aggregation.outlier_excluded_prices || [];
+        const stats = data.extractionStats || (data.diagnostics && data.diagnostics.extractionStats) || {};
+        const dictionaryDiagnostics = data.modelDictionaryDiagnostics
+          || (data.diagnostics && data.diagnostics.modelDictionaryDiagnostics)
+          || (data.goBikeDiagnosis && data.goBikeDiagnosis.modelDictionaryDiagnostics)
+          || {};
+        const masterMatch = data.goobikeModelMasterMatch
+          || (data.diagnostics && data.diagnostics.goobikeModelMasterMatch)
+          || (data.goBikeDiagnosis && data.goBikeDiagnosis.goobikeModelMasterMatch)
+          || {};
+        const listingDiagnostics = data.parsedListings || [];
+        const lines = [
+          `実行日時: ${data.executedAt || summary.fetchedAt || ''}`,
+          `入力車種: ${data.inputBikeName || ''}`,
+          `使用したGooBike正式車種名: ${data.usedGoobikeOfficialModelName || (data.diagnostics && data.diagnostics.usedGoobikeOfficialModelName) || '-'}`,
+          `正式車種マスタ候補: ${((masterMatch.candidates || []).map((item) => `${item.officialModelName || item}(${formatCount(item.listingCount)}件)`).join(' / ')) || '-'}`,
+          `入力年式: ${data.inputYear || ''}`,
+          `正規化後の車種: ${data.normalizedBikeName || ''}`,
+          `正規化後の年式: ${data.normalizedYear || '年式指定なし'}`,
+          `使った検索URL: ${(data.searchUrls || []).join(' / ')}`,
+          `HTTPステータス: ${firstFetch.statusCode || ''}`,
+          `レスポンス本文サイズ: ${firstFetch.contentLength || ''}`,
+          `レスポンス内に車種名: ${firstFetch.containsBikeName ? 'あり' : 'なし'}`,
+          `レスポンス内に価格らしき文字列: ${firstFetch.containsPriceText ? 'あり' : 'なし'}`,
+          '',
+          '【一覧ページ抽出】',
+          `GooBike表示件数: ${formatCount(stats.displayedCount ?? firstFetch.displayedCount)}`,
+          `detail URL取得件数: ${formatCount(stats.detailUrlCount ?? firstFetch.detailUrlCount)}`,
+          `一覧カード抽出件数: ${formatCount(stats.listCardCount)}`,
+          `一覧価格取得件数: ${formatCount(stats.listPriceCount)}`,
+          `詳細ページ価格取得件数: ${formatCount(stats.detailPriceCount)}`,
+          `マージ後車両数: ${formatCount(stats.mergedListingCount)}`,
+          `重複除外後車両数: ${formatCount(stats.dedupedListingCount)}`,
+          `車種一致数: ${formatCount(stats.modelMatchedCount)}`,
+          `年式一致数: ${formatCount(stats.yearMatchedCount)}`,
+          `selected_price_yen取得数: ${formatCount(stats.selectedPriceCount)}`,
+          '',
+          '【集計】',
+          `取得候補件数: ${formatCount(extractedCount)}`,
+          `年式一致件数: ${formatCount(yearMatchedCount)}`,
+          `価格取得件数: ${formatCount(priceAvailableCount)}`,
+          `集計対象件数: ${formatCount(calculationTargetCount)}`,
+          `除外した外れ値件数: ${formatCount(aggregation.outlier_excluded_count)}`,
+          `除外した価格一覧: ${Array.isArray(outlierExcludedPrices) ? outlierExcludedPrices.map(formatYen).join(' / ') : outlierExcludedPrices}`,
+          `最低総額: ${formatYen(aggregation.min_price)}`,
+          `最高総額: ${formatYen(aggregation.max_price)}`,
+          `単純平均: ${formatYen(aggregation.simple_average_price)}`,
+          `中央値: ${formatYen(aggregation.median_price)}`,
+          `外れ値除外平均: ${formatYen(aggregation.trimmed_average_price)}`,
+          `参考相場: ${formatYen(aggregation.reference_market_price)}`,
+          `計算方法: ${aggregation.calculation_method ?? ''}`,
+          `最終判定: ${data.finalJudgement || summary.status || ''}`,
+          `エラーコード: ${data.errorCode || summary.errorCode || ''}`,
+          `エラー詳細: ${data.errorMessage || summary.errorMessage || ''}`
+        ];
+        lines.push(
+          '',
+          '【辞書候補】',
+          `入力車種: ${dictionaryDiagnostics.inputBikeName || data.inputBikeName || ''}`,
+          `正規化後入力車種: ${dictionaryDiagnostics.normalizedInput || data.normalizedBikeName || ''}`,
+          `辞書代表車種: ${dictionaryDiagnostics.canonicalName || dictionaryDiagnostics.canonicalKey || '-'}`,
+          `近い辞書候補: ${((dictionaryDiagnostics.closeCandidates || []).map((item) => `${item.canonicalName || item.canonicalKey}:${item.alias}`).join(' / ')) || '-'}`,
+          `GooBike検索結果に出てきた車種名一覧: ${((dictionaryDiagnostics.resultModelNames || []).join(' / ')) || '-'}`,
+          `推定される車種候補: ${((dictionaryDiagnostics.inferredModelCandidates || []).join(' / ')) || '-'}`,
+          `追加すべき同義語候補: ${((dictionaryDiagnostics.aliasCandidates || []).join(' / ')) || '-'}`,
+          `除外語候補: ${((dictionaryDiagnostics.excludeCandidates || []).join(' / ')) || '-'}`
+        );
+        const candidateScoreDiagnostics = dictionaryDiagnostics.candidateScoreDiagnostics
+          || masterMatch.candidateDiagnostics
+          || [];
+        if (candidateScoreDiagnostics.length > 0) {
+          lines.push('', '【候補スコア】');
+          candidateScoreDiagnostics.slice(0, 30).forEach((item) => {
+            lines.push([
+              `候補車種: ${item.officialModelName || ''}`,
+              `メーカー: ${item.maker || item.candidateMaker || ''}`,
+              `推定メーカー: ${item.inputMaker || ''}`,
+              `排気量: ${item.candidateDisplacement || '-'}`,
+              `推定排気量: ${item.inputDisplacement || '-'}`,
+              `主要語: ${((item.candidateMajorTerms || []).join(', ')) || '-'}`,
+              `スコア: ${formatCount(item.score)}`,
+              `候補に出す: ${item.showCandidate ? '出す' : '出さない'}`,
+              `理由: ${((item.reasons || []).join(', ')) || '-'}`,
+              `除外理由: ${((item.excludeReasons || []).join(', ')) || '-'}`
+            ].join(' / '));
+          });
+        }
+        if (data.errorCode === 'FETCH_FORBIDDEN' || data.errorCode === 'FETCH_BLOCKED') {
+          lines.push(
+            '',
+            '【外部サイト取得不可】',
+            'ブラウザでは表示されていますが、Google Apps ScriptサーバーからGooBikeの検索結果を取得できません。',
+            '相場取得方法を、登録済み相場データ方式または正式API方式に切り替えてください。'
+          );
+        }
+        if (listingDiagnostics.length > 0) {
+          lines.push('', '【車両別診断】');
+          listingDiagnostics.slice(0, 80).forEach((item, index) => {
+            const yearText = Array.isArray(item.years) ? item.years.join(', ') : (item.year || '');
+            const modelYearNote = item.titleModelYear ? ` / ${item.titleModelYear}モデル表記あり` : '';
+            const debug = item.cardDebug || {};
+            lines.push(
+              '',
+              `#${index + 1}`,
+              `URL: ${item.url || ''}`,
+              `タイトル: ${item.title || ''}`,
+              `正規化後タイトル: ${item.normalizedTitle || ''}`,
+              `正規化後入力車種: ${item.normalizedInputBikeName || ''}`,
+              `辞書代表車種: ${item.modelCanonicalKey || ''}`,
+              `タイトル判定結果: ${item.titleValidationResult || ''}`,
+              `カード境界判定: ${item.cardBoundaryResult || ''}`,
+              `CARD_BOUNDARY_ERRORの扱い: ${item.cardBoundaryTreatment || ''}`,
+              `車種一致結果: ${item.modelMatched ? '一致' : '不一致'}`,
+              `車種一致理由: ${item.modelMatchReason || ''}`,
+              `ZX-4RR除外判定: ${item.zx4rrExcluded ? '除外' : '対象外'}`,
+              `年式: ${yearText}${modelYearNote}`,
+              `年式一致理由: ${item.yearMatchReason || ''}`,
+              `車両価格: ${formatYen(item.vehiclePriceYen || item.basePriceYen)}`,
+              `支払総額: ${formatYen(item.totalPriceYen)}`,
+              `保証付きプラン価格: ${formatYen(item.warrantyTotalPriceYen)}`,
+              `採用価格: ${formatYen(item.selectedPriceYen)}`,
+              `採用理由: ${item.selectedPriceReason || ''}`,
+              `価格判定結果: ${item.priceValidationResult || ''}`,
+              `価格取得できなかった理由: ${item.priceMissingReason || ''}`,
+              `集計対象: ${item.calculationTarget ? 'true' : 'false'}`,
+              `除外理由: ${item.exclusionReason || ''}`,
+              `車両価格ラベル周辺: ${debug.vehiclePriceSnippet || ''}`,
+              `支払総額ラベル周辺: ${debug.totalPriceSnippet || ''}`,
+              `保証付きプランラベル周辺: ${debug.warrantyPriceSnippet || ''}`
+            );
+            if (!item.selectedPriceYen) {
+              lines.push(
+                `cardHtmlLength: ${formatCount(debug.cardHtmlLength)}`,
+                `cardHtml内に車両価格: ${debug.containsVehiclePriceLabel ? 'あり' : 'なし'}`,
+                `cardHtml内に支払総額: ${debug.containsTotalPriceLabel ? 'あり' : 'なし'}`,
+                `cardHtml内に万円: ${debug.containsManYen ? 'あり' : 'なし'}`,
+                `cardHtml内に価格らしき数字: ${debug.containsPriceLikeNumber ? 'あり' : 'なし'}`,
+                `cardHtml先頭300文字: ${debug.cardHtmlHead || ''}`,
+                `車両価格周辺: ${debug.vehiclePriceSnippet || ''}`,
+                `支払総額周辺: ${debug.totalPriceSnippet || ''}`,
+                `万円周辺: ${debug.manYenSnippet || ''}`
+              );
+            }
+          });
+        }
+        const abnormalExcludedPrices = aggregation.abnormal_excluded_prices || summary.market_abnormal_excluded_prices || [];
+        if (abnormalExcludedPrices.length > 0) {
+          lines.push('', '【異常価格除外】');
+          abnormalExcludedPrices.slice(0, 30).forEach((item) => {
+            lines.push(`除外価格: ${formatYen(item.price)} / 理由: ${item.reason || 'PRICE_OUT_OF_RANGE'} / ${item.title || ''}`);
+          });
+        }
+        lines.push('', 'レスポンス先頭500文字:', firstFetch.contentSample || '', '', 'JSON詳細:', JSON.stringify(data, null, 2));
+        const recommendedCandidates = uniqueStrings(
+          (candidateScoreDiagnostics.length ? candidateScoreDiagnostics : (masterMatch.candidates || []))
+            .filter((item) => item && (item.showCandidate === undefined || item.showCandidate))
+            .map((item) => item.officialModelName || item)
+        ).slice(0, 3);
+        const conclusion = buildMarketDebugConclusion(data, summary, stats, recommendedCandidates);
+        pane.innerHTML = `
+          <div class="market-debug-conclusion">
+            <strong>【診断結果】</strong>
+            <div>${escapeHtml(conclusion.message).replace(/\n/g, '<br>')}</div>
+            ${recommendedCandidates.length ? `
+              <div style="margin-top:10px; font-weight:700;">おすすめ再検索候補</div>
+              <div class="market-debug-rerun-list">
+                ${recommendedCandidates.map((candidate) => `<button type="button" data-dict-candidate-rerun="${escapeHtml(candidate)}">${escapeHtml(candidate)}で再検索</button>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+          <details class="market-debug-details">
+            <summary>詳細ログ</summary>
+            <pre>${escapeHtml(lines.join('\n'))}</pre>
+          </details>
+        `;
+        pane.querySelectorAll('[data-dict-candidate-rerun]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const bikeInput = document.getElementById('marketDebugBikeName');
+            if (bikeInput) bikeInput.value = button.dataset.dictCandidateRerun || '';
+            runMarketDebug('fetch');
+          });
+        });
+        renderDictionaryCandidateActions(pane, dictionaryDiagnostics);
+      }
+
+      function buildMarketDebugConclusion(data, summary, stats, candidates) {
+        if ((summary && summary.status) === 'success') {
+          const official = data.usedGoobikeOfficialModelName || (data.diagnostics && data.diagnostics.usedGoobikeOfficialModelName) || '';
+          const count = data.goobikeModelMasterMatch && data.goobikeModelMasterMatch.listingCount;
+          return { message: [
+            official ? 'GooBike正式車種が見つかりました。' : '相場取得できています。',
+            official ? `使用車種名：${official}` : '',
+            count ? `掲載件数：${formatCount(count)}件` : '',
+            `参考相場は ${formatYen((summary.priceAggregation || {}).reference_market_price)} です。`
+          ].filter(Boolean).join('\n') };
+        }
+        if (data.errorCode === 'FETCH_FORBIDDEN' || data.errorCode === 'FETCH_BLOCKED') {
+          return { message: 'GooBikeへの通信がブロックされています。時間を置いて再試行してください。' };
+        }
+        if (candidates && candidates.length) {
+          return { message: 'GooBikeには候補があります。車種名の表記ゆれの可能性があります。' };
+        }
+        if (Number((stats && stats.displayedCount) || 0) > 0 || Number((stats && stats.detailUrlCount) || 0) > 0) {
+          return { message: 'GooBikeには検索結果がありますが、自動判定できませんでした。候補を選んで再検索してください。' };
+        }
+        return { message: 'この条件ではGooBikeの候補を確認できませんでした。車種名を少し変えて再検索してください。' };
+      }
+
+      function renderDictionaryCandidateActions(pane, diagnostics) {
+        if (!pane || !diagnostics) return;
+        const scoredCandidates = (diagnostics.candidateScoreDiagnostics || [])
+          .filter((item) => item && item.showCandidate)
+          .map((item) => item.officialModelName || '');
+        const candidates = uniqueStrings(scoredCandidates).slice(0, 3);
+        if (candidates.length === 0) return;
+        const canonicalName = diagnostics.canonicalName || diagnostics.inputBikeName || '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'market-debug-actions';
+        wrapper.innerHTML = `
+          <div style="margin-top:12px; font-weight:700;">候補操作</div>
+          ${candidates.map((candidate) => `
+            <div class="market-debug-candidate">
+              <span>${escapeHtml(candidate)}</span>
+              <button type="button" data-dict-candidate-rerun="${escapeHtml(candidate)}">この候補で再検索</button>
+              <button type="button" data-dict-candidate-action="alias" data-dict-candidate-value="${escapeHtml(candidate)}">同義語に追加</button>
+              <button type="button" data-dict-candidate-action="exclude" data-dict-candidate-value="${escapeHtml(candidate)}">除外語に追加</button>
+              <button type="button" data-dict-candidate-action="priority" data-dict-candidate-value="${escapeHtml(candidate)}">優先検索ワードに設定</button>
+            </div>
+          `).join('')}
+        `;
+        pane.appendChild(wrapper);
+        wrapper.querySelectorAll('[data-dict-candidate-action]').forEach((button) => {
+          button.addEventListener('click', () => updateBikeModelDictionaryFromCandidate(
+            canonicalName,
+            button.dataset.dictCandidateValue || '',
+            button.dataset.dictCandidateAction || ''
+          ));
+        });
+        wrapper.querySelectorAll('[data-dict-candidate-rerun]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const bikeInput = document.getElementById('marketDebugBikeName');
+            if (bikeInput) bikeInput.value = button.dataset.dictCandidateRerun || '';
+            runMarketDebug('fetch');
+          });
+        });
+      }
+
+      function uniqueStrings(values) {
+        const seen = new Set();
+        return values.filter((value) => {
+          const text = String(value || '').trim();
+          const key = normalizeText(text);
+          if (!text || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      function updateBikeModelDictionaryFromCandidate(canonicalName, value, action) {
+        const resultPane = document.getElementById('bikeModelDictResult');
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (resultPane) resultPane.textContent = result.message || '車種名辞書を更新しました。';
+            renderBikeModelDictionaryData(result.data || {});
+            showToast(result.message || '車種名辞書を更新しました。');
+          })
+          .withFailureHandler((error) => {
+            showToast(error.message || String(error));
+          })
+          .updateBikeModelDictionaryFromCandidate({ canonicalName, value, action }, marketAdminAuth());
+      }
+
+      function loadMarketLogs() {
+        const rows = document.getElementById('marketLogRows');
+        if (rows) rows.innerHTML = '<tr><td colspan="11" class="empty">読み込み中です</td></tr>';
+        google.script.run
+          .withSuccessHandler(renderMarketLogs)
+          .withFailureHandler((error) => {
+            if (rows) rows.innerHTML = `<tr><td colspan="11" class="empty">${escapeHtml(error.message || String(error))}</td></tr>`;
+          })
+          .getBikeMarketLogsForAdmin(80, marketAdminAuth());
+      }
+
+      function renderMarketLogs(data) {
+        const rows = document.getElementById('marketLogRows');
+        if (!rows) return;
+        const logs = (data && data.rows) || [];
+        state.marketLogs = logs;
+        if (logs.length === 0) {
+          rows.innerHTML = '<tr><td colspan="11" class="empty">取得ログはまだありません。</td></tr>';
+          return;
+        }
+        rows.innerHTML = logs.map((log, index) => {
+          return `
+            <tr>
+              <td>${escapeHtml(log.timestamp)}</td>
+              <td>${escapeHtml(log.customer_name)}</td>
+              <td>${escapeHtml(log.bike_name)}</td>
+              <td>${escapeHtml(log.year)}</td>
+              <td>${escapeHtml(log.status)}</td>
+              <td>${escapeHtml(log.error_code)}</td>
+              <td>${escapeHtml(log.http_status)}</td>
+              <td>${escapeHtml(log.content_length)}</td>
+              <td>${escapeHtml(log.parsed_count)}</td>
+              <td>${escapeHtml(log.price_count)}</td>
+              <td><button type="button" data-market-log-detail="${index}">詳細</button></td>
+            </tr>
+          `;
+        }).join('');
+        rows.querySelectorAll('[data-market-log-detail]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const index = Number(button.dataset.marketLogDetail);
+            renderMarketDebugResult(state.marketLogs[index] || {});
+          });
+        });
       }
 
       function renderApplicationTypeFilter() {
@@ -700,11 +2097,37 @@
         els.statusFilter.value = current;
       }
 
+      function renderMarketFilter() {
+        const current = els.marketFilter.value;
+        els.marketFilter.innerHTML = '<option value="">全相場</option>';
+        state.marketFilterOptions.forEach((status) => {
+          const option = document.createElement('option');
+          option.value = status;
+          option.textContent = marketFilterLabel(status);
+          els.marketFilter.appendChild(option);
+        });
+        els.marketFilter.value = current;
+      }
+
+      function marketFilterLabel(status) {
+        return {
+          '相場取得済み': '相場済',
+          '相場取得中': '相場取得中',
+          '相場未取得': '未取得',
+          '車種名確認': '車種名確認',
+          '該当なし': '該当なし',
+          '取得エラー': '取得失敗',
+          '要再取得': '再取得推奨'
+        }[status] || status;
+      }
+
       function applyFilters() {
         const keyword = normalizeText(els.search.value);
         const applicationType = els.applicationTypeFilter.value;
         const status = els.statusFilter.value;
         const requestType = els.requestFilter.value;
+        const marketStatus = els.marketFilter.value;
+        const sortType = els.marketSort.value;
 
         state.filtered = state.customers.filter((customer) => {
           const searchable = normalizeText([
@@ -713,21 +2136,51 @@
             customer.phone,
             customer.email,
             customer.workplace,
-            customer.desiredCar
+            customer.desiredCar,
+            customer.desiredYear,
+            customer.market && customer.market.status
           ].join(' '));
 
           return (!keyword || searchable.includes(keyword))
             && (!applicationType || customer.applicationType === applicationType)
             && (!status || customer.status === status)
-            && (!requestType || customer.requestType === requestType);
+            && (!requestType || customer.requestType === requestType)
+            && (!marketStatus || (customer.market && customer.market.status === marketStatus));
         });
+
+        sortFilteredCustomers(sortType);
 
         renderTable();
       }
 
+      function sortFilteredCustomers(sortType) {
+        if (!sortType) {
+          return;
+        }
+        const direction = sortType.endsWith('Asc') ? 1 : -1;
+        const getterMap = {
+          marketFetchedDesc: (customer) => parseDateTime(customer.market && customer.market.fetchedAt),
+          marketFetchedAsc: (customer) => parseDateTime(customer.market && customer.market.fetchedAt),
+          marketAverageDesc: (customer) => safeNumber(getMarketAggregation(customer.market).reference_market_price),
+          marketAverageAsc: (customer) => safeNumber(getMarketAggregation(customer.market).reference_market_price),
+          marketListingDesc: (customer) => safeNumber(getMarketAggregation(customer.market).price_available_count),
+          marketListingAsc: (customer) => safeNumber(getMarketAggregation(customer.market).price_available_count)
+        };
+        const getter = getterMap[sortType];
+        if (!getter) {
+          return;
+        }
+        state.filtered.sort((a, b) => {
+          const av = getter(a);
+          const bv = getter(b);
+          if (av === bv) return parseDateTime(b.receivedAt) - parseDateTime(a.receivedAt);
+          return av > bv ? direction : -direction;
+        });
+      }
+
       function renderTable() {
         if (state.filtered.length === 0) {
-          els.rows.innerHTML = '<tr><td colspan="12" class="empty">該当する申込はありません。</td></tr>';
+          els.rows.innerHTML = '<tr><td colspan="14" class="empty">該当する申込はありません。</td></tr>';
           return;
         }
 
@@ -737,6 +2190,7 @@
           const rowClasses = [];
           if (state.selected && state.selected.rowKey === customer.rowKey) rowClasses.push('selected');
           if (isDelivered(customer)) rowClasses.push('result-delivered');
+          else if (isResponseUnavailable(customer)) rowClasses.push('result-denied');
           else if (isCustomerApproved(customer)) rowClasses.push('result-approved');
           else if (isGuarantorReview(customer)) rowClasses.push('result-guarantor');
           else if (isPendingReview(customer)) rowClasses.push('result-pending');
@@ -754,6 +2208,7 @@
             <td>${escapeHtml(customer.workplace)}</td>
             <td>${escapeHtml(customer.desiredCar)}</td>
             <td>${escapeHtml(customer.monthlyPayment || customer.maxMonthlyPayment)}</td>
+            <td>${marketBadge(customer.market)}</td>
             <td>${badge(customer.status)}</td>
             <td>${escapeHtml(customer.callCount || 0)}回<br><span class="muted">${escapeHtml(customer.latestCallResult || '')}</span></td>
             <td>${badge(customer.review1)}</td>
@@ -797,6 +2252,7 @@
 
           <div class="detail-section">
             ${readonlyField('希望車種', customer.desiredCar)}
+            ${readonlyField('年式', customer.desiredYear)}
             ${readonlyField('審査申込金額', customer.applicationAmount)}
             ${readonlyField('支払い回数', customer.paymentCount)}
             ${readonlyField('お客様提示金利(%)', customer.customerRate)}
@@ -807,6 +2263,10 @@
             ${readonlyField('実コスト総額', customer.actualCostTotal)}
             ${readonlyField('キックバック差額', customer.kickbackDiff)}
           </div>
+
+          <form id="marketForm" class="detail-section market-card">
+            ${marketCardHtml(customer)}
+          </form>
 
           <form id="managementForm" class="detail-section">
             ${selectField('申込種別', 'applicationType', customer.applicationType, state.applicationTypeOptions)}
@@ -850,6 +2310,10 @@
         document.getElementById('saveButton').addEventListener('click', saveSelected);
         document.getElementById('deleteCustomerButton').addEventListener('click', deleteSelectedCustomer);
         document.getElementById('premiumPdfButton').addEventListener('click', createPremiumApplicationPdf);
+        document.getElementById('marketSearchButton').addEventListener('click', searchMarketForSelected);
+        document.querySelectorAll('[data-market-candidate]').forEach((button) => {
+          button.addEventListener('click', () => searchMarketCandidate(button.dataset.marketCandidate || ''));
+        });
         const fetchInquiryButton = document.getElementById('fetchInquiryButton');
         if (fetchInquiryButton) {
           fetchInquiryButton.addEventListener('click', fetchInquiryContentForSelected);
@@ -1067,10 +2531,17 @@
         if (!customer) {
           return false;
         }
+        if (isResponseUnavailable(customer)) {
+          return true;
+        }
         if (isAstTargetPrefecture(customer.prefecture)) {
           return isPremiumDenied(customer) && isAstDenied(customer);
         }
         return isPremiumDenied(customer);
+      }
+
+      function isResponseUnavailable(customer) {
+        return customer && (customer.status === '対応不可' || customer.status === '相談のみで終了');
       }
 
       function isGuarantorReview(customer) {
@@ -1150,6 +2621,18 @@
         setBusy(true);
         google.script.run
           .withSuccessHandler((result) => {
+            const normalized = normalizeMarketResult(result);
+            console.log('market search response', {
+              status: result && result.status,
+              marketStatus: result && result.marketStatus,
+              summary: result && result.summary,
+              summaryPriceAggregation: result && result.summary && result.summary.priceAggregation,
+              priceAggregation: result && result.priceAggregation,
+              errorCode: result && result.errorCode,
+              errorMessage: result && result.errorMessage,
+              normalized
+            });
+            applyNormalizedMarketToSelected(normalized, payload);
             showToast(result.message);
             state.saving = false;
             loadDashboard();
@@ -1219,6 +2702,173 @@
             showToast(error.message || String(error));
           })
           .deleteCustomerApplication(payload);
+      }
+
+      function searchMarketForSelected() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+        const form = document.getElementById('marketForm');
+        const payload = {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey,
+          bikeName: form.elements.marketBikeName.value,
+          year: form.elements.marketYear.value
+        };
+
+        runMarketSearch(payload);
+      }
+
+      function searchMarketCandidate(candidate) {
+        if (!candidate || !state.selected || state.saving) {
+          return;
+        }
+        const form = document.getElementById('marketForm');
+        if (form && form.elements.marketBikeName) {
+          form.elements.marketBikeName.value = candidate;
+        }
+        runMarketSearch({
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey,
+          bikeName: candidate,
+          year: form && form.elements.marketYear ? form.elements.marketYear.value : (state.selected.desiredYear || '')
+        });
+      }
+
+      function runMarketSearch(payload) {
+        state.saving = true;
+        setBusy(true);
+        const button = document.getElementById('marketSearchButton');
+        if (button) {
+          button.disabled = true;
+          button.textContent = '相場取得中...';
+        }
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (result && result.customer) {
+              applyServerCustomerUpdate(result.customer);
+            } else {
+              const normalized = normalizeMarketResult(result);
+              applyNormalizedMarketToSelected(normalized, payload);
+              applyFilters();
+            }
+            showToast(result.message);
+            state.saving = false;
+            setBusy(false);
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            state.saving = false;
+            setBusy(false);
+            showToast('相場情報を取得できませんでした。時間を置いて再度お試しください。改善しない場合は管理者に確認してください。');
+            if (button) {
+              button.disabled = false;
+              button.textContent = '相場取得';
+            }
+          })
+          .searchBikeMarketForCustomer(payload);
+      }
+
+      function applyServerCustomerUpdate(customer) {
+        if (!customer || !customer.rowKey) {
+          return;
+        }
+        const index = state.customers.findIndex((item) => item.rowKey === customer.rowKey);
+        if (index >= 0) {
+          state.customers[index] = customer;
+        } else {
+          state.customers.unshift(customer);
+        }
+        if (state.selected && state.selected.rowKey === customer.rowKey) {
+          state.selected = customer;
+          renderDetail(customer);
+        }
+        applyFilters();
+      }
+
+      function normalizeMarketResult(response) {
+        const summary = (response && response.summary) || response || {};
+        const agg = summary.priceAggregation || (response && response.priceAggregation) || {};
+        const normalized = {
+          status: 'success',
+          market_status: 'success',
+          market_reference_price: Number(agg.reference_market_price || summary.market_reference_price || summary.referenceMarketPriceYen || 0),
+          market_min_price: Number(agg.min_price || summary.market_min_price || summary.minTotalPriceYen || 0),
+          market_max_price: Number(agg.max_price || summary.market_max_price || summary.maxTotalPriceYen || 0),
+          market_simple_average_price: Number(agg.simple_average_price || summary.market_simple_average_price || summary.simpleAverageTotalPriceYen || summary.averageTotalPriceYen || 0),
+          market_median_price: Number(agg.median_price || summary.market_median_price || summary.medianTotalPriceYen || 0),
+          market_trimmed_average_price: Number(agg.trimmed_average_price || summary.market_trimmed_average_price || summary.trimmedAverageTotalPriceYen || 0),
+          market_extracted_count: Number(agg.extracted_count || summary.market_extracted_count || summary.extractedCount || 0),
+          market_year_matched_count: Number(agg.year_matched_count || summary.market_year_matched_count || summary.yearMatchedCount || 0),
+          market_price_available_count: Number(agg.price_available_count || summary.market_price_available_count || summary.priceAvailableCount || summary.validPriceCount || 0),
+          market_calculation_target_count: Number(agg.calculation_target_count || summary.market_calculation_target_count || summary.calculationTargetCount || 0),
+          market_calculation_method: agg.calculation_method || summary.market_calculation_method || summary.calculationMethod || '',
+          market_price_warning: agg.price_warning || summary.market_price_warning || summary.priceWarning || '',
+          market_error_message: '',
+          market_error_code: '',
+          market_fetched_at: summary.fetchedAt || new Date().toISOString(),
+          market_raw_json: JSON.stringify(summary)
+        };
+        const isSuccess = normalized.market_reference_price > 0
+          && normalized.market_min_price > 0
+          && normalized.market_max_price > 0
+          && normalized.market_price_available_count > 0;
+        if (!isSuccess) {
+          normalized.status = 'error';
+          normalized.market_status = 'error';
+          normalized.market_error_message = (response && response.errorMessage) || summary.errorMessage || '相場価格を確認できませんでした。';
+          normalized.market_error_code = (response && response.errorCode) || summary.errorCode || '';
+        }
+        return normalized;
+      }
+
+      function applyNormalizedMarketToSelected(normalized, payload) {
+        if (!state.selected || !normalized || normalized.market_status !== 'success') {
+          return;
+        }
+        const agg = {
+          extracted_count: normalized.market_extracted_count,
+          year_matched_count: normalized.market_year_matched_count,
+          price_available_count: normalized.market_price_available_count,
+          calculation_target_count: normalized.market_calculation_target_count,
+          min_price: normalized.market_min_price,
+          max_price: normalized.market_max_price,
+          simple_average_price: normalized.market_simple_average_price,
+          median_price: normalized.market_median_price,
+          trimmed_average_price: normalized.market_trimmed_average_price,
+          reference_market_price: normalized.market_reference_price,
+          calculation_method: normalized.market_calculation_method,
+          price_warning: normalized.market_price_warning
+        };
+        state.selected.market = Object.assign({}, state.selected.market || {}, {
+          status: '相場取得済み',
+          marketStatus: 'success',
+          minPrice: normalized.market_min_price,
+          maxPrice: normalized.market_max_price,
+          simpleAveragePrice: normalized.market_simple_average_price,
+          medianPrice: normalized.market_median_price,
+          trimmedAveragePrice: normalized.market_trimmed_average_price,
+          referencePrice: normalized.market_reference_price,
+          validPriceCount: normalized.market_price_available_count,
+          extractedCount: normalized.market_extracted_count,
+          yearMatchedCount: normalized.market_year_matched_count,
+          calculationTargetCount: normalized.market_calculation_target_count,
+          calculationMethod: normalized.market_calculation_method,
+          priceWarning: normalized.market_price_warning,
+          priceAggregation: agg,
+          fetchedAt: normalized.market_fetched_at,
+          errorMessage: '',
+          errorCode: '',
+          searchBikeName: payload && payload.bikeName ? payload.bikeName : state.selected.desiredCar,
+          searchYear: payload && payload.year ? payload.year : state.selected.desiredYear
+        });
+        state.selected.market_status = 'success';
+        state.selected.market_reference_price = normalized.market_reference_price;
+        state.selected.market_min_price = normalized.market_min_price;
+        state.selected.market_max_price = normalized.market_max_price;
+        state.selected.market_price_available_count = normalized.market_price_available_count;
+        state.selected.market_calculation_method = normalized.market_calculation_method;
+        renderDetail(state.selected);
       }
 
       function bindLoanPreviewEvents() {
@@ -1308,6 +2958,133 @@
         `;
       }
 
+      function marketCardHtml(customer) {
+        const market = customer.market || {};
+        const agg = getMarketAggregation(market);
+        const status = market.status || '相場未取得';
+        const statusText = marketStatusText(market);
+        const isSuccess = status === '相場取得済み';
+        return `
+          <h3>
+            <span>バイク相場</span>
+          </h3>
+          ${isSuccess ? marketSuccessSummaryHtml(agg, market) : `<div class="muted" style="margin-bottom:10px; white-space:pre-line;">${escapeHtml(statusText)}</div>`}
+          ${status === '車種名確認' ? marketCandidateButtonsHtml(market) : ''}
+          <div class="application-grid">
+            ${inputField('希望車種', 'marketBikeName', customer.desiredCar, '例: R1250GS')}
+            ${inputField('年式', 'marketYear', customer.desiredYear || (market.searchYear || ''), '例: 2022 / 2020-2023 / 令和4年')}
+          </div>
+          <div class="actions">
+            <button type="button" id="marketSearchButton" class="primary">相場取得</button>
+          </div>
+          <details class="market-note" style="margin-top:12px;">
+            <summary>集計詳細</summary>
+            <div class="market-grid" style="margin-top:10px;">
+              <div><label>希望車種</label><strong>${escapeHtml(market.searchBikeName || customer.desiredCar || '-')}</strong></div>
+              <div><label>年式</label><strong>${escapeHtml(marketYearDisplay(market.searchYear || customer.desiredYear))}</strong></div>
+              <div><label>掲載候補</label><strong>${formatCount(agg.extracted_count)}台</strong></div>
+              <div><label>年式一致</label><strong>${formatCount(agg.year_matched_count)}台</strong></div>
+              <div><label>集計対象</label><strong>${formatCount(agg.calculation_target_count)}台</strong></div>
+              <div><label>単純平均</label><strong>${formatYen(agg.simple_average_price)}</strong></div>
+              <div><label>中央値</label><strong>${formatYen(agg.median_price)}</strong></div>
+              <div><label>取得日時</label><strong>${escapeHtml(formatDateTimeMinute(market.fetchedAt))}</strong></div>
+            </div>
+          </details>
+          <div class="market-note">
+            ※参考相場は、台数に応じて中央値または外れ値除外後の平均を使用しています。<br>
+            ※総額が取得できない車両は本体価格で代用している場合があります。<br>
+            ※表示価格は掲載情報ベースであり、実売価格・陸送費・登録費用・保証費用は別途確認が必要です。
+          </div>
+        `;
+      }
+
+      function marketSuccessSummaryHtml(agg, market) {
+        const priceWarning = (agg && agg.price_warning) || (market && market.priceWarning) || '';
+        return `
+          <div class="market-summary">
+            <div class="market-summary-status">🟢 相場取得済み</div>
+            ${priceWarning ? `<div class="market-summary-warning">⚠ ${escapeHtml(priceWarning)}</div>` : ''}
+            <div class="market-summary-reference">
+              <label>参考相場</label>
+              <strong>${formatYen(agg.reference_market_price)}</strong>
+            </div>
+            <div class="market-summary-row">
+              <label>最低総額</label>
+              <strong>${formatYen(agg.min_price)}</strong>
+            </div>
+            <div class="market-summary-row">
+              <label>最高総額</label>
+              <strong>${formatYen(agg.max_price)}</strong>
+            </div>
+            <div class="market-summary-row">
+              <label>価格取得</label>
+              <strong>${formatCount(agg.price_available_count)}台</strong>
+            </div>
+          </div>
+        `;
+      }
+
+      function marketCandidateButtonsHtml(market) {
+        const candidates = uniqueStrings(market && market.modelCandidateOptions ? market.modelCandidateOptions : []).slice(0, 3);
+        if (candidates.length === 0) {
+          return '';
+        }
+        return `
+          <div class="market-candidates">
+            <div class="market-candidates-title">近い車種候補を選んで再検索してください。</div>
+            ${candidates.map((candidate) => `
+              <button type="button" class="market-candidate-button" data-market-candidate="${escapeHtml(candidate)}">${escapeHtml(candidate)}で再検索</button>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function marketStatusText(market) {
+        const status = market.status || '相場未取得';
+        const agg = getMarketAggregation(market);
+        if (status === '相場取得済み') {
+          const priceWarning = (agg && agg.price_warning) || market.priceWarning || '';
+          return [
+            '【相場取得済み】',
+            priceWarning ? `⚠ ${priceWarning}` : '',
+            `参考相場：${formatYen(agg.reference_market_price)}`,
+            '',
+            `最低総額：${formatYen(agg.min_price)}`,
+            `最高総額：${formatYen(agg.max_price)}`,
+            `価格取得：${formatCount(agg.price_available_count)}台`
+          ].filter((line) => line !== '').join('\n');
+        }
+        if (status === '相場取得中') {
+          return '【相場取得中】\n新規申込の相場を自動取得しています。完了後に一覧へ反映されます。';
+        }
+        if (status === '車種名確認') {
+          if (market.noDataReason === 'goobike_model_master_unavailable') {
+            return '【車種名確認】\n車種マスタが未更新です。\n管理者画面でGooBike車種マスタを更新してください。';
+          }
+          if (market.noDataReason === 'multiple_model_candidates') {
+            const candidates = (market.modelCandidateOptions || []).map((item) => `- ${item}`).join('\n');
+            return ['【車種名確認】', '複数の車種が入力されています。', 'どれか1つを選んでください。', '', '候補:', candidates || '-'].join('\n');
+          }
+          if (market.noDataReason === 'model_confirmation_required') {
+            if ((market.modelCandidateOptions || []).length > 0) {
+              return '【車種名確認】\nこの車種名では相場を自動取得できませんでした。\n近い車種候補を選んで再検索してください。';
+            }
+            return '【車種名確認】\nこの車種名では相場を自動取得できませんでした。\n車種名を少し変えて再検索してください。';
+          }
+          return '【車種名確認】\nこの車種名では相場を自動取得できませんでした。\n車種名を少し変えて再検索してください。';
+        }
+        if (status === '該当なし') {
+          return '【該当なし】\nこの車種・年式に一致する相場データが見つかりませんでした。';
+        }
+        if (status === '取得エラー') {
+          return '【相場取得エラー】\n相場情報を取得できませんでした。管理者に確認してください。';
+        }
+        if (status === '要再取得') {
+          return '【再取得推奨】\n前回取得から30日以上経過、または希望車種・年式が変更されています。';
+        }
+        return 'この顧客の希望車種はまだ相場取得されていません。';
+      }
+
       function parseNumber(value) {
         const normalized = String(value || '')
           .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
@@ -1316,15 +3093,70 @@
         return Number.isFinite(number) ? number : 0;
       }
 
-      function formatYen(value) {
+      function safeNumber(value) {
         if (value === '' || value === null || value === undefined) {
+          return null;
+        }
+        const number = typeof value === 'number' ? value : Number(value);
+        return Number.isFinite(number) ? number : null;
+      }
+
+      function formatYen(value) {
+        const number = safeNumber(value);
+        if (number === null) {
           return '-';
         }
-        const number = parseNumber(value);
-        if (!number) {
+        if (Math.abs(number) >= 1000000000) {
+          return '表示値エラー';
+        }
+        if (number === 0) {
           return '-';
         }
         return Math.round(number).toLocaleString('ja-JP') + '円';
+      }
+
+      function formatCount(value) {
+        const number = safeNumber(value);
+        if (number === null) {
+          return '-';
+        }
+        if (number > 10000) {
+          return '件数エラー';
+        }
+        if (number < 0) {
+          return '件数エラー';
+        }
+        return Math.round(number).toLocaleString('ja-JP');
+      }
+
+      function getMarketAggregation(market) {
+        return (market && market.priceAggregation) || {};
+      }
+
+      function marketCalculationMethodLabel(method) {
+        return {
+          single_price: '1台のみ',
+          simple_average_2_items: '2台平均',
+          median_3_to_6_items: '中央値',
+          trimmed_average_7_to_9_items: '外れ値除外平均',
+          iqr_filtered_average_10_plus: 'IQR外れ値除外',
+          median_fallback: '中央値'
+        }[method] || '-';
+      }
+
+      function marketYearDisplay(value) {
+        const text = String(value || '').trim();
+        const normalized = text.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, '');
+        if (!normalized || ['特になし', 'なし', '未指定', '不明', '年式なし', '年式未指定', 'なるべく新しめ', '新しめ', '高年式', '最近の年式'].includes(normalized)) {
+          return '年式指定なし';
+        }
+        return text;
+      }
+
+      function formatDateTimeMinute(value) {
+        const text = String(value || '').trim();
+        const match = text.match(/^(\d{4}\/\d{1,2}\/\d{1,2})\s+(\d{1,2}:\d{2})/);
+        return match ? `${match[1]} ${match[2]}` : (text || '-');
       }
 
       function addCallForSelected() {
@@ -1499,9 +3331,27 @@
         const text = value || '-';
         let color = '';
         if (text.indexOf('可決') !== -1 || text.indexOf('成約') !== -1) color = 'green';
-        if (text.indexOf('否決') !== -1 || text.indexOf('終了') !== -1) color = 'red';
+        if (text.indexOf('否決') !== -1 || text.indexOf('終了') !== -1 || text.indexOf('対応不可') !== -1) color = 'red';
         if (text.indexOf('審査中') !== -1 || text.indexOf('架電中') !== -1) color = 'amber';
         return `<span class="badge ${color}">${escapeHtml(text)}</span>`;
+      }
+
+      function marketBadge(market) {
+        const status = market && market.status ? market.status : '相場未取得';
+        const agg = getMarketAggregation(market);
+        const reference = agg.reference_market_price ? ` 参考 ${formatYen(agg.reference_market_price)}` : '';
+        const count = agg.price_available_count ? ` / ${formatCount(agg.price_available_count)}台` : '';
+        const warning = (agg.price_warning || (market && market.priceWarning)) ? ' ⚠要確認' : '';
+        const config = {
+          '相場取得済み': { cls: 'done', label: `🟢 相場済${warning}${reference}${count}` },
+          '相場取得中': { cls: 'refresh', label: '🔄 相場取得中' },
+          '相場未取得': { cls: 'none', label: '⚪ 未取得' },
+          '車種名確認': { cls: 'refresh', label: '🟡 車種名確認' },
+          '該当なし': { cls: 'refresh', label: '🟠 該当なし' },
+          '取得エラー': { cls: 'error', label: '🔴 取得失敗' },
+          '要再取得': { cls: 'refresh', label: '🟡 再取得推奨' }
+        }[status] || { cls: 'none', label: status };
+        return `<span class="market-badge ${config.cls}">${escapeHtml(config.label)}</span>`;
       }
 
       function prefectureCell(prefecture) {
@@ -1535,6 +3385,27 @@
 
       function normalizeText(value) {
         return String(value || '').replace(/\s+/g, '').toLowerCase();
+      }
+
+      function numberValue(value) {
+        const number = Number(String(value || '').replace(/[^\d.-]/g, ''));
+        return Number.isFinite(number) ? number : 0;
+      }
+
+      function parseDateTime(value) {
+        const text = String(value || '').trim();
+        const match = text.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (!match) {
+          return 0;
+        }
+        return new Date(
+          Number(match[1]),
+          Number(match[2]) - 1,
+          Number(match[3]),
+          Number(match[4] || 0),
+          Number(match[5] || 0),
+          Number(match[6] || 0)
+        ).getTime();
       }
 
       function escapeHtml(value) {

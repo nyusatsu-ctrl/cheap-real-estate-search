@@ -4,6 +4,7 @@
 // ============================================================
 
 // ★★★ ここにスプレッドシートのIDを貼り付けてください ★★★
+// TODO: 公開リポジトリで運用する場合は PropertiesService 管理へ移し、コード上に固定IDを置かない。
 var SPREADSHEET_ID = '1mHHZj52sdonTvhqTHv2mYrjFumdnGwltzg9-t6XXvpw';
 
 // シート名
@@ -190,6 +191,20 @@ function importLoanApplications() {
       sheet.getRange(2, 1, 1, row.length).setValues([row]);
       setApplicationTypeIfColumnExists_(sheet, 2, applicationType);
       setExtraApplicationColumns_(sheet, 2, parsed);
+      var autoMarketCustomerId = '';
+      try {
+        var autoMarketHeaderMap = getHeaderMap_(sheet);
+        var autoMarketRow = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+        autoMarketCustomerId = buildApplicationRowKey_(autoMarketRow, autoMarketHeaderMap);
+        autoFetchBikeMarketForNewCustomer(autoMarketCustomerId);
+      } catch (autoMarketError) {
+        try {
+          saveBikeMarketAutoFetchError(autoMarketCustomerId || 2, autoMarketError);
+        } catch (saveAutoMarketError) {
+          Logger.log('相場自動取得エラー保存失敗: ' + (saveAutoMarketError && saveAutoMarketError.message ? saveAutoMarketError.message : saveAutoMarketError));
+        }
+        Logger.log('相場自動取得は失敗しましたが、申込取込は継続します: ' + (autoMarketError && autoMarketError.message ? autoMarketError.message : autoMarketError));
+      }
       Logger.log('取り込み完了: ' + (parsed['お名前'] || '名前なし'));
     }
 

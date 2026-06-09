@@ -1,16 +1,28 @@
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 const APP_ROOT = path.resolve(new URL("..", import.meta.url).pathname);
+const requireFromApp = createRequire(import.meta.url);
 const SOURCES_PATH = path.join(APP_ROOT, "data", "defense-sources.json");
 const CANDIDATES_PATH = path.join(APP_ROOT, "data", "defense-candidates.json");
 const CRAWL_SUMMARY_PATH = path.join(APP_ROOT, "data", "defense-crawl-summary.json");
 const FETCH_TIMEOUT_MS = 8000;
+const PLAYWRIGHT_TIMEOUT_MS = Number(process.env.DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS ?? 30000);
+const PLAYWRIGHT_WAIT_INTERVAL_MS = Number(process.env.DEFENSE_CRAWLER_PLAYWRIGHT_WAIT_INTERVAL_MS ?? 3000);
+const PLAYWRIGHT_MAX_WAIT_MS = Number(process.env.DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS ?? 45000);
 const CHILD_LINK_LIMIT = 5;
 const REQUEST_DELAY_MS = 100;
 const CHILD_REQUEST_DELAY_MS = 50;
 const CRAWL_CONCURRENCY = 6;
+const PLAYWRIGHT_FALLBACK_ENABLED = process.env.DEFENSE_CRAWLER_DISABLE_PLAYWRIGHT !== "1";
+const PLAYWRIGHT_HEADLESS = process.env.DEFENSE_CRAWLER_PLAYWRIGHT_HEADLESS !== "0";
+const BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
+
+let playwrightBrowser = null;
+let playwrightContext = null;
+let playwrightFallbackChain = Promise.resolve();
 
 const OFFICIAL_HOSTS = [
   "mod.go.jp",
@@ -196,7 +208,7 @@ const ASDF_BASE_SOURCES = [
 const DEFENSE_SEED_SOURCES = [
   ...DEFENSE_PARENT_SOURCES,
   source("北部方面隊", "ground_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/gsdf/nae/fin/", "defense_unit", "A"),
-  source("東北方面隊", "ground_self_defense_force", "東北", null, "https://www.mod.go.jp/gsdf/neae/neahq/koukoku/finindex.htm", "defense_unit", "A"),
+  source("東北方面隊", "ground_self_defense_force", "東北", null, "https://www.mod.go.jp/gsdf/neae/koukoku/fin/", "defense_unit", "A"),
   source("東部方面隊", "ground_self_defense_force", "関東", null, "https://www.mod.go.jp/gsdf/eae/kaikei/eafin/index.html", "defense_unit", "A"),
   source("中部方面隊", "ground_self_defense_force", "中部", null, "https://www.mod.go.jp/gsdf/mae/mafin/", "defense_unit", "A"),
   source("西部方面隊", "ground_self_defense_force", "九州", null, "https://www.mod.go.jp/gsdf/wae/info/nyusatu/", "defense_unit", "A"),
@@ -242,7 +254,16 @@ function source(sourceName, organizationType, region, prefecture, url, crawlerTy
   };
 }
 
-async function fetchText(url) {
+async function fetchText(url, options = {}) {
+  try {
+    return await fetchTextDirect(url);
+  } catch (error) {
+    if (!shouldUsePlaywrightFallback(error, url, options.sourceInfo)) throw error;
+    return withPlaywrightFallback(() => fetchTextWithPlaywright(url, options.sourceInfo, error));
+  }
+}
+
+async function fetchTextDirect(url) {
   assertOfficialUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -256,9 +277,19 @@ async function fetchText(url) {
   const buffer = Buffer.from(await response.arrayBuffer());
   const contentType = response.headers.get("content-type") ?? "";
   const html = decodeBuffer(buffer, contentType);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.url}`);
-  if (/Just a moment|Cloudflare|cf-browser-verification|Attention Required/i.test(html)) {
-    throw new Error(`Blocked by anti-bot challenge: ${response.url}`);
+  if (!response.ok) {
+    throw fetchError(`HTTP ${response.status}: ${response.url}`, {
+      code: response.status === 403 ? "HTTP_403" : "HTTP_ERROR",
+      status: response.status,
+      url: response.url
+    });
+  }
+  if (isChallengeHtml(html) || response.headers.get("cf-mitigated") === "challenge") {
+    throw fetchError(`Blocked by anti-bot challenge: ${response.url}`, {
+      code: "ANTI_BOT_CHALLENGE",
+      status: response.status,
+      url: response.url
+    });
   }
   return {
     url: response.url,
@@ -267,6 +298,183 @@ async function fetchText(url) {
     html,
     mojibake: false
   };
+}
+
+function fetchError(message, details = {}) {
+  const error = new Error(message);
+  Object.assign(error, details);
+  return error;
+}
+
+function isChallengeHtml(html) {
+  return /Just a moment|Cloudflare|cf-browser-verification|Attention Required|Enable JavaScript and cookies|cf_chl|しばらくお待ちください/i.test(html);
+}
+
+function shouldUsePlaywrightFallback(error, url, sourceInfo) {
+  if (!PLAYWRIGHT_FALLBACK_ENABLED) return false;
+  if (!["HTTP_403", "ANTI_BOT_CHALLENGE"].includes(error.code)) return false;
+
+  const target = `${url} ${sourceInfo?.source_name ?? ""}`;
+  return /西部方面|北部方面|東北方面|中央会計隊|中部方面|東部方面|\/gsdf\/wae\/|\/gsdf\/nae\/|\/gsdf\/neae\/|\/gsdf\/dc\/cfin\/|\/gsdf\/mae\/|\/gsdf\/eae\/kaikei\/eafin\//.test(target);
+}
+
+async function withPlaywrightFallback(task) {
+  const run = playwrightFallbackChain.then(task, task);
+  playwrightFallbackChain = run.catch(() => {});
+  return run;
+}
+
+async function fetchTextWithPlaywright(url, sourceInfo, originalError) {
+  assertOfficialUrl(url);
+  const context = await getPlaywrightContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: PLAYWRIGHT_TIMEOUT_MS });
+    const html = await waitForPlaywrightContent(page);
+    if (isChallengeHtml(html)) {
+      throw fetchError(`Playwright blocked by anti-bot challenge: ${page.url()}`, {
+        code: "PLAYWRIGHT_ANTI_BOT_CHALLENGE",
+        url: page.url()
+      });
+    }
+
+    const frames = await collectPlaywrightFrames(page);
+    return {
+      url: page.url(),
+      status: 200,
+      contentType: "text/html; charset=utf-8; fetched-by=playwright",
+      html: combinePlaywrightHtml(html, frames),
+      frameRows: frames.flatMap((frame) => frame.rows),
+      playwright: true,
+      fallback_from: originalError?.message ?? null,
+      source_name: sourceInfo?.source_name ?? null
+    };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function waitForPlaywrightContent(page) {
+  const startedAt = Date.now();
+  let html = await page.content();
+
+  while (isChallengeHtml(html) && Date.now() - startedAt < PLAYWRIGHT_MAX_WAIT_MS) {
+    await page.waitForTimeout(PLAYWRIGHT_WAIT_INTERVAL_MS);
+    html = await page.content();
+  }
+
+  await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+  return page.content();
+}
+
+async function getPlaywrightContext() {
+  if (playwrightContext) return playwrightContext;
+
+  const { chromium } = loadPlaywright();
+  const executablePath = await findChromeExecutable();
+  const launchOptions = {
+    headless: PLAYWRIGHT_HEADLESS,
+    args: ["--disable-blink-features=AutomationControlled"]
+  };
+  if (executablePath) launchOptions.executablePath = executablePath;
+
+  playwrightBrowser = await chromium.launch(launchOptions);
+  playwrightContext = await playwrightBrowser.newContext({
+    locale: "ja-JP",
+    timezoneId: "Asia/Tokyo",
+    userAgent: BROWSER_USER_AGENT,
+    viewport: { width: 1365, height: 900 }
+  });
+  return playwrightContext;
+}
+
+function loadPlaywright() {
+  const candidates = [
+    process.env.PLAYWRIGHT_MODULE_PATH,
+    "playwright",
+    path.join(process.env.HOME ?? "", ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright")
+  ].filter(Boolean);
+  const errors = [];
+
+  for (const candidate of candidates) {
+    try {
+      return requireFromApp(candidate);
+    } catch (error) {
+      errors.push(`${candidate}: ${error.message}`);
+    }
+  }
+
+  throw new Error(`Playwright is not available. Tried: ${errors.join(" | ")}`);
+}
+
+async function findChromeExecutable() {
+  const candidates = [
+    process.env.CHROME_EXECUTABLE_PATH,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser"
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // Try next browser executable.
+    }
+  }
+
+  return null;
+}
+
+async function closePlaywrightBrowser() {
+  await playwrightContext?.close().catch(() => {});
+  await playwrightBrowser?.close().catch(() => {});
+  playwrightContext = null;
+  playwrightBrowser = null;
+}
+
+async function collectPlaywrightFrames(page) {
+  const frames = [];
+  for (const frame of page.frames()) {
+    try {
+      const html = await frame.content();
+      const rows = await frame.evaluate(() => {
+        const normalize = (value) => (value || "").replace(/\s+/g, " ").trim();
+        return [...document.querySelectorAll("tr")].map((row, rowIndex) => {
+          const cells = [...row.querySelectorAll("th,td")].map((cell) => normalize(cell.innerText));
+          const links = [...row.querySelectorAll("a[href]")].map((anchor) => ({
+            text: normalize(anchor.innerText || anchor.textContent),
+            url: anchor.href
+          }));
+          return {
+            rowIndex,
+            text: normalize(row.innerText),
+            cells,
+            links
+          };
+        }).filter((row) => row.text || row.links.length);
+      });
+      if (rows.length || /<frame|<iframe|\.pdf|入札|公告|見積|契約|調達/.test(html)) {
+        frames.push({ url: frame.url(), html, rows: rows.map((row) => ({ ...row, frameUrl: frame.url() })) });
+      }
+    } catch {
+      // Cross-origin or transient frames are not required for these official pages.
+    }
+  }
+  return frames;
+}
+
+function combinePlaywrightHtml(html, frames) {
+  const frameHtml = frames
+    .filter((frame) => frame.html)
+    .map((frame) => `<section data-playwright-frame-url="${escapeHtml(frame.url)}">${frame.html}</section>`)
+    .join("\n");
+  return `${html}\n${frameHtml}`;
 }
 
 function decodeBuffer(buffer, contentType) {
@@ -432,6 +640,102 @@ function extractWesternAreaCandidates(html, pageUrl, sourceInfo, yearContext) {
     });
   }
   return uniqueBy(candidates, (candidate) => `${candidate.source_url}-${candidate.title}`);
+}
+
+function extractFrameRowCandidates(frameRows, pageUrl, sourceInfo) {
+  const candidates = [];
+  const yearContext = yearContextFrom(pageUrl + " " + sourceInfo.source_name);
+
+  for (const row of frameRows ?? []) {
+    const rowText = cleanText(row.text || row.cells?.join(" ") || "");
+    const links = (row.links ?? []).map((link) => ({
+      text: cleanText(link.text),
+      url: link.url,
+      attrs: "",
+      file_type: fileType(link.url),
+      source_text: rowText
+    })).filter((link) => isOfficialUrl(link.url));
+    const noticeLinks = links.filter((link) => ["pdf", "excel", "word", "html"].includes(link.file_type));
+    if (!noticeLinks.length || !rowText || /公告中の案件はありません|該当.*ありません/.test(rowText)) continue;
+
+    const title = pickFrameRowTitle(row.cells ?? [], noticeLinks, rowText);
+    if (!title || isExcluded(title)) continue;
+
+    const dates = pickFrameRowDates(row.cells ?? [], rowText, yearContext);
+    const location = westernAreaLocation(rowText);
+    const classification = classify(`${title} ${rowText}`);
+    const primaryLink = noticeLinks.find((link) => link.file_type === "pdf") ?? noticeLinks[0];
+    const attachments = noticeLinks.map((link) => ({
+      title: link.text || title,
+      url: link.url,
+      file_type: link.file_type,
+      label: link.text || null,
+      source_text: link.source_text || null
+    }));
+
+    candidates.push({
+      source_id: null,
+      source_name: sourceInfo.source_name,
+      organization_type: sourceInfo.organization_type,
+      title,
+      agency_name: sourceInfo.source_name,
+      tender_type: classification.tender_type === "unknown" ? inferWesternAreaTenderType(title, rowText) : classification.tender_type,
+      original_label: classification.original_label,
+      region: location.region ?? sourceInfo.region ?? regionFromText(rowText + pageUrl, "全国"),
+      prefecture: location.prefecture ?? sourceInfo.prefecture ?? prefectureFromText(rowText + pageUrl, "未設定"),
+      base_location: location.baseLocation ?? sourceInfo.prefecture ?? sourceInfo.region ?? null,
+      published_at: dates.published_at,
+      deadline_at: dates.bid_at,
+      bid_at: dates.bid_at,
+      qualification_required: /全省庁統一資格|競争参加資格|資格審査|防衛省競争参加資格/.test(rowText),
+      required_qualification: /全省庁統一資格|競争参加資格|資格審査|防衛省競争参加資格/.test(rowText) ? "防衛省または全省庁統一資格等。公式公告を確認してください。" : null,
+      source_url: primaryLink.url,
+      pdf_url: noticeLinks.find((link) => link.file_type === "pdf")?.url ?? null,
+      attachments,
+      raw_text: rowText.slice(0, 2000),
+      ai_summary: `${sourceInfo.source_name}の公式ページから抽出した候補です。正式条件は元ページ・添付ファイルで確認してください。`,
+      classification_confidence: classification.confidence,
+      duplicate_candidate_id: null,
+      review_status: "pending",
+      admin_note: "Playwrightフォールバックで取得したfrSheet/表データから抽出。管理者確認後に公開。",
+      fetched_at: new Date().toISOString()
+    });
+  }
+
+  return uniqueBy(candidates, (candidate) => `${candidate.source_url}-${candidate.title}`).filter(isInitialRangeCandidate);
+}
+
+function pickFrameRowTitle(cells, links, rowText) {
+  const cellObjects = cells.map((text) => ({ text: cleanText(text), links: [] }));
+  const title = pickWesternAreaTitle(cellObjects, links, rowText);
+  if (title) return title;
+
+  const linkTitle = links
+    .map((link) => cleanText(link.text))
+    .find((text) => isWesternTitleCell(text));
+  return linkTitle ? cleanWesternTitle(linkTitle).slice(0, 180) : "";
+}
+
+function pickFrameRowDates(cells, rowText, yearContext) {
+  const orderedDates = [];
+  for (const cell of cells) {
+    for (const date of parseDates(cell, yearContext)) {
+      if (!orderedDates.includes(date)) orderedDates.push(date);
+    }
+  }
+
+  if (orderedDates.length >= 2) {
+    return {
+      bid_at: orderedDates[orderedDates.length - 2] ?? null,
+      published_at: orderedDates[orderedDates.length - 1] ?? null
+    };
+  }
+
+  const dates = parseDates(rowText, yearContext);
+  return {
+    published_at: orderedDates[0] ?? dates[0] ?? null,
+    bid_at: dates.find((date) => date !== (orderedDates[0] ?? dates[0])) ?? null
+  };
 }
 
 function candidateFromText(text, links, sourceInfo, pageUrl, yearContext) {
@@ -638,14 +942,18 @@ async function discover(group) {
   const parents = filterSources(DEFENSE_SEED_SOURCES, group);
   const discovered = [...filterSources(DEFENSE_SEED_SOURCES, group)];
 
-  for (const parent of parents) {
-    try {
-      const page = await fetchText(parent.tender_list_url);
-      discovered.push(...discoverFromPage(page.html, page.url, parent));
-      await delay(400);
-    } catch (error) {
-      discovered.push({ ...parent, last_error_message: error.message });
+  try {
+    for (const parent of parents) {
+      try {
+        const page = await fetchText(parent.tender_list_url, { sourceInfo: parent });
+        discovered.push(...discoverFromPage(page.html, page.url, parent));
+        await delay(400);
+      } catch (error) {
+        discovered.push({ ...parent, last_error_message: error.message });
+      }
     }
+  } finally {
+    await closePlaywrightBrowser();
   }
 
   const sources = uniqueBy(discovered, (item) => item.tender_list_url);
@@ -663,10 +971,14 @@ async function crawl(group) {
   const candidates = [];
   const errors = [];
 
-  const results = await mapLimit(sources, CRAWL_CONCURRENCY, crawlSource);
-  for (const result of results) {
-    candidates.push(...result.candidates);
-    errors.push(...result.errors);
+  try {
+    const results = await mapLimit(sources, CRAWL_CONCURRENCY, crawlSource);
+    for (const result of results) {
+      candidates.push(...result.candidates);
+      errors.push(...result.errors);
+    }
+  } finally {
+    await closePlaywrightBrowser();
   }
 
   const uniqueCandidates = uniqueBy(candidates, (item) => `${item.source_url}-${item.title}`);
@@ -688,15 +1000,18 @@ async function crawlSource(sourceInfo) {
   const candidates = [];
   const errors = [];
   try {
-    const page = await fetchText(sourceInfo.tender_list_url);
+    const page = await fetchText(sourceInfo.tender_list_url, { sourceInfo });
+    candidates.push(...extractFrameRowCandidates(page.frameRows, page.url, sourceInfo));
     candidates.push(...extractCandidates(page.html, page.url, sourceInfo));
     for (const link of traversalLinks(page.html, page.url).slice(0, CHILD_LINK_LIMIT)) {
       try {
-        const childPage = await fetchText(link.url);
-        candidates.push(...extractCandidates(childPage.html, childPage.url, {
+        const childSourceInfo = {
           ...sourceInfo,
           source_name: `${sourceInfo.source_name} / ${link.text || path.basename(new URL(link.url).pathname)}`
-        }));
+        };
+        const childPage = await fetchText(link.url, { sourceInfo: childSourceInfo });
+        candidates.push(...extractFrameRowCandidates(childPage.frameRows, childPage.url, childSourceInfo));
+        candidates.push(...extractCandidates(childPage.html, childPage.url, childSourceInfo));
         await delay(CHILD_REQUEST_DELAY_MS);
       } catch {
         // Child pages are opportunistic. The parent source error is kept clear if the main page succeeded.
@@ -954,6 +1269,15 @@ function decodeHtml(value = "") {
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, " ")
     .replace(/&times;/g, "×");
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function cleanText(value = "") {

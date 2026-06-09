@@ -2179,7 +2179,7 @@
     "region": "東北",
     "prefecture": null,
     "base_url": "https://www.mod.go.jp",
-    "tender_list_url": "https://www.mod.go.jp/gsdf/neae/koukoku/fin/index_l.htm",
+    "tender_list_url": "https://www.mod.go.jp/gsdf/neae/koukoku/fin/",
     "open_counter_url": null,
     "result_url": null,
     "target_types": [

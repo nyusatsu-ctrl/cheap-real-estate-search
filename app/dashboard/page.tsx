@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { Bell, Bookmark, Calculator, CreditCard, LogOut, Search } from "lucide-react";
+import { Bell, CreditCard, FileSearch, LogOut, Star, UserRoundCheck } from "lucide-react";
 import { signOutMemberAction } from "@/app/auth/actions";
 import { formatDate } from "@/lib/format";
-import { getPublishedProperties } from "@/lib/properties";
+import { getPublishedTenders } from "@/lib/tenders";
 import { requireActiveMember } from "@/lib/user";
 
 export default async function DashboardPage() {
   const member = await requireActiveMember();
-  const properties = await getPublishedProperties({ maxPrice: 3000000 });
-  const zeroYenCount = properties.filter((property) => property.price_yen === 0).length;
+  const tenders = await getPublishedTenders({ sort: "new" });
+  const deadlineSoonCount = tenders.filter((tender) => tender.is_deadline_soon).length;
+  const openCounterCount = tenders.filter((tender) => tender.tender_type === "open_counter").length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -32,27 +33,26 @@ export default async function DashboardPage() {
           <p className="mt-2 text-sm text-slate-700">無料期間終了: {formatDate(member.trialEndsAt)}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm font-bold text-slate-500">公開物件</p>
-          <p className="mt-2 text-2xl font-black text-slate-950">{properties.length}件</p>
-          <p className="mt-2 text-sm text-slate-700">0円物件: {zeroYenCount}件</p>
+          <p className="text-sm font-bold text-slate-500">公開案件</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{tenders.length}件</p>
+          <p className="mt-2 text-sm text-slate-700">締切間近: {deadlineSoonCount}件</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm font-bold text-slate-500">月額プラン</p>
-          <p className="mt-2 text-2xl font-black text-brand-700">2,980円</p>
-          <p className="mt-2 text-sm text-slate-700">無料期間後は手動で有料登録</p>
+          <p className="text-sm font-bold text-slate-500">オープンカウンター</p>
+          <p className="mt-2 text-2xl font-black text-brand-700">{openCounterCount}件</p>
+          <p className="mt-2 text-sm text-slate-700">初心者向け案件を優先確認</p>
         </div>
       </section>
 
       <section className="mt-6 grid gap-4 md:grid-cols-2">
         {[
-          [Search, "物件を探す", "0円から300万円以下の物件を検索します。", "/properties"],
-          [Bookmark, "保存条件", "将来的にエリアや価格条件を保存して通知に使います。", "/properties"],
-          [Bell, "新着確認", "新着、価格変更、成約済みの更新を確認します。", "/properties"],
-          [Calculator, "見積もり相談", "名義変更、解体、残置物処分、リフォームを相談します。", "/estimate"],
-          [CreditCard, "課金設定", "Stripe Checkout と契約状態を確認します。", "/billing"]
+          [FileSearch, "案件検索", "地域、都道府県、案件種別、資格有無、キーワードで検索します。", "/tenders"],
+          [Star, "お気に入り案件", "気になる案件を保存し、対応ステータスとメモを管理します。", "/favorites"],
+          [Bell, "通知設定", "新着案件や締切間近案件の通知条件を登録します。", "/notifications"],
+          [UserRoundCheck, "全省庁統一資格", "資格の概要、取得方法、公式申請リンクを確認します。", "/qualification"],
+          [CreditCard, "課金管理", "Stripe Checkout と契約状態を確認します。", "/billing"]
         ].map(([Icon, title, text, href]) => (
           <Link key={title as string} href={href as string} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm focus-ring">
-            {/* TypeScript narrows tuple icons poorly in JSX without this local component shape. */}
             <Icon className="h-5 w-5 text-brand-700" />
             <h2 className="mt-3 font-bold text-slate-950">{title as string}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">{text as string}</p>

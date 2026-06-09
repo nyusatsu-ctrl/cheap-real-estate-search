@@ -3,8 +3,8 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "格安不動産サーチ",
-  description: "0円から300万円以下の格安不動産を探せる会員制サービス"
+  title: "GPS車両管理システム",
+  description: "車・バイク自社ローン、レンタカー、車両管理向けのGPS管理システム"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -14,20 +14,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="text-base font-bold text-slate-950">
-              格安不動産サーチ
+              GPS車両管理システム
             </Link>
             <nav className="flex items-center gap-3 text-sm font-medium text-slate-700">
-              <Link href="/properties" className="hover:text-brand-700">
-                物件一覧
+              <Link href="/admin/gps" className="hover:text-brand-700">
+                GPS管理
               </Link>
-              <Link href="/plans" className="hover:text-brand-700">
-                料金
-              </Link>
-              <Link href="/signup" className="hover:text-brand-700">
-                無料登録
-              </Link>
-              <Link href="/dashboard" className="hover:text-brand-700">
-                会員
+              <Link href="/admin/login" className="hover:text-brand-700">
+                管理者ログイン
               </Link>
             </nav>
           </div>

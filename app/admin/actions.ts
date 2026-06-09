@@ -28,7 +28,7 @@ export async function signInAction(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/admin/login?error=${encodeURIComponent(error.message)}`);
 
-  redirect("/admin/properties");
+  redirect("/admin/gps");
 }
 
 export async function signOutAction() {

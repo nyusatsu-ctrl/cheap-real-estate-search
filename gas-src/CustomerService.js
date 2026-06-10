@@ -2843,6 +2843,7 @@ function inspectGoobikeListings_(html, bikeName, normalizedYear, fetchedAt) {
     var yearMatchReason = getBikeMarketYearMatchReason_(years, normalizedYear, yearMatched);
     var priceAvailable = Boolean(prices.selectedPriceYen);
     var cardBoundaryTreatment = getBikeMarketCardBoundaryTreatment_(cardValidation, title, prices, modelMatched, yearMatched);
+    var cardBoundaryExplanation = getBikeMarketCardBoundaryExplanation_(cardValidation, cardBoundaryTreatment);
     var exclusionReason = getBikeMarketListingExclusionReason_(cardValidation, cardBoundaryTreatment, modelMatch, yearMatched, prices);
     var parsed = {
       title: title,
@@ -2852,6 +2853,8 @@ function inspectGoobikeListings_(html, bikeName, normalizedYear, fetchedAt) {
       titleValidationResult: cardValidation.titleValidationResult,
       cardBoundaryResult: cardValidation.cardBoundaryResult,
       cardBoundaryTreatment: cardBoundaryTreatment,
+      cardBoundarySeverity: cardBoundaryExplanation.severity,
+      cardBoundaryMessage: cardBoundaryExplanation.message,
       years: years,
       titleModelYear: titleModelYear,
       basePriceYen: prices.basePriceYen,
@@ -2896,6 +2899,8 @@ function inspectGoobikeListings_(html, bikeName, normalizedYear, fetchedAt) {
         priceMissingReason: prices.priceMissingReason,
         priceValidationResult: prices.priceValidationResult,
         cardBoundaryTreatment: cardBoundaryTreatment,
+        cardBoundarySeverity: cardBoundaryExplanation.severity,
+        cardBoundaryMessage: cardBoundaryExplanation.message,
         modelMatchReason: modelMatch.reason,
         yearMatchReason: yearMatchReason,
         cardDebug: prices.cardDebug,
@@ -3403,6 +3408,8 @@ function parseGoobikeListings_(html, bikeName, normalizedYear, fetchedAt) {
     if (!prices.selectedPriceYen) {
       continue;
     }
+    var cardBoundaryTreatment = getBikeMarketCardBoundaryTreatment_(cardValidation, title, prices, true, true);
+    var cardBoundaryExplanation = getBikeMarketCardBoundaryExplanation_(cardValidation, cardBoundaryTreatment);
     listings.push({
       source: WEBAPP_BIKE_MARKET_GOOBIKE_SOURCE,
       title: title,
@@ -3416,6 +3423,9 @@ function parseGoobikeListings_(html, bikeName, normalizedYear, fetchedAt) {
       selectedPriceReason: prices.selectedPriceReason,
       priceMissingReason: prices.priceMissingReason,
       priceValidationResult: prices.priceValidationResult,
+      cardBoundaryTreatment: cardBoundaryTreatment,
+      cardBoundarySeverity: cardBoundaryExplanation.severity,
+      cardBoundaryMessage: cardBoundaryExplanation.message,
       cardDebug: prices.cardDebug,
       mileageKm: parseGoobikeMileageKm_(block),
       extractionSource: 'list',
@@ -3593,6 +3603,22 @@ function getBikeMarketCardBoundaryTreatment_(cardValidation, title, prices, mode
     return 'warning / タイトル・価格・年式が正常なため集計対象';
   }
   return 'exclusion / カード境界を確認できないため除外';
+}
+
+function getBikeMarketCardBoundaryExplanation_(cardValidation, cardBoundaryTreatment) {
+  if (!cardValidation || cardValidation.cardBoundaryResult !== 'CARD_BOUNDARY_ERROR') {
+    return { severity: 'none', message: '' };
+  }
+  if (String(cardBoundaryTreatment || '').indexOf('warning') === 0) {
+    return {
+      severity: 'warning',
+      message: 'CARD_BOUNDARY_ERRORは検出されていますが、タイトル・価格・年式が正常なため警告として集計対象にしています。'
+    };
+  }
+  return {
+    severity: 'error',
+    message: 'CARD_BOUNDARY_ERRORのため、このカードは境界誤認の可能性があり集計対象から除外します。'
+  };
 }
 
 function getBikeMarketListingExclusionReason_(cardValidation, cardBoundaryTreatment, modelMatch, yearMatched, prices) {

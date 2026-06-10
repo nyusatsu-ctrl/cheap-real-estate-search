@@ -1040,7 +1040,22 @@
 
     <script>
       const IS_MARKET_ADMIN = document.body.dataset.marketAdmin === '1';
-      const MARKET_ADMIN_PASSCODE = <?!= marketAdminPasscodeJson ?>;
+      const MARKET_ADMIN_PASSCODE = <?!= typeof marketAdminPasscodeJson !== 'undefined' ? marketAdminPasscodeJson : '""' ?>;
+      if (IS_MARKET_ADMIN && !MARKET_ADMIN_PASSCODE) {
+        document.body.innerHTML = `
+          <div style="max-width:420px;margin:32px auto;background:#fff;border:1px solid #d9dee5;border-radius:8px;padding:20px;font-family:Arial,'Hiragino Sans','Yu Gothic',sans-serif;color:#20242a;">
+            <h1 style="margin-top:0;font-size:22px;">相場管理ログイン</h1>
+            <p style="color:#667085;">相場データ管理画面を開くには管理用パスコードが必要です。</p>
+            <form method="get">
+              <input type="hidden" name="admin" value="market">
+              <label for="market_passcode" style="display:block;font-weight:700;margin-bottom:8px;">管理用パスコード</label>
+              <input id="market_passcode" name="market_passcode" type="password" autocomplete="current-password" autofocus style="width:100%;box-sizing:border-box;border:1px solid #d9dee5;border-radius:6px;padding:10px;">
+              <button type="submit" style="margin-top:14px;border:0;border-radius:6px;background:#2563eb;color:#fff;padding:10px 14px;cursor:pointer;">管理画面を開く</button>
+            </form>
+          </div>
+        `;
+        throw new Error('Market admin passcode is required.');
+      }
       if (IS_MARKET_ADMIN) {
         document.body.classList.add('market-admin-mode');
       }
@@ -1116,21 +1131,30 @@
         toast: document.getElementById('toast')
       };
 
-      els.search.addEventListener('input', applyFilters);
-      els.applicationTypeFilter.addEventListener('change', applyFilters);
-      els.statusFilter.addEventListener('change', applyFilters);
-      els.requestFilter.addEventListener('change', applyFilters);
-      els.marketFilter.addEventListener('change', applyFilters);
-      els.marketSort.addEventListener('change', applyFilters);
-      els.setupButton.addEventListener('click', setupColumns);
-      els.fixPhonesButton.addEventListener('click', fixPhoneNumbers);
-      els.setupNoticeButton.addEventListener('click', setupColumns);
-      els.refreshButton.addEventListener('click', loadDashboard);
-
       if (IS_MARKET_ADMIN) {
-        initMarketAdmin();
+        bootMarketAdmin();
       } else {
+        bindStaffUi();
         loadDashboard();
+      }
+
+      function bindStaffUi() {
+        safeAddEventListener(els.search, 'input', applyFilters);
+        safeAddEventListener(els.applicationTypeFilter, 'change', applyFilters);
+        safeAddEventListener(els.statusFilter, 'change', applyFilters);
+        safeAddEventListener(els.requestFilter, 'change', applyFilters);
+        safeAddEventListener(els.marketFilter, 'change', applyFilters);
+        safeAddEventListener(els.marketSort, 'change', applyFilters);
+        safeAddEventListener(els.setupButton, 'click', setupColumns);
+        safeAddEventListener(els.fixPhonesButton, 'click', fixPhoneNumbers);
+        safeAddEventListener(els.setupNoticeButton, 'click', setupColumns);
+        safeAddEventListener(els.refreshButton, 'click', loadDashboard);
+      }
+
+      function safeAddEventListener(element, eventName, handler) {
+        if (element) {
+          element.addEventListener(eventName, handler);
+        }
       }
 
       function loadDashboard() {
@@ -1182,6 +1206,46 @@
 
       function marketAdminAuth() {
         return { marketAdminPasscode: MARKET_ADMIN_PASSCODE };
+      }
+
+      function bootMarketAdmin() {
+        try {
+          initMarketAdmin();
+        } catch (error) {
+          renderMarketAdminFatalError(error);
+        }
+      }
+
+      function runMarketAdminLoader(label, loader) {
+        try {
+          loader();
+        } catch (error) {
+          renderMarketAdminFatalError(error, label);
+        }
+      }
+
+      function marketAdminErrorMessage(error) {
+        return error && error.message ? error.message : String(error || '不明なエラー');
+      }
+
+      function renderMarketAdminFatalError(error, label) {
+        document.body.classList.add('market-admin-mode');
+        const app = document.getElementById('marketAdminApp');
+        const message = marketAdminErrorMessage(error);
+        const title = label ? `${label}の初期化に失敗しました。` : '相場管理画面の初期化に失敗しました。';
+        const html = `
+          <div class="admin-panel" style="border-color:#f3b4ad;background:#fff7f6;">
+            <h2 style="margin:0 0 8px;color:#b42318;">${escapeHtml(title)}</h2>
+            <p class="muted">画面を再読み込みしても解消しない場合は、Apps Script のデプロイ版とブラウザのコンソールエラーを確認してください。</p>
+            <pre class="market-debug-result">${escapeHtml(message)}</pre>
+          </div>
+        `;
+        if (app) {
+          app.insertAdjacentHTML('afterbegin', html);
+          app.style.display = 'block';
+        } else {
+          document.body.innerHTML = html;
+        }
       }
 
       function fixPhoneNumbers() {
@@ -1266,11 +1330,11 @@
           });
         });
         if (deleteButton) deleteButton.addEventListener('click', deleteSelectedMarketAdminRows);
-        loadMarketAdminData();
-        loadBikeMarketAutomationSettings();
-        loadBikeModelDictionaryData();
-        loadGoobikeModelMasterData();
-        loadMarketLogs();
+        runMarketAdminLoader('相場データ一覧', loadMarketAdminData);
+        runMarketAdminLoader('自動相場取得設定', loadBikeMarketAutomationSettings);
+        runMarketAdminLoader('車種名辞書', loadBikeModelDictionaryData);
+        runMarketAdminLoader('GooBike車種マスタ', loadGoobikeModelMasterData);
+        runMarketAdminLoader('取得ログ', loadMarketLogs);
       }
 
       function loadBikeMarketAutomationSettings() {
@@ -1282,7 +1346,9 @@
             updateBikeMarketAutomationSettingLabel(checkbox.checked);
           })
           .withFailureHandler((error) => {
-            showToast(error.message || String(error));
+            const message = marketAdminErrorMessage(error);
+            showToast(message);
+            renderMarketAdminFatalError(message, '自動相場取得設定');
           })
           .getBikeMarketAutomationSettingsForAdmin(marketAdminAuth());
       }

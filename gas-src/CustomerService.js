@@ -202,6 +202,8 @@ var WEBAPP_BIKE_MARKET_AUTO_LOG_COLUMNS = [
 ];
 var WEBAPP_AUTO_FETCH_MARKET_PROPERTY_KEY = 'AUTO_FETCH_MARKET_ON_NEW_APPLICATION';
 var WEBAPP_AUTO_FETCH_MARKET_TIMEOUT_MS = 30000;
+var WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN = 3;
+var WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS = 280000;
 var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v20-goobike-model-master';
 var WEBAPP_BIKE_MARKET_GOOBIKE_BASE_URL = 'https://goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_ALTERNATE_BASE_URL = 'https://www.goobike.com';
@@ -911,6 +913,159 @@ function autoFetchBikeMarketForNewCustomer(customerId) {
       errorMessage: error && error.message ? error.message : String(error)
     };
   }
+}
+
+function queueBikeMarketLookupForNewCustomer(customerId) {
+  var sheet = getMainSheet_();
+  var headerMap = getHeaderMap_(sheet);
+  ensureBikeMarketColumns_(sheet, headerMap);
+  var rowNumber = findRowNumberByCustomerId_(sheet, headerMap, customerId);
+  if (!rowNumber) {
+    appendBikeMarketAutoFetchLog_({
+      customerId: customerId || '',
+      triggerType: 'new_application_import',
+      status: 'skipped',
+      marketStatus: '',
+      errorCode: 'CUSTOMER_NOT_FOUND',
+      errorMessage: '相場取得キュー対象の顧客行が見つかりません。'
+    });
+    return { queued: false, reason: 'customer_not_found' };
+  }
+
+  var row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  var rowKey = buildApplicationRowKey_(row, headerMap);
+  var customerName = getCellByHeader_(row, headerMap, 'お名前') || '';
+  var bikeName = trimFullWidth(String(getCellByHeader_(row, headerMap, '希望車種(希望車種)') || ''));
+  var yearInput = trimFullWidth(String(getCellByHeader_(row, headerMap, '年式(希望車種)') || ''));
+  var eligibility = getBikeMarketAutoFetchEligibility_(row, headerMap);
+  if (!eligibility.eligible) {
+    appendBikeMarketAutoFetchLog_({
+      customerId: rowKey,
+      customerName: customerName,
+      bikeName: bikeName,
+      year: yearInput,
+      triggerType: 'new_application_import',
+      status: 'skipped',
+      marketStatus: getCellByHeader_(row, headerMap, '相場_ステータス') || '',
+      errorCode: eligibility.reason,
+      errorMessage: eligibility.message
+    });
+    return { queued: false, reason: eligibility.reason, message: eligibility.message };
+  }
+
+  var requestedAt = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+  setBikeMarketProcessingStatus_(sheet, headerMap, rowNumber, requestedAt);
+  appendBikeMarketAutoFetchLog_({
+    customerId: rowKey,
+    customerName: customerName,
+    bikeName: bikeName,
+    year: yearInput,
+    triggerType: 'new_application_import',
+    status: 'queued',
+    marketStatus: 'processing',
+    referencePrice: '',
+    priceAvailableCount: 0,
+    errorCode: '',
+    errorMessage: ''
+  });
+  return { queued: true, rowNumber: rowNumber, customerId: rowKey };
+}
+
+function processPendingBikeMarketLookups(maxItems) {
+  var startedAt = new Date().getTime();
+  var limit = Math.max(1, Math.min(Number(maxItems || WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN) || WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN, WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN));
+  var sheet = getMainSheet_();
+  var headerMap = getHeaderMap_(sheet);
+  ensureBikeMarketColumns_(sheet, headerMap);
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return { processed: 0, skipped: 0, errors: 0, deferred: 0, message: '対象行はありません。' };
+  }
+
+  var statusColumn = headerMap['相場_ステータス'];
+  if (!statusColumn) {
+    return { processed: 0, skipped: 0, errors: 0, deferred: 0, message: '相場ステータス列がありません。' };
+  }
+
+  var rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
+  var processed = 0;
+  var skipped = 0;
+  var errors = 0;
+  var deferred = 0;
+
+  for (var i = 0; i < rows.length; i++) {
+    if (processed >= limit) {
+      break;
+    }
+    if (new Date().getTime() - startedAt >= WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS) {
+      deferred++;
+      break;
+    }
+    var row = rows[i];
+    var rowNumber = i + 2;
+    var status = trimFullWidth(String(getCellByHeader_(row, headerMap, '相場_ステータス') || ''));
+    if (status !== 'processing') {
+      continue;
+    }
+    var bikeName = trimFullWidth(String(getCellByHeader_(row, headerMap, '希望車種(希望車種)') || ''));
+    var yearInput = trimFullWidth(String(getCellByHeader_(row, headerMap, '年式(希望車種)') || ''));
+    var customerName = getCellByHeader_(row, headerMap, 'お名前') || '';
+    var rowKey = buildApplicationRowKey_(row, headerMap);
+    if (!bikeName || !isBikeApplicationRow_(row, headerMap)) {
+      setBikeMarketDeferredStatus_(sheet, headerMap, rowNumber, 'PENDING_LOOKUP_SKIPPED', !bikeName ? '希望車種が未入力のため相場取得を保留しました。' : 'バイク申込ではないため相場取得を保留しました。');
+      appendBikeMarketAutoFetchLog_({
+        customerId: rowKey,
+        customerName: customerName,
+        bikeName: bikeName,
+        year: yearInput,
+        triggerType: 'pending_market_lookup',
+        status: 'skipped',
+        marketStatus: 'deferred',
+        errorCode: 'PENDING_LOOKUP_SKIPPED',
+        errorMessage: !bikeName ? '希望車種が未入力です。' : 'バイク申込ではありません。'
+      });
+      skipped++;
+      continue;
+    }
+
+    try {
+      runBikeMarketSearchForCustomer_({
+        rowNumber: rowNumber,
+        rowKey: rowKey,
+        bikeName: bikeName,
+        year: yearInput
+      }, {
+        triggerType: 'pending_market_lookup',
+        markProcessing: false
+      });
+      processed++;
+    } catch (error) {
+      saveBikeMarketAutoFetchError(rowKey, error);
+      errors++;
+    }
+  }
+
+  return {
+    processed: processed,
+    skipped: skipped,
+    errors: errors,
+    deferred: deferred,
+    message: '保留中の相場取得を処理しました。'
+  };
+}
+
+function installPendingBikeMarketLookupTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction && triggers[i].getHandlerFunction() === 'processPendingBikeMarketLookups') {
+      return { installed: false, message: 'processPendingBikeMarketLookups のトリガーは既に存在します。' };
+    }
+  }
+  ScriptApp.newTrigger('processPendingBikeMarketLookups')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+  return { installed: true, message: 'processPendingBikeMarketLookups の5分ごとトリガーを作成しました。' };
 }
 
 function saveBikeMarketAutoFetchError(customerId, error) {

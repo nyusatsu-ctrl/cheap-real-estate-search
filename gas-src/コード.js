@@ -15,13 +15,21 @@ var LABEL_NAME = '仮審査_処理済み';
 
 // 取り込み・整理対象にする最初の日付（2026年5月1日以降だけ残します）
 var IMPORT_START_DATE = new Date(2026, 4, 1, 0, 0, 0);
+var IMPORT_RECENT_QUERY_WINDOW = 'newer_than:14d';
+var IMPORT_GMAIL_SEARCH_LIMIT_PER_QUERY = 10;
+var IMPORT_MAX_THREADS_PER_RUN = 10;
+var IMPORT_MAX_MESSAGES_PER_RUN = 10;
+var IMPORT_MAX_NEW_ROWS_PER_RUN = 5;
+var IMPORT_SAFE_RUNTIME_MS = 280000;
+var IMPORT_PROCESSED_MESSAGE_IDS_PROPERTY = 'IMPORT_PROCESSED_MESSAGE_IDS';
+var IMPORT_PROCESSED_MESSAGE_IDS_MAX = 300;
 
 // メール検索条件
 // Gmailの検索式は複雑にまとめず、仮審査とお問い合わせを別々に検索して取りこぼしを防ぎます。
 var SEARCH_QUERIES = [
-  'subject:"自社ローン仮審査申し込み" after:2026/4/30 -label:' + LABEL_NAME,
-  'subject:お問い合わせ after:2026/4/30 -label:' + LABEL_NAME,
-  '"お問い合わせ内容" after:2026/4/30 -label:' + LABEL_NAME
+  'subject:"自社ローン仮審査申し込み" ' + IMPORT_RECENT_QUERY_WINDOW + ' -label:' + LABEL_NAME,
+  'subject:お問い合わせ ' + IMPORT_RECENT_QUERY_WINDOW + ' -label:' + LABEL_NAME,
+  '"お問い合わせ内容" ' + IMPORT_RECENT_QUERY_WINDOW + ' -label:' + LABEL_NAME
 ];
 
 var PHONE_COLUMNS = [
@@ -103,6 +111,15 @@ var COLUMNS = [
 // メイン処理：メールを読み取ってスプレッドシートに書き込む
 // ============================================================
 function importLoanApplications() {
+  var startedAt = new Date().getTime();
+  var processedMessageIds = getImportProcessedMessageIdMap_();
+  var processedMessageIdsChanged = false;
+  var checkedMessageCount = 0;
+  var importedCount = 0;
+  var duplicateCount = 0;
+  var skippedCount = 0;
+  var reachedLimit = false;
+
   // スプレッドシートとシートを取得
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(SHEET_NAME);
@@ -136,13 +153,36 @@ function importLoanApplications() {
     return;
   }
 
-  Logger.log(threads.length + ' 件の新しいメールが見つかりました。');
+  Logger.log(threads.length + ' 件の未処理スレッドが見つかりました。');
 
   for (var t = 0; t < threads.length; t++) {
+    if (shouldStopImportRun_(startedAt)) {
+      reachedLimit = true;
+      Logger.log('実行時間上限が近いため、残りのスレッドは次回に回します。');
+      break;
+    }
+
     var messages = threads[t].getMessages();
+    messages.sort(function(a, b) {
+      return b.getDate().getTime() - a.getDate().getTime();
+    });
+    var threadFullyHandled = true;
 
     for (var m = 0; m < messages.length; m++) {
+      if (shouldStopImportRun_(startedAt) || checkedMessageCount >= IMPORT_MAX_MESSAGES_PER_RUN || importedCount >= IMPORT_MAX_NEW_ROWS_PER_RUN) {
+        threadFullyHandled = false;
+        reachedLimit = true;
+        Logger.log('今回の処理上限に達したため、残りのメールは次回に回します。');
+        break;
+      }
+
       var message = messages[m];
+      var messageId = getGmailMessageId_(message);
+      if (messageId && processedMessageIds[messageId]) {
+        continue;
+      }
+      checkedMessageCount++;
+
       var subject = message.getSubject();
       var applicationType = getApplicationTypeFromSubject_(subject);
       var body = message.getPlainBody();
@@ -152,12 +192,22 @@ function importLoanApplications() {
 
       // 仮審査・お問い合わせ以外のメールは取り込まない
       if (applicationType === '') {
+        if (messageId) {
+          processedMessageIds[messageId] = true;
+          processedMessageIdsChanged = true;
+        }
+        skippedCount++;
         continue;
       }
 
       var receivedDate = message.getDate();
       if (receivedDate < IMPORT_START_DATE) {
         Logger.log('2026/05/01より前のため取り込みスキップ: ' + subject);
+        if (messageId) {
+          processedMessageIds[messageId] = true;
+          processedMessageIdsChanged = true;
+        }
+        skippedCount++;
         continue;
       }
 
@@ -182,6 +232,11 @@ function importLoanApplications() {
       // 既に同じ申込がある場合は、二重取り込みしない
       if (isDuplicateApplication(sheet, row)) {
         Logger.log('重複のため取り込みスキップ: ' + (parsed['お名前'] || '名前なし'));
+        if (messageId) {
+          processedMessageIds[messageId] = true;
+          processedMessageIdsChanged = true;
+        }
+        duplicateCount++;
         continue;
       }
 
@@ -196,7 +251,7 @@ function importLoanApplications() {
         var autoMarketHeaderMap = getHeaderMap_(sheet);
         var autoMarketRow = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
         autoMarketCustomerId = buildApplicationRowKey_(autoMarketRow, autoMarketHeaderMap);
-        autoFetchBikeMarketForNewCustomer(autoMarketCustomerId);
+        queueBikeMarketLookupForNewCustomer(autoMarketCustomerId);
       } catch (autoMarketError) {
         try {
           saveBikeMarketAutoFetchError(autoMarketCustomerId || 2, autoMarketError);
@@ -205,15 +260,35 @@ function importLoanApplications() {
         }
         Logger.log('相場自動取得は失敗しましたが、申込取込は継続します: ' + (autoMarketError && autoMarketError.message ? autoMarketError.message : autoMarketError));
       }
+      if (messageId) {
+        processedMessageIds[messageId] = true;
+        processedMessageIdsChanged = true;
+      }
+      importedCount++;
       Logger.log('取り込み完了: ' + (parsed['お名前'] || '名前なし'));
     }
 
     // スレッドに処理済みラベルを付ける
-    threads[t].addLabel(label);
+    if (threadFullyHandled) {
+      threads[t].addLabel(label);
+    }
+    if (processedMessageIdsChanged) {
+      saveImportProcessedMessageIdMap_(processedMessageIds);
+      processedMessageIdsChanged = false;
+    }
   }
 
-  normalizeApplicationSheetForCurrentPolicy();
-  Logger.log('全件の取り込みが完了しました。');
+  if (processedMessageIdsChanged) {
+    saveImportProcessedMessageIdMap_(processedMessageIds);
+  }
+
+  if (!shouldStopImportRun_(startedAt)) {
+    normalizeApplicationSheetForCurrentPolicy();
+  } else {
+    Logger.log('実行時間上限が近いため、シート整理処理は次回以降に回します。');
+  }
+
+  Logger.log('取り込み処理終了: 確認メール数=' + checkedMessageCount + ', 新規取り込み=' + importedCount + ', 重複スキップ=' + duplicateCount + ', その他スキップ=' + skippedCount + ', 上限到達=' + reachedLimit);
 }
 
 function searchTargetThreads_() {
@@ -221,17 +296,64 @@ function searchTargetThreads_() {
   var threads = [];
 
   for (var i = 0; i < SEARCH_QUERIES.length; i++) {
-    var foundThreads = GmailApp.search(SEARCH_QUERIES[i], 0, 50);
+    var foundThreads = GmailApp.search(SEARCH_QUERIES[i], 0, IMPORT_GMAIL_SEARCH_LIMIT_PER_QUERY);
     for (var t = 0; t < foundThreads.length; t++) {
       var threadId = foundThreads[t].getId();
       if (!threadMap[threadId]) {
         threadMap[threadId] = true;
         threads.push(foundThreads[t]);
+        if (threads.length >= IMPORT_MAX_THREADS_PER_RUN) {
+          return threads;
+        }
       }
     }
   }
 
   return threads;
+}
+
+function shouldStopImportRun_(startedAt) {
+  return new Date().getTime() - startedAt >= IMPORT_SAFE_RUNTIME_MS;
+}
+
+function getGmailMessageId_(message) {
+  try {
+    return message && message.getId ? String(message.getId()) : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function getImportProcessedMessageIdMap_() {
+  var raw = '';
+  try {
+    raw = PropertiesService.getScriptProperties().getProperty(IMPORT_PROCESSED_MESSAGE_IDS_PROPERTY) || '';
+  } catch (error) {
+    return {};
+  }
+  if (!raw) {
+    return {};
+  }
+  try {
+    var ids = JSON.parse(raw);
+    var map = {};
+    (Array.isArray(ids) ? ids : []).forEach(function(id) {
+      if (id) {
+        map[String(id)] = true;
+      }
+    });
+    return map;
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveImportProcessedMessageIdMap_(messageIdMap) {
+  var ids = Object.keys(messageIdMap || {});
+  if (ids.length > IMPORT_PROCESSED_MESSAGE_IDS_MAX) {
+    ids = ids.slice(ids.length - IMPORT_PROCESSED_MESSAGE_IDS_MAX);
+  }
+  PropertiesService.getScriptProperties().setProperty(IMPORT_PROCESSED_MESSAGE_IDS_PROPERTY, JSON.stringify(ids));
 }
 
 function getApplicationTypeFromSubject_(subject) {

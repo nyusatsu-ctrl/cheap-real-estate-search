@@ -25,10 +25,18 @@ export async function signInAction(formData: FormData) {
 
   const email = requiredString(formData, "email");
   const password = requiredString(formData, "password");
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/admin/login?error=${encodeURIComponent(error.message)}`);
 
-  redirect("/admin/gps");
+  if (process.env.ADMIN_AUTH_DEBUG === "1" || process.env.NODE_ENV === "development") {
+    console.info("[admin-auth] sign_in", {
+      userId: data.user?.id ?? null,
+      email: data.user?.email ?? null,
+      hasSession: Boolean(data.session)
+    });
+  }
+
+  redirect("/admin/diagnoses");
 }
 
 export async function signOutAction() {

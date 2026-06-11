@@ -3,8 +3,8 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GPS車両管理システム",
-  description: "車・バイク自社ローン、レンタカー、車両管理向けのGPS管理システム"
+  title: "建設業売上アップ診断",
+  description: "建設業者・一人親方・職人・専門工事業者向けの売上アップ診断アプリ"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -14,11 +14,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="text-base font-bold text-slate-950">
-              GPS車両管理システム
+              建設業売上アップ診断
             </Link>
             <nav className="flex items-center gap-3 text-sm font-medium text-slate-700">
-              <Link href="/admin/gps" className="hover:text-brand-700">
-                GPS管理
+              <Link href="/diagnosis" className="hover:text-brand-700">
+                無料診断
               </Link>
               <Link href="/admin/login" className="hover:text-brand-700">
                 管理者ログイン

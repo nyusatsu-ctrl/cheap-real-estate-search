@@ -1,6 +1,19 @@
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export type DiagnosisTypeCode = "A" | "B" | "C" | "D" | "E" | "F" | "G";
+export type LeadSource = "aidma" | "meta" | "lp" | "referral" | "direct" | "other";
+export type SeminarInterest = "wants_to_join" | "wants_schedule" | "wants_materials" | "undecided" | "not_interested";
+export type LeadStatus =
+  | "new"
+  | "call_scheduled"
+  | "contacted"
+  | "seminar_reserved"
+  | "seminar_attended"
+  | "consultation_scheduled"
+  | "proposal_sent"
+  | "won"
+  | "lost"
+  | "unreachable";
 
 export type DiagnosisAnswerKey =
   | "business_type"
@@ -52,7 +65,24 @@ export type ConstructionDiagnosis = {
   business_type: string;
   monthly_sales: string;
   wants_consultation: string;
+  lead_source: LeadSource;
+  source_campaign: string | null;
+  seminar_interest: SeminarInterest;
+  preferred_contact_time: string | null;
+  lead_status: LeadStatus;
+  admin_memo: string | null;
+  admin_memo_updated_at: string | null;
+  last_contacted_at: string | null;
+  lead_updated_at: string;
   created_at: string;
+};
+
+export type AdminDiagnosisFilters = {
+  mainType?: DiagnosisTypeCode;
+  wantsConsultation?: string;
+  seminarInterest?: SeminarInterest;
+  leadSource?: LeadSource;
+  leadStatus?: LeadStatus;
 };
 
 export const DIAGNOSIS_TYPES: Record<DiagnosisTypeCode, {
@@ -134,6 +164,40 @@ export const CONSULTATION_LABELS: Record<string, string> = {
   maybe: "内容次第で検討したい",
   no: "今は不要"
 };
+
+export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
+  aidma: "アイドマHD",
+  meta: "Meta広告",
+  lp: "自社LP",
+  referral: "紹介",
+  direct: "直接",
+  other: "その他"
+};
+
+export const SEMINAR_INTEREST_LABELS: Record<SeminarInterest, string> = {
+  wants_to_join: "無料説明会に参加したい",
+  wants_schedule: "日程が合えば参加したい",
+  wants_materials: "まずは資料だけ見たい",
+  undecided: "未定",
+  not_interested: "今は希望しない"
+};
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new: "新規",
+  call_scheduled: "架電予定",
+  contacted: "架電済み",
+  seminar_reserved: "説明会予約",
+  seminar_attended: "説明会参加済み",
+  consultation_scheduled: "個別相談予定",
+  proposal_sent: "条件提示済み",
+  won: "成約",
+  lost: "失注",
+  unreachable: "連絡不可"
+};
+
+export const LEAD_SOURCE_OPTIONS = Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => ({ value: value as LeadSource, label }));
+export const SEMINAR_INTEREST_OPTIONS = Object.entries(SEMINAR_INTEREST_LABELS).map(([value, label]) => ({ value: value as SeminarInterest, label }));
+export const LEAD_STATUS_OPTIONS = Object.entries(LEAD_STATUS_LABELS).map(([value, label]) => ({ value: value as LeadStatus, label }));
 
 export const DIAGNOSIS_QUESTIONS: DiagnosisQuestion[] = [
   {
@@ -353,6 +417,20 @@ export const DIAGNOSIS_QUESTIONS: DiagnosisQuestion[] = [
 ];
 
 const TYPE_ORDER: DiagnosisTypeCode[] = ["A", "B", "C", "D", "E", "F", "G"];
+const LEAD_SOURCE_VALUES = new Set<LeadSource>(["aidma", "meta", "lp", "referral", "direct", "other"]);
+const SEMINAR_INTEREST_VALUES = new Set<SeminarInterest>(["wants_to_join", "wants_schedule", "wants_materials", "undecided", "not_interested"]);
+const LEAD_STATUS_VALUES = new Set<LeadStatus>([
+  "new",
+  "call_scheduled",
+  "contacted",
+  "seminar_reserved",
+  "seminar_attended",
+  "consultation_scheduled",
+  "proposal_sent",
+  "won",
+  "lost",
+  "unreachable"
+]);
 
 export function scoreDiagnosis(answers: Record<string, string>) {
   const scores = Object.fromEntries(TYPE_ORDER.map((type) => [type, 0])) as Record<DiagnosisTypeCode, number>;
@@ -382,6 +460,34 @@ export function getQuestionLabel(key: string) {
   return DIAGNOSIS_QUESTIONS.find((candidate) => candidate.key === key)?.label ?? key;
 }
 
+export function normalizeLeadSource(value: string | null | undefined): LeadSource {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "direct";
+  return LEAD_SOURCE_VALUES.has(normalized as LeadSource) ? normalized as LeadSource : "other";
+}
+
+export function normalizeSeminarInterest(value: string | null | undefined): SeminarInterest {
+  const normalized = String(value ?? "").trim();
+  return SEMINAR_INTEREST_VALUES.has(normalized as SeminarInterest) ? normalized as SeminarInterest : "undecided";
+}
+
+export function normalizeLeadStatus(value: string | null | undefined): LeadStatus {
+  const normalized = String(value ?? "").trim();
+  return LEAD_STATUS_VALUES.has(normalized as LeadStatus) ? normalized as LeadStatus : "new";
+}
+
+export function getLeadSourceLabel(value: string | null | undefined) {
+  return LEAD_SOURCE_LABELS[normalizeLeadSource(value)];
+}
+
+export function getSeminarInterestLabel(value: string | null | undefined) {
+  return SEMINAR_INTEREST_LABELS[normalizeSeminarInterest(value)];
+}
+
+export function getLeadStatusLabel(value: string | null | undefined) {
+  return LEAD_STATUS_LABELS[normalizeLeadStatus(value)];
+}
+
 export async function getDiagnosisClient() {
   return createSupabaseServiceRoleClient() ?? await createSupabaseServerClient();
 }
@@ -400,14 +506,23 @@ export async function getConstructionDiagnosis(id: string) {
   return data as ConstructionDiagnosis;
 }
 
-export async function getConstructionDiagnoses() {
+export async function getConstructionDiagnoses(filters: AdminDiagnosisFilters = {}) {
   const supabase = await getDiagnosisClient();
   if (!supabase) return [] as ConstructionDiagnosis[];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("construction_diagnoses")
     .select("*")
+    .order("lead_updated_at", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (filters.mainType) query = query.eq("main_type", filters.mainType);
+  if (filters.wantsConsultation) query = query.eq("wants_consultation", filters.wantsConsultation);
+  if (filters.seminarInterest) query = query.eq("seminar_interest", filters.seminarInterest);
+  if (filters.leadSource) query = query.eq("lead_source", filters.leadSource);
+  if (filters.leadStatus) query = query.eq("lead_status", filters.leadStatus);
+
+  const { data, error } = await query;
 
   if (error) return [] as ConstructionDiagnosis[];
   return (data ?? []) as ConstructionDiagnosis[];

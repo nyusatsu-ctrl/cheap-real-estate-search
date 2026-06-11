@@ -1,7 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { DIAGNOSIS_QUESTIONS, getDiagnosisClient, scoreDiagnosis } from "@/lib/construction-diagnosis";
+import {
+  DIAGNOSIS_QUESTIONS,
+  getDiagnosisClient,
+  normalizeLeadSource,
+  normalizeSeminarInterest,
+  scoreDiagnosis
+} from "@/lib/construction-diagnosis";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -19,6 +25,10 @@ export async function submitConstructionDiagnosisAction(formData: FormData) {
   const email = requiredString(formData, "email");
   const companyName = String(formData.get("company_name") ?? "").trim() || null;
   const phone = String(formData.get("phone") ?? "").trim() || null;
+  const leadSource = normalizeLeadSource(String(formData.get("lead_source") ?? ""));
+  const sourceCampaign = String(formData.get("source_campaign") ?? "").trim() || null;
+  const seminarInterest = normalizeSeminarInterest(String(formData.get("seminar_interest") ?? ""));
+  const preferredContactTime = String(formData.get("preferred_contact_time") ?? "").trim() || null;
   const { scores, mainType, subType } = scoreDiagnosis(answers);
 
   const supabase = await getDiagnosisClient();
@@ -37,7 +47,11 @@ export async function submitConstructionDiagnosisAction(formData: FormData) {
       sub_type: subType,
       business_type: answers.business_type,
       monthly_sales: answers.monthly_sales,
-      wants_consultation: answers.wants_consultation
+      wants_consultation: answers.wants_consultation,
+      lead_source: leadSource,
+      source_campaign: sourceCampaign,
+      seminar_interest: seminarInterest,
+      preferred_contact_time: preferredContactTime
     })
     .select("id")
     .single();

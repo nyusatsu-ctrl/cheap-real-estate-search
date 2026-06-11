@@ -3,17 +3,46 @@ import { getCurrentAdmin } from "@/lib/admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
+  type AdminDiagnosisFilters,
   formatDiagnosisDate,
   getAnswerLabel,
-  getConstructionDiagnoses
+  getConstructionDiagnoses,
+  getLeadSourceLabel,
+  getLeadStatusLabel,
+  getSeminarInterestLabel,
+  normalizeLeadSource,
+  normalizeLeadStatus,
+  normalizeSeminarInterest,
+  type DiagnosisTypeCode
 } from "@/lib/construction-diagnosis";
 
-export async function GET() {
+export async function GET(request: Request) {
   const admin = await getCurrentAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const diagnoses = await getConstructionDiagnoses();
-  const headers = ["氏名", "会社名", "電話番号", "メール", "業種", "月商", "診断タイプ", "サブ課題", "相談意欲", "診断日時"];
+  const filters = getFilters(new URL(request.url).searchParams);
+  const diagnoses = await getConstructionDiagnoses(filters);
+  const headers = [
+    "氏名",
+    "会社名",
+    "電話番号",
+    "メール",
+    "業種",
+    "月商",
+    "診断タイプ",
+    "サブ課題",
+    "相談意欲",
+    "説明会意向",
+    "流入元",
+    "キャンペーン",
+    "希望連絡時間",
+    "対応ステータス",
+    "管理者メモ",
+    "メモ更新日時",
+    "最終接触日時",
+    "リード更新日時",
+    "診断日時"
+  ];
   const rows = diagnoses.map((diagnosis) => [
     diagnosis.name,
     diagnosis.company_name ?? "",
@@ -24,6 +53,15 @@ export async function GET() {
     DIAGNOSIS_TYPES[diagnosis.main_type].name,
     DIAGNOSIS_TYPES[diagnosis.sub_type].name,
     CONSULTATION_LABELS[diagnosis.wants_consultation] ?? diagnosis.wants_consultation,
+    getSeminarInterestLabel(diagnosis.seminar_interest),
+    getLeadSourceLabel(diagnosis.lead_source),
+    diagnosis.source_campaign ?? "",
+    diagnosis.preferred_contact_time ?? "",
+    getLeadStatusLabel(diagnosis.lead_status),
+    diagnosis.admin_memo ?? "",
+    formatNullableDiagnosisDate(diagnosis.admin_memo_updated_at),
+    formatNullableDiagnosisDate(diagnosis.last_contacted_at),
+    formatNullableDiagnosisDate(diagnosis.lead_updated_at),
     formatDiagnosisDate(diagnosis.created_at)
   ]);
 
@@ -38,4 +76,44 @@ export async function GET() {
 
 function csvCell(value: string) {
   return `"${value.replaceAll("\"", "\"\"")}"`;
+}
+
+function formatNullableDiagnosisDate(value: string | null | undefined) {
+  return value ? formatDiagnosisDate(value) : "";
+}
+
+function getFilters(params: URLSearchParams): AdminDiagnosisFilters {
+  return {
+    mainType: normalizeDiagnosisType(params.get("main_type") ?? ""),
+    wantsConsultation: normalizeConsultation(params.get("wants_consultation") ?? ""),
+    seminarInterest: normalizeOptionalSeminarInterest(params.get("seminar_interest") ?? ""),
+    leadSource: normalizeOptionalLeadSource(params.get("lead_source") ?? ""),
+    leadStatus: normalizeOptionalLeadStatus(params.get("lead_status") ?? "")
+  };
+}
+
+function normalizeDiagnosisType(value: string): DiagnosisTypeCode | undefined {
+  return value in DIAGNOSIS_TYPES ? (value as DiagnosisTypeCode) : undefined;
+}
+
+function normalizeConsultation(value: string) {
+  return value && value in CONSULTATION_LABELS ? value : undefined;
+}
+
+function normalizeOptionalLeadSource(value: string) {
+  if (!value) return undefined;
+  const normalized = normalizeLeadSource(value);
+  return normalized === "other" && value !== "other" ? undefined : normalized;
+}
+
+function normalizeOptionalSeminarInterest(value: string) {
+  if (!value) return undefined;
+  const normalized = normalizeSeminarInterest(value);
+  return normalized === "undecided" && value !== "undecided" ? undefined : normalized;
+}
+
+function normalizeOptionalLeadStatus(value: string) {
+  if (!value) return undefined;
+  const normalized = normalizeLeadStatus(value);
+  return normalized === "new" && value !== "new" ? undefined : normalized;
 }

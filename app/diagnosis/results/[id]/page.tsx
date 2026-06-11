@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { CONSULTATION_LABELS, DIAGNOSIS_TYPES, formatDiagnosisDate, getConstructionDiagnosis } from "@/lib/construction-diagnosis";
 import { ArrowRight, CalendarCheck, Hammer, PhoneCall } from "lucide-react";
 
+const SEMINAR_GUIDE_HREF = "/diagnosis?source=direct&campaign=seminar_guide";
+const CONSULTATION_HREF = "/diagnosis?source=direct&campaign=consultation_cta";
+
 export default async function DiagnosisResultPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const diagnosis = await getConstructionDiagnosis(id);
@@ -55,6 +58,27 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
           </Link>
         </aside>
       </div>
+
+      <section className="mx-auto max-w-5xl px-4 pb-10">
+        <div className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm md:flex md:items-center md:justify-between md:gap-6">
+          <div>
+            <p className="text-sm font-bold text-brand-700">公共工事参入支援</p>
+            <h2 className="mt-2 text-xl font-black text-slate-950">無料オンライン説明会で参入可能性を確認できます</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700">
+              診断結果をもとに、御社が国の公共工事へ参入できる可能性を無料説明会で確認できます。
+            </p>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 md:mt-0 md:min-w-80 md:grid-cols-1">
+            <Link href={SEMINAR_GUIDE_HREF} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-4 py-3 text-sm font-black text-white focus-ring">
+              無料オンライン説明会の案内を受ける
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link href={CONSULTATION_HREF} className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800 focus-ring">
+              個別相談を希望する
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -33,7 +33,7 @@ function classifyText(value) {
   if (/別荘地|リゾート地|分譲地/.test(text) && /一区画|区画|土地|宅地|更地|売地|敷地|山林|原野|分譲地|別荘地/.test(text)) {
     return { propertyType: "land", propertyCategory: "vacation_house" };
   }
-  if (/農地|農用地|田畑|田んぼ|畑地|水田/.test(text)) return { propertyType: "land", propertyCategory: "farmland" };
+  if (isFarmland(text)) return { propertyType: "land", propertyCategory: "farmland" };
   if (/土地|宅地|更地|売地|雑草地/.test(text)) return { propertyType: "land", propertyCategory: "land" };
   if (/空き家|空家/.test(text)) return { propertyType: "detached_house", propertyCategory: "vacant_house" };
   if (/戸建住宅|戸建て住宅|戸建|一戸建て|中古住宅|住宅|家屋|建物|木造家屋/.test(text)) {
@@ -45,7 +45,11 @@ function classifyText(value) {
 
 function isOldHouseWithLand(text) {
   if (/建物なし|家屋なし|古家なし|更地/.test(text)) return false;
-  return /古家付き土地|古家付土地|古屋付き土地|古屋付土地|古民家付き土地|古民家付土地|家屋付き土地|建物付き土地|土地[0-9０-９〇○一二三四五六七八九十百千万]+筆と家屋|土地[0-9０-９〇○一二三四五六七八九十百千万]+筆と建物|土地複数筆と家屋|土地複数筆と建物|土地と家屋|土地と建物|宅地と家屋|宅地と建物|土地及び家屋|土地及び建物|土地建物|土地・家屋|土地・建物|土地\/家屋|土地\/建物|家屋あり|建物あり/.test(text);
+  return /古家付き土地|古家付土地|古屋付き土地|古屋付土地|古民家付き土地|古民家付土地|家屋付き土地|建物付き土地|土地[0-9０-９〇○一二三四五六七八九十百千万]+筆と家屋|土地[0-9０-９〇○一二三四五六七八九十百千万]+筆と建物|土地複数筆と家屋|土地複数筆と建物|土地と家屋|土地と建物|宅地と家屋|宅地と建物|土地及び家屋|土地及び建物|土地および家屋|土地および建物|土地建物|土地・家屋|土地・建物|土地、家屋|土地,家屋|土地,\s*家屋|土地、建物|土地,\s*建物|土地\/家屋|土地\/建物|土地複数筆、家屋|土地複数筆、建物|合計[0-9０-９〇○一二三四五六七八九十百千万]+筆の土地、家屋|合計[0-9０-９〇○一二三四五六七八九十百千万]+筆の土地、建物|[0-9０-９〇○一二三四五六七八九十百千万]+筆の土地、家屋|[0-9０-９〇○一二三四五六七八九十百千万]+筆の土地、建物|家屋あり|建物あり/.test(text);
+}
+
+function isFarmland(text) {
+  return /農地|農用地|農業用地|田畑|田んぼ|畑地|水田|耕作|お米の栽培|米の栽培|水稲|稲作|畑付き|畑付|畑あり|畑を|畑、|畑・|畑と/.test(text);
 }
 
 function categoryForBaseType(baseType) {

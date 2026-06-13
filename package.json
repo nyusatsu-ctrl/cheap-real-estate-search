@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "crawl:properties": "node scripts/crawlers/run.mjs",
     "import:properties": "node scripts/import-properties.mjs",
     "import:nationwide": "node scripts/import-properties.mjs --source=all",
     "import:athome": "node scripts/import-properties.mjs --source=athome-akiyabank",

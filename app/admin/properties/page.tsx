@@ -28,29 +28,42 @@ export default async function AdminPropertiesPage() {
     <AdminShell email={admin.email}>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-[1080px] table-fixed divide-y divide-slate-200 text-sm">
+            <colgroup>
+              <col className="w-[42%]" />
+              <col className="w-[9rem]" />
+              <col className="w-[13rem]" />
+              <col className="w-[8rem]" />
+              <col className="w-[6rem]" />
+              <col className="w-[7rem]" />
+              <col className="w-[5.5rem]" />
+            </colgroup>
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
               <tr>
                 <th className="px-3 py-3">物件</th>
-                <th className="px-3 py-3">価格</th>
+                <th className="px-3 py-3 text-right">価格</th>
                 <th className="px-3 py-3">所在地</th>
                 <th className="px-3 py-3">種別</th>
-                <th className="px-3 py-3">状態</th>
+                <th className="px-3 py-3 whitespace-nowrap">状態</th>
                 <th className="px-3 py-3">更新日</th>
-                <th className="px-3 py-3">操作</th>
+                <th className="px-3 py-3 whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {properties.map((property) => (
                 <tr key={property.id}>
-                  <td className="px-3 py-3 font-bold text-slate-950">{property.title}</td>
-                  <td className="px-3 py-3 font-black text-brand-700">{formatPrice(property.price_yen)}</td>
-                  <td className="px-3 py-3 text-slate-700">{property.prefecture}{property.city}</td>
-                  <td className="px-3 py-3 text-slate-700">{PROPERTY_TYPE_LABELS[property.property_type]}</td>
-                  <td className="px-3 py-3 text-slate-700">{STATUS_LABELS[property.status]}</td>
-                  <td className="px-3 py-3 text-slate-700">{formatDate(property.updated_at)}</td>
-                  <td className="px-3 py-3">
-                    <Link href={`/admin/properties/${property.id}/edit`} className="font-bold text-brand-700">
+                  <td className="px-3 py-3 align-top font-bold text-slate-950">
+                    <div className="line-clamp-2 leading-6">{property.title}</div>
+                  </td>
+                  <td className="px-3 py-3 text-right align-top font-black text-brand-700 whitespace-nowrap">{formatPrice(property.price_yen)}</td>
+                  <td className="px-3 py-3 align-top text-slate-700">
+                    <div className="line-clamp-2 leading-6">{property.prefecture}{property.city}</div>
+                  </td>
+                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{PROPERTY_TYPE_LABELS[property.property_type]}</td>
+                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{STATUS_LABELS[property.status]}</td>
+                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{formatDate(property.updated_at)}</td>
+                  <td className="px-3 py-3 align-top whitespace-nowrap">
+                    <Link href={`/admin/properties/${property.id}/edit`} className="font-bold text-brand-700 whitespace-nowrap">
                       編集
                     </Link>
                   </td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Search } from "lucide-react";
 import { PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { getCityOptions, getRegionPrefectures } from "@/lib/property-filters";
@@ -18,47 +18,17 @@ type Props = {
 };
 
 export function SearchFilters({ action = "/properties", locations, region, prefecture, city, priceRange, propertyType, keyword }: Props) {
-  const formRef = useRef<HTMLFormElement>(null);
   const [selectedRegion, setSelectedRegion] = useState(region ?? "");
   const [selectedPrefecture, setSelectedPrefecture] = useState(prefecture ?? "");
   const [selectedCity, setSelectedCity] = useState(city ?? "");
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRange ?? "");
 
-  const priceButtons = [
-    { label: "0円物件", value: "zero" },
-    { label: "300万円以下", value: "under300" }
-  ];
   const prefectures = getRegionPrefectures(selectedRegion);
   const cities = getCityOptions(locations, selectedRegion, selectedPrefecture);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <form ref={formRef} action={action}>
-        <div className="mb-4 flex flex-wrap gap-2">
-          {priceButtons.map((button) => {
-            const isSelected = selectedPriceRange === button.value;
-
-            return (
-              <button
-                key={button.label}
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => {
-                  setSelectedPriceRange(button.value);
-                  window.requestAnimationFrame(() => formRef.current?.requestSubmit());
-                }}
-                className={`rounded border px-3 py-2 text-sm font-bold focus-ring ${
-                  isSelected
-                    ? "border-brand-600 bg-brand-50 text-brand-800 ring-2 ring-brand-600"
-                    : "border-brand-100 bg-brand-50 text-brand-700"
-                }`}
-              >
-                {button.label}
-              </button>
-            );
-          })}
-        </div>
-
+      <form action={action}>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             地方ブロック

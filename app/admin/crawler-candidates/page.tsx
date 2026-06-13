@@ -4,7 +4,6 @@ import { CrawlerCandidateActions } from "@/components/CrawlerCandidateActions";
 import { PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_TYPE_LABELS, STATUS_LABELS } from "@/lib/constants";
 import {
   getCrawlerCandidateLocations,
-  getCrawlerCandidateSources,
   getCrawlerCandidates,
   normalizeCrawlerCandidateFilters,
   type CrawlerCandidate,
@@ -45,11 +44,7 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
   const admin = await requireAdmin();
   const resolvedSearchParams = await searchParams;
   const filters = normalizeCrawlerCandidateFilters(resolvedSearchParams);
-  const [candidates, sources, locations] = await Promise.all([
-    getCrawlerCandidates(filters),
-    getCrawlerCandidateSources(),
-    getCrawlerCandidateLocations()
-  ]);
+  const [candidates, locations] = await Promise.all([getCrawlerCandidates({ ...filters, source: undefined }), getCrawlerCandidateLocations()]);
   const prefectures = getRegionPrefectures(filters.region);
   const cities = getCityOptions(locations, filters.region, filters.prefecture);
   const returnTo = buildReturnTo(resolvedSearchParams);
@@ -66,7 +61,6 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
       <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <form action="/admin/crawler-candidates">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <SelectField name="source" label="収集元" value={filters.source} options={sources.map((source) => [source.source_key, `${source.source_key} / ${source.name}`])} />
             <SelectField name="status" label="公開状態" value={filters.status} options={STATUS_OPTIONS} />
             <SelectField name="permission" label="承認状態" value={filters.permission} options={PERMISSION_OPTIONS} />
             <SelectField name="crawlStatus" label="取込状態" value={filters.crawlStatus} options={CRAWL_STATUS_OPTIONS} />
@@ -81,7 +75,7 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
               <input
                 name="keyword"
                 defaultValue={filters.keyword ?? ""}
-                placeholder="物件名、所在地、収集元、元URL、ハッシュなど"
+                placeholder="物件名、所在地、情報元名、元URL、ハッシュなど"
                 className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
               />
             </label>
@@ -123,7 +117,7 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
                 <th className="px-3 py-3">市区町村</th>
                 <th className="px-3 py-3">種別</th>
                 <th className="px-3 py-3">詳細種別</th>
-                <th className="px-3 py-3">収集元</th>
+                <th className="px-3 py-3">情報元</th>
                 <th className="px-3 py-3">状態</th>
                 <th className="px-3 py-3">承認状態</th>
                 <th className="px-3 py-3">取込状態</th>
@@ -148,9 +142,8 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{candidate.city}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{propertyLabel(candidate.property_type)}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{propertyLabel(candidate.property_category ?? candidate.property_type)}</td>
-                  <td className="px-3 py-3 align-top text-slate-700">
-                    <div className="font-mono text-xs text-slate-500">{candidate.property_crawl_sources?.source_key ?? "-"}</div>
-                    <div className="mt-1 font-semibold">{candidate.property_crawl_sources?.name ?? candidate.property_sources?.name ?? "-"}</div>
+                  <td className="px-3 py-3 align-top text-xs font-semibold leading-5 text-slate-600">
+                    {sourceName(candidate)}
                   </td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{STATUS_LABELS[candidate.status as keyof typeof STATUS_LABELS] ?? candidate.status}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{permissionLabel(candidate.publication_permission)}</td>
@@ -218,6 +211,8 @@ function CandidateDetails({ candidate }: { candidate: CrawlerCandidate }) {
     ["property_category", candidate.property_category],
     ["land_area_m2", formatArea(candidate.land_area_m2)],
     ["building_area_m2", formatArea(candidate.building_area_m2)],
+    ["source_name", sourceName(candidate)],
+    ["source_key", candidate.property_crawl_sources?.source_key ?? "-"],
     ["source_url", candidate.source_url],
     ["duplicate_key", candidate.duplicate_key],
     ["content_hash", candidate.content_hash],
@@ -258,6 +253,10 @@ function crawlStatusLabel(value?: string | null) {
   return CRAWL_STATUS_LABELS[value] ?? value;
 }
 
+function sourceName(candidate: CrawlerCandidate) {
+  return candidate.property_crawl_sources?.name ?? candidate.property_sources?.name ?? "-";
+}
+
 function formatList(value?: string[] | null) {
   return value?.length ? value.join(", ") : "-";
 }
@@ -273,6 +272,7 @@ function formatDateTime(value?: string | null) {
 function buildReturnTo(params: CrawlerCandidateSearchParams) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
+    if (key === "source") continue;
     const first = Array.isArray(value) ? value[0] : value;
     if (first) search.set(key, first);
   }

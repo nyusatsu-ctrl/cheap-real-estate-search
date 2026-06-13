@@ -1601,6 +1601,7 @@ function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHis
     prefecture: extractPrefecture_(getCellByHeader_(row, headerMap, '住所'), getCellByHeader_(row, headerMap, '郵便番号')),
     workplace: getCellByHeader_(row, headerMap, '勤務先名'),
     workplaceKana: getCellByHeader_(row, headerMap, '勤務先名(フリガナ)'),
+    workPostalCode: getCellByHeader_(row, headerMap, '勤務先郵便番号'),
     workAddress: getCellByHeader_(row, headerMap, '勤務先住所'),
     workPhone: normalizeDisplayValue_('勤務先電話番号', getCellByHeader_(row, headerMap, '勤務先電話番号')),
     yearsEmployed: getCellByHeader_(row, headerMap, '勤続年数'),

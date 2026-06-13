@@ -56,7 +56,8 @@ var FIELD_ALIASES = {
   '住所（かな）': '住所(カナ)',
   '住所カナ': '住所(カナ)',
   '住所フリガナ': '住所(カナ)',
-  '勤務先名（フリガナ）': '勤務先名(フリガナ)'
+  '勤務先名（フリガナ）': '勤務先名(フリガナ)',
+  'kinmu-yuubin': '勤務先郵便番号'
 };
 
 // スプレッドシートに書き込む項目名（メールの項目名と同じ順番）
@@ -81,6 +82,7 @@ var COLUMNS = [
   'メールアドレス',
   '勤務先名',
   '勤務先名(フリガナ)',
+  '勤務先郵便番号',
   '勤務先住所',
   '勤務先電話番号',
   '業務内容',
@@ -217,15 +219,21 @@ function importLoanApplications() {
         parsed['お問い合わせ内容'] = extractInquiryContent_(body);
       }
 
-      // 1行分のデータを作成
-      var row = [];
+      var headerMap = buildHeaderMapForSheet_(sheet);
+      var row = new Array(COLUMNS.length).fill('');
       for (var c = 0; c < COLUMNS.length; c++) {
+        var columnName = COLUMNS[c];
+        var columnNumber = headerMap[columnName];
+        if (!columnNumber || columnNumber > COLUMNS.length) {
+          continue;
+        }
+
         if (COLUMNS[c] === '受信日時') {
           // 受信日時をフォーマットして入れる
-          row.push(Utilities.formatDate(receivedDate, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm'));
+          row[columnNumber - 1] = Utilities.formatDate(receivedDate, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
         } else {
-          // メール本文から該当する値を取得（なければ空欄）
-          row.push(normalizeImportedValue_(COLUMNS[c], parsed[COLUMNS[c]] || ''));
+          // メール本文から項目名ベースで該当する値を取得（なければ空欄）
+          row[columnNumber - 1] = normalizeImportedValue_(columnName, parsed[columnName] || '');
         }
       }
 
@@ -242,8 +250,8 @@ function importLoanApplications() {
 
       // スプレッドシートの2行目に挿入（新しい申込が常に一番上に来る）
       sheet.insertRowAfter(1);
-      formatPhoneColumns_(sheet, 2);
-      sheet.getRange(2, 1, 1, row.length).setValues([row]);
+      formatPhoneColumns_(sheet, 2, headerMap);
+      sheet.getRange(2, 1, 1, COLUMNS.length).setValues([row]);
       setApplicationTypeIfColumnExists_(sheet, 2, applicationType);
       setExtraApplicationColumns_(sheet, 2, parsed);
       var autoMarketCustomerId = '';
@@ -289,6 +297,41 @@ function importLoanApplications() {
   }
 
   Logger.log('取り込み処理終了: 確認メール数=' + checkedMessageCount + ', 新規取り込み=' + importedCount + ', 重複スキップ=' + duplicateCount + ', その他スキップ=' + skippedCount + ', 上限到達=' + reachedLimit);
+}
+
+function verifyWorkPostalCodeColumnSetup() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    throw new Error('シート「' + SHEET_NAME + '」が見つかりません。');
+  }
+
+  ensureBaseColumns_(sheet);
+  var headerMap = buildHeaderMapForSheet_(sheet);
+  var workPostalCodeColumn = headerMap['勤務先郵便番号'] || 0;
+  var workAddressColumn = headerMap['勤務先住所'] || 0;
+  var workPhoneColumn = headerMap['勤務先電話番号'] || 0;
+  var headers = sheet.getRange(1, 1, 1, COLUMNS.length).getDisplayValues()[0];
+  var mismatches = [];
+  for (var i = 0; i < COLUMNS.length; i++) {
+    var actual = trimFullWidth(String(headers[i] || ''));
+    if (actual !== COLUMNS[i]) {
+      mismatches.push({
+        column: i + 1,
+        expected: COLUMNS[i],
+        actual: actual
+      });
+    }
+  }
+
+  return {
+    ok: Boolean(mismatches.length === 0 && workPostalCodeColumn && workAddressColumn && workPostalCodeColumn < workAddressColumn),
+    workPostalCodeColumn: workPostalCodeColumn,
+    workAddressColumn: workAddressColumn,
+    workPhoneColumn: workPhoneColumn,
+    mismatchCount: mismatches.length,
+    mismatches: mismatches
+  };
 }
 
 function searchTargetThreads_() {
@@ -1056,26 +1099,58 @@ function repairBaseApplicationHeaders_(sheet) {
     return;
   }
 
-  if (sheet.getMaxColumns() < COLUMNS.length) {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), COLUMNS.length - sheet.getMaxColumns());
-  }
-
-  var currentHeaders = sheet.getRange(1, 1, 1, COLUMNS.length).getDisplayValues()[0];
-  var needsRepair = false;
-  for (var i = 0; i < COLUMNS.length; i++) {
-    if (trimFullWidth(String(currentHeaders[i] || '')) !== COLUMNS[i]) {
-      needsRepair = true;
-      break;
-    }
-  }
-
-  if (!needsRepair) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(COLUMNS);
+    sheet.getRange(1, 1, 1, COLUMNS.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
     return;
   }
 
-  sheet.getRange(1, 1, 1, COLUMNS.length).setValues([COLUMNS]);
+  for (var i = 0; i < COLUMNS.length; i++) {
+    var expectedColumnName = COLUMNS[i];
+    var targetColumn = i + 1;
+    ensureSheetColumnCapacity_(sheet, targetColumn);
+
+    var headerMap = buildRawHeaderMapForSheet_(sheet);
+    var currentColumn = headerMap[expectedColumnName];
+    if (!currentColumn) {
+      sheet.insertColumnBefore(targetColumn);
+      sheet.getRange(1, targetColumn).setValue(expectedColumnName).setFontWeight('bold');
+      continue;
+    }
+
+    if (currentColumn !== targetColumn) {
+      sheet.moveColumns(sheet.getRange(1, currentColumn, sheet.getMaxRows(), 1), targetColumn);
+    }
+  }
+
   sheet.getRange(1, 1, 1, COLUMNS.length).setFontWeight('bold');
   sheet.setFrozenRows(1);
+}
+
+function ensureSheetColumnCapacity_(sheet, columnNumber) {
+  var maxColumns = sheet.getMaxColumns();
+  if (maxColumns >= columnNumber) {
+    return;
+  }
+  sheet.insertColumnsAfter(maxColumns, columnNumber - maxColumns);
+}
+
+function buildRawHeaderMapForSheet_(sheet) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) {
+    return {};
+  }
+
+  var headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+  var headerMap = {};
+  for (var i = 0; i < headers.length; i++) {
+    var header = trimFullWidth(String(headers[i] || ''));
+    if (header !== '' && !headerMap[header]) {
+      headerMap[header] = i + 1;
+    }
+  }
+  return headerMap;
 }
 
 function setExtraApplicationColumns_(sheet, rowNumber, parsed) {
@@ -1109,8 +1184,10 @@ function isDuplicateApplication(sheet, row) {
   }
 
   var checkColumnNames = ['受信日時', 'お名前', '電話番号', 'メールアドレス'];
+  var headerMap = buildHeaderMapForSheet_(sheet);
   var checkIndexes = checkColumnNames.map(function(columnName) {
-    return COLUMNS.indexOf(columnName);
+    var columnNumber = headerMap[columnName];
+    return columnNumber ? columnNumber - 1 : -1;
   });
 
   var newKey = buildDuplicateKey(row, checkIndexes);
@@ -1118,7 +1195,7 @@ function isDuplicateApplication(sheet, row) {
     return false;
   }
 
-  var existingRows = sheet.getRange(2, 1, lastRow - 1, COLUMNS.length).getDisplayValues();
+  var existingRows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
   for (var i = 0; i < existingRows.length; i++) {
     if (buildDuplicateKey(existingRows[i], checkIndexes) === newKey) {
       return true;
@@ -1175,11 +1252,12 @@ function normalizePhoneNumber_(value) {
   return text;
 }
 
-function formatPhoneColumns_(sheet, rowNumber) {
+function formatPhoneColumns_(sheet, rowNumber, headerMap) {
+  headerMap = headerMap || buildHeaderMapForSheet_(sheet);
   for (var i = 0; i < PHONE_COLUMNS.length; i++) {
-    var index = COLUMNS.indexOf(PHONE_COLUMNS[i]);
-    if (index !== -1) {
-      sheet.getRange(rowNumber, index + 1).setNumberFormat('@');
+    var columnNumber = headerMap[PHONE_COLUMNS[i]];
+    if (columnNumber) {
+      sheet.getRange(rowNumber, columnNumber).setNumberFormat('@');
     }
   }
 }
@@ -1197,14 +1275,14 @@ function fixExistingPhoneNumbers() {
     return;
   }
 
+  var headerMap = buildHeaderMapForSheet_(sheet);
   var updatedCount = 0;
   for (var i = 0; i < PHONE_COLUMNS.length; i++) {
-    var columnIndex = COLUMNS.indexOf(PHONE_COLUMNS[i]);
-    if (columnIndex === -1) {
+    var columnNumber = headerMap[PHONE_COLUMNS[i]];
+    if (!columnNumber) {
       continue;
     }
 
-    var columnNumber = columnIndex + 1;
     var range = sheet.getRange(2, columnNumber, lastRow - 1, 1);
     range.setNumberFormat('@');
     var values = range.getDisplayValues();

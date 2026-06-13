@@ -3,7 +3,7 @@ import { signOutAction } from "@/app/admin/actions";
 
 const adminMenuItems = [
   { href: "/admin/properties", label: "物件管理" },
-  { href: "/admin/estimates", label: "見積管理" }
+  { href: "/admin/estimates", label: "問い合わせ管理" }
 ];
 
 export function AdminShell({ children, email }: { children: React.ReactNode; email: string }) {

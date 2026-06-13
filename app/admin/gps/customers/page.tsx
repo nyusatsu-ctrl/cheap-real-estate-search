@@ -17,8 +17,8 @@ export default async function GpsCustomersPage() {
             <tr>
               <th className="px-3 py-3">氏名</th>
               <th className="px-3 py-3">電話</th>
-              <th className="px-3 py-3">車両</th>
-              <th className="px-3 py-3">端末</th>
+              <th className="px-3 py-3">物件</th>
+              <th className="px-3 py-3">管理対象</th>
               <th className="px-3 py-3">最新位置</th>
               <th className="px-3 py-3">契約種別</th>
               <th className="px-3 py-3">ステータス</th>

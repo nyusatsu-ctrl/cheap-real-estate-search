@@ -73,12 +73,12 @@ const SHORT_PREFECTURES: Record<string, string> = {
 };
 
 const DEFENSE_KEYWORDS = [
-  "防衛省",
+  "空き家",
   "防衛装備庁",
-  "陸上自衛隊",
-  "海上自衛隊",
-  "航空自衛隊",
-  "自衛隊",
+  "陸上古家",
+  "海上古家",
+  "航空古家",
+  "古家",
   "方面会計隊",
   "地方総監部",
   "基地",
@@ -130,13 +130,13 @@ export function inferDefenseOrganizationType(item: TenderLike) {
   const current = item.organization_type ?? item.tender_sources?.organization_type;
   if (isDefenseOrganizationType(current)) return current;
   if (/防衛装備庁/.test(text)) return "defense_equipment_agency";
-  if (/陸上自衛隊|\/gsdf\//.test(text)) return "ground_self_defense_force";
-  if (/海上自衛隊|地方総監部|\/msdf\//.test(text)) return "maritime_self_defense_force";
-  if (/航空自衛隊|基地|分屯基地|\/asdf\//.test(text)) return "air_self_defense_force";
+  if (/陸上古家|\/gsdf\//.test(text)) return "ground_self_defense_force";
+  if (/海上古家|地方総監部|\/msdf\//.test(text)) return "maritime_self_defense_force";
+  if (/航空古家|基地|分屯基地|\/asdf\//.test(text)) return "air_self_defense_force";
   if (/防衛局/.test(text)) return "defense_bureau";
   if (/防衛医科大学校|ndmc\.ac\.jp/.test(text)) return "defense_hospital";
   if (/防衛研究所|nids\.mod\.go\.jp/.test(text)) return "defense_research";
-  if (/防衛省|自衛隊|mod\.go\.jp/.test(text)) return "defense_ministry";
+  if (/空き家|古家|mod\.go\.jp/.test(text)) return "defense_ministry";
   return current ?? null;
 }
 

@@ -18,10 +18,10 @@ export default async function AdminGpsDashboardPage() {
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <MetricCard label="GPS顧客数" value={data.customers.length} href="/admin/gps/customers" />
-        <MetricCard label="車両数" value={data.vehicles.length} href="/admin/gps/vehicles" />
-        <MetricCard label="端末数" value={data.devices.length} href="/admin/gps/devices" />
-        <MetricCard label="オンライン端末" value={onlineCount} href="/admin/gps/devices" />
-        <MetricCard label="オフライン端末" value={offlineCount} href="/admin/gps/devices" />
+        <MetricCard label="物件数" value={data.vehicles.length} href="/admin/gps/vehicles" />
+        <MetricCard label="管理対象数" value={data.devices.length} href="/admin/gps/devices" />
+        <MetricCard label="オンライン管理対象" value={onlineCount} href="/admin/gps/devices" />
+        <MetricCard label="オフライン管理対象" value={offlineCount} href="/admin/gps/devices" />
         <MetricCard label="最新rawログ件数" value={latestRawLogs.length} href="/admin/gps/raw-logs" />
       </div>
 
@@ -51,7 +51,7 @@ export default async function AdminGpsDashboardPage() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-black text-slate-950">端末状態</h2>
+          <h2 className="text-lg font-black text-slate-950">管理対象状態</h2>
           <div className="mt-3 divide-y divide-slate-200">
             {data.devices.slice(0, 8).map((device) => (
               <div key={device.id} className="flex items-center justify-between gap-3 py-3 text-sm">

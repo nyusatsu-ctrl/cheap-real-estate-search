@@ -18,7 +18,7 @@ export const sampleTenderSources: TenderSource[] = [
   },
   {
     id: "source-mod",
-    name: "防衛省 調達情報",
+    name: "空き家 調達情報",
     url: "https://www.mod.go.jp/",
     source_type: "defense",
     is_active: true,
@@ -29,7 +29,7 @@ export const sampleTenderSources: TenderSource[] = [
   },
   {
     id: "source-local",
-    name: "自治体オープンカウンター",
+    name: "自治体0円物件",
     url: "https://example.local-procurement.jp/",
     source_type: "municipality",
     is_active: false,
@@ -43,7 +43,7 @@ export const sampleTenderSources: TenderSource[] = [
 export const sampleTenders: Tender[] = [
   {
     id: "tender-cleaning-open-counter",
-    title: "庁舎日常清掃業務 オープンカウンター見積",
+    title: "庁舎日常清掃業務 0円物件見積",
     agency_name: "関東地方防衛局",
     tender_type: "open_counter",
     region: "関東",
@@ -55,7 +55,7 @@ export const sampleTenders: Tender[] = [
     required_qualification: null,
     source_url: "https://example.com/tenders/cleaning",
     pdf_url: "https://example.com/tenders/cleaning/spec.pdf",
-    detail_memo: "清掃、消耗品補充、簡易点検を含む初心者向けの小規模案件。正式条件は公告文と仕様書で確認してください。",
+    detail_memo: "清掃、消耗品補充、簡易点検を含む初心者向けの小規模物件。正式条件は公告文と仕様書で確認してください。",
     is_new: true,
     is_deadline_soon: true,
     is_defense: true,
@@ -63,7 +63,7 @@ export const sampleTenders: Tender[] = [
     fetched_at: daysAgo(1),
     created_at: daysAgo(1),
     updated_at: daysAgo(1),
-    tender_sources: { name: "防衛省 調達情報", url: "https://www.mod.go.jp/" }
+    tender_sources: { name: "空き家 調達情報", url: "https://www.mod.go.jp/" }
   },
   {
     id: "tender-office-supplies",
@@ -76,7 +76,7 @@ export const sampleTenders: Tender[] = [
     deadline_at: daysFromNow(12),
     bid_at: daysFromNow(14),
     qualification_required: true,
-    required_qualification: "全省庁統一資格 物品の販売",
+    required_qualification: "エリア検索 物品の販売",
     source_url: "https://example.com/tenders/office-supplies",
     pdf_url: null,
     detail_memo: "文具、トナー、ファイル等の物品調達。資格区分と競争参加地域を確認してください。",
@@ -91,8 +91,8 @@ export const sampleTenders: Tender[] = [
   },
   {
     id: "tender-vehicle-tire",
-    title: "車両用タイヤ交換及び廃タイヤ処分",
-    agency_name: "陸上自衛隊 駐屯地",
+    title: "物件用タイヤ交換及び廃タイヤ処分",
+    agency_name: "陸上古家 駐屯地",
     tender_type: "service",
     region: "北海道",
     prefecture: "北海道",
@@ -103,7 +103,7 @@ export const sampleTenders: Tender[] = [
     required_qualification: null,
     source_url: "https://example.com/tenders/tire",
     pdf_url: "https://example.com/tenders/tire/spec.pdf",
-    detail_memo: "車両、タイヤ、運搬、廃棄物処理に関連する案件。地域事業者が参加しやすい想定です。",
+    detail_memo: "物件、タイヤ、運搬、廃棄物処理に関連する物件。地域事業者が参加しやすい想定です。",
     is_new: false,
     is_deadline_soon: true,
     is_defense: true,
@@ -111,7 +111,7 @@ export const sampleTenders: Tender[] = [
     fetched_at: daysAgo(1),
     created_at: daysAgo(5),
     updated_at: daysAgo(1),
-    tender_sources: { name: "防衛省 調達情報", url: "https://www.mod.go.jp/" }
+    tender_sources: { name: "空き家 調達情報", url: "https://www.mod.go.jp/" }
   },
   {
     id: "tender-led-maintenance",
@@ -124,10 +124,10 @@ export const sampleTenders: Tender[] = [
     deadline_at: daysFromNow(18),
     bid_at: daysFromNow(20),
     qualification_required: true,
-    required_qualification: "全省庁統一資格 役務の提供等",
+    required_qualification: "エリア検索 役務の提供等",
     source_url: "https://example.com/tenders/led",
     pdf_url: null,
-    detail_memo: "照明、点検、保守の案件。仕様書全文は転載せず、公式URLで確認する運用です。",
+    detail_memo: "照明、点検、保守の物件。仕様書全文は転載せず、公式URLで確認する運用です。",
     is_new: false,
     is_deadline_soon: false,
     is_defense: false,
@@ -135,7 +135,7 @@ export const sampleTenders: Tender[] = [
     fetched_at: daysAgo(1),
     created_at: daysAgo(7),
     updated_at: daysAgo(1),
-    tender_sources: { name: "自治体オープンカウンター", url: "https://example.local-procurement.jp/" }
+    tender_sources: { name: "自治体0円物件", url: "https://example.local-procurement.jp/" }
   },
   {
     id: "tender-grass-cutting",
@@ -151,7 +151,7 @@ export const sampleTenders: Tender[] = [
     required_qualification: null,
     source_url: "https://example.com/tenders/grass-cutting",
     pdf_url: "https://example.com/tenders/grass-cutting/spec.pdf",
-    detail_memo: "草刈、除草、運搬を含む役務案件。資格不要案件として初心者でも検討しやすい想定です。",
+    detail_memo: "草刈、除草、運搬を含む役務物件。資格不要物件として初心者でも検討しやすい想定です。",
     is_new: true,
     is_deadline_soon: false,
     is_defense: false,
@@ -172,10 +172,10 @@ export const sampleTenders: Tender[] = [
     deadline_at: daysFromNow(16),
     bid_at: daysFromNow(18),
     qualification_required: true,
-    required_qualification: "全省庁統一資格 役務の提供等",
+    required_qualification: "エリア検索 役務の提供等",
     source_url: "https://example.com/tenders/facility-security",
     pdf_url: null,
-    detail_memo: "警備、巡回、施設管理に関する役務案件。参加資格と警備業関連の要件を公式情報で確認してください。",
+    detail_memo: "警備、巡回、施設管理に関する役務物件。参加資格と警備業関連の要件を公式情報で確認してください。",
     is_new: false,
     is_deadline_soon: false,
     is_defense: false,
@@ -196,10 +196,10 @@ export const sampleTenders: Tender[] = [
     deadline_at: daysFromNow(21),
     bid_at: daysFromNow(23),
     qualification_required: true,
-    required_qualification: "全省庁統一資格 役務の提供等",
+    required_qualification: "エリア検索 役務の提供等",
     source_url: "https://example.com/tenders/pc-maintenance",
     pdf_url: "https://example.com/tenders/pc-maintenance/spec.pdf",
-    detail_memo: "パソコン、保守、点検、メモリーカード等に関連する役務案件。詳細は公式仕様書で確認してください。",
+    detail_memo: "パソコン、保守、点検、メモリーカード等に関連する役務物件。詳細は公式仕様書で確認してください。",
     is_new: false,
     is_deadline_soon: false,
     is_defense: false,
@@ -212,7 +212,7 @@ export const sampleTenders: Tender[] = [
   {
     id: "tender-waste-transport",
     title: "廃棄物収集運搬及び処分業務",
-    agency_name: "航空自衛隊 基地",
+    agency_name: "航空古家 基地",
     tender_type: "service",
     region: "九州",
     prefecture: "福岡県",
@@ -223,7 +223,7 @@ export const sampleTenders: Tender[] = [
     required_qualification: null,
     source_url: "https://example.com/tenders/waste-transport",
     pdf_url: null,
-    detail_memo: "運搬、廃棄物、施設管理に関連する役務案件。防衛省・自衛隊案件としてラベル表示されます。",
+    detail_memo: "運搬、廃棄物、施設管理に関連する役務物件。空き家・古家・土地・山林物件としてラベル表示されます。",
     is_new: true,
     is_deadline_soon: true,
     is_defense: true,
@@ -231,7 +231,7 @@ export const sampleTenders: Tender[] = [
     fetched_at: daysAgo(1),
     created_at: daysAgo(2),
     updated_at: daysAgo(1),
-    tender_sources: { name: "防衛省 調達情報", url: "https://www.mod.go.jp/" }
+    tender_sources: { name: "空き家 調達情報", url: "https://www.mod.go.jp/" }
   }
 ];
 

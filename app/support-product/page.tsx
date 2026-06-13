@@ -4,9 +4,9 @@ export default function SupportProductPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <p className="text-sm font-bold text-brand-700">会員向け追加サービス</p>
-      <h1 className="mt-2 text-3xl font-black text-slate-950">全省庁統一資格 申請準備サポート</h1>
+      <h1 className="mt-2 text-3xl font-black text-slate-950">エリア検索 申請準備サポート</h1>
       <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
-        申請手順、必要書類チェックリスト、公式申請ページへの案内、入力前の確認ポイント、取得後に見るべき案件の探し方をまとめて確認できる自社サービスです。
+        申請手順、必要書類チェックリスト、公式申請ページへの案内、入力前の確認ポイント、取得後に見るべき物件の探し方をまとめて確認できる自社サービスです。
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-lg border border-brand-200 bg-brand-50 p-5">
@@ -18,7 +18,7 @@ export default function SupportProductPage() {
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black text-slate-950">含まれる内容</h2>
           <ul className="mt-4 grid gap-2 text-sm leading-7 text-slate-700">
-            {["申請手順の案内", "必要書類チェックリスト", "公式申請ページへの案内", "入力前の確認ポイント", "物品・役務案件への活用方法", "取得後に見るべき案件の探し方", "アプリ内の資格必要案件フィルターの使い方"].map((item) => (
+            {["申請手順の案内", "必要書類チェックリスト", "公式申請ページへの案内", "入力前の確認ポイント", "物品・役務物件への活用方法", "取得後に見るべき物件の探し方", "アプリ内のエリア指定物件フィルターの使い方"].map((item) => (
               <li key={item}>・{item}</li>
             ))}
           </ul>

@@ -332,7 +332,7 @@ function isDefenseCandidate(candidate: TenderCandidate) {
 
 function isClearlyExcludedCandidate(candidate: TenderCandidate) {
   const target = `${candidate.title} ${candidate.raw_text ?? ""} ${candidate.source_url}`;
-  if (/契約|調達|入札|公告|公募|公示|見積|オープンカウンタ|売払/.test(target)) return false;
+  if (/契約|調達|物件|公告|公募|公示|見積|オープンカウンタ|売払/.test(target)) return false;
   return /採用|広報|イベント|SNS|アクセス|お問い合わせ|部隊紹介|沿革|サイトマップ|プライバシーポリシー|オープンキャンパス|ポスター|リーフレット/.test(target);
 }
 

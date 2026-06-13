@@ -4,17 +4,17 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 export default function QualificationPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <p className="text-sm font-bold text-brand-700">全省庁統一資格ガイド</p>
-      <h1 className="mt-2 text-3xl font-black text-slate-950">全省庁統一資格とは</h1>
+      <p className="text-sm font-bold text-brand-700">エリア検索ガイド</p>
+      <h1 className="mt-2 text-3xl font-black text-slate-950">エリア検索とは</h1>
       <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
-        国の機関などが発注する物品の販売、役務の提供等の案件に参加する際、案件によって必要になる競争参加資格です。資格が必要な案件と不要なオープンカウンター案件を分けて確認することで、初心者でも取り組みやすい案件を探しやすくなります。
+        国の機関などが発注する物品の販売、役務の提供等の物件に参加する際、物件によって必要になる競争参加資格です。資格が必要な物件と不要な0円物件物件を分けて確認することで、初心者でも取り組みやすい物件を探しやすくなります。
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {[
-          ["物品・役務案件で使う", "文具、消耗品、車両、清掃、点検、保守など、工事以外の案件でも資格が求められる場合があります。"],
-          ["オープンカウンターとの違い", "オープンカウンターは比較的小規模で見積参加しやすい案件が多く、資格不要の案件もあります。"],
-          ["競争参加地域を確認", "資格には参加できる地域の考え方があります。全国か地域別かを案件ごとに確認します。"],
-          ["資格必要/不要で切替", "アプリ内では資格必要案件と資格不要案件をフィルターで切り替えられます。"]
+          ["物品・役務物件で使う", "文具、消耗品、物件、清掃、点検、保守など、工事以外の物件でも資格が求められる場合があります。"],
+          ["0円物件との違い", "0円物件は比較的小規模で見積参加しやすい物件が多く、資格不要の物件もあります。"],
+          ["競争参加地域を確認", "資格には参加できる地域の考え方があります。全国か地域別かを物件ごとに確認します。"],
+          ["エリア指定/不要で切替", "アプリ内ではエリア指定物件と資格不要物件をフィルターで切り替えられます。"]
         ].map(([title, body]) => (
           <section key={title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <CheckCircle2 className="h-5 w-5 text-brand-700" />
@@ -24,7 +24,7 @@ export default function QualificationPage() {
         ))}
       </div>
       <div className="mt-8 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
-        申請条件、必要書類、審査内容は必ず公式サイトで確認してください。当アプリの情報は分かりやすく案内するための補助情報であり、資格取得、案件への参加、落札、契約を保証するものではありません。
+        申請条件、必要書類、審査内容は必ず公式サイトで確認してください。当アプリの情報は分かりやすく案内するための補助情報であり、資格取得、物件への参加、落札、契約を保証するものではありません。
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link href="/qualification/how-to-apply" className="inline-flex items-center gap-2 rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">

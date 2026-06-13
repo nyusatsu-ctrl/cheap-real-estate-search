@@ -163,7 +163,7 @@ export function scoreSimilarAwards(awards: PastAwardResult[], tender: Tender): S
       }
       if (award.tender_type && award.tender_type === tender.tender_type) {
         score += 18;
-        reasons.push("案件種別一致");
+        reasons.push("物件種別一致");
       }
       if (award.business_type && `${tender.title} ${tender.detail_memo ?? ""}`.includes(award.business_type)) {
         score += 10;
@@ -223,7 +223,7 @@ function keywordSet(value: string) {
     .replace(/[()（）「」『』【】［］,、。・/]/g, " ")
     .split(/\s+/)
     .map((word) => word.trim())
-    .filter((word) => word.length >= 2 && !/^(公告|入札|一般|仕様書|一式|業務|購入|役務|物品)$/.test(word));
+    .filter((word) => word.length >= 2 && !/^(公告|物件|一般|仕様書|一式|業務|購入|役務|物品)$/.test(word));
   return new Set(words);
 }
 

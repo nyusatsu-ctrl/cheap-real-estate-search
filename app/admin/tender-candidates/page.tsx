@@ -43,8 +43,8 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-slate-950">候補案件確認</h2>
-          <p className="mt-1 text-sm text-slate-600">クローラー結果はここで確認し、承認した案件だけ公開一覧へ登録します。</p>
+          <h2 className="text-xl font-black text-slate-950">候補物件確認</h2>
+          <p className="mt-1 text-sm text-slate-600">クローラー結果はここで確認し、承認した物件だけ公開一覧へ登録します。</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries({ pending: "確認待ち", all: "すべて", rejected: "却下", duplicate: "重複", approved: "承認済み" }).map(([value, label]) => (
@@ -68,10 +68,10 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
       ) : null}
 
       <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <Metric label="防衛省候補件数" value={metrics.defenseCandidates} />
-        <Metric label="防衛省公開済み件数" value={metrics.defensePublished} />
-        <Metric label="九州の防衛省候補件数" value={metrics.kyushuDefenseCandidates} />
-        <Metric label="九州の防衛省公開済み件数" value={metrics.kyushuDefensePublished} />
+        <Metric label="空き家候補件数" value={metrics.defenseCandidates} />
+        <Metric label="空き家公開済み件数" value={metrics.defensePublished} />
+        <Metric label="九州の空き家候補件数" value={metrics.kyushuDefenseCandidates} />
+        <Metric label="九州の空き家公開済み件数" value={metrics.kyushuDefensePublished} />
         <Metric label="西部方面会計隊候補件数" value={metrics.westernCandidates} />
         <Metric label="西部方面会計隊公開済み件数" value={metrics.westernPublished} />
         <Metric label="pending 件数" value={metrics.pending} />
@@ -105,7 +105,7 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
         ))}
         {candidates.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
-            対象の候補案件はありません。
+            対象の候補物件はありません。
           </div>
         ) : null}
       </div>
@@ -141,7 +141,7 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
             組織区分: {organizationLabel(candidate.organization_type ?? candidate.tender_sources?.organization_type)} / 取得元: {candidate.source_name ?? candidate.tender_sources?.source_name ?? candidate.tender_sources?.name ?? "取得元未設定"}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            入札日 {formatDate(candidate.bid_at)} / 取得日時 {formatDate(candidate.fetched_at)} / 信頼度 {candidate.classification_confidence ?? "-"} / 重複候補 {candidate.duplicate_candidate_id ?? "なし"}
+            物件日 {formatDate(candidate.bid_at)} / 取得日時 {formatDate(candidate.fetched_at)} / 信頼度 {candidate.classification_confidence ?? "-"} / 重複候補 {candidate.duplicate_candidate_id ?? "なし"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -156,7 +156,7 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
         <input type="hidden" name="source_name" value={candidate.source_name ?? candidate.tender_sources?.source_name ?? candidate.tender_sources?.name ?? ""} />
         <input type="hidden" name="organization_type" value={candidate.organization_type ?? candidate.tender_sources?.organization_type ?? ""} />
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="案件名" name="title" defaultValue={candidate.title} required />
+          <Field label="物件名" name="title" defaultValue={candidate.title} required />
           <Field label="発注機関" name="agency_name" defaultValue={candidate.agency_name} required />
           <Select label="分類" name="tender_type" options={TENDER_CANDIDATE_TYPE_LABELS} defaultValue={candidate.tender_type} />
           <Field label="original_label" name="original_label" defaultValue={candidate.original_label ?? ""} />
@@ -165,7 +165,7 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
           <Field label="駐屯地/基地" name="base_location" defaultValue={candidate.base_location ?? ""} />
           <Field label="公告日" name="published_at" type="date" defaultValue={dateValue(candidate.published_at)} />
           <Field label="締切日" name="deadline_at" type="date" defaultValue={dateValue(candidate.deadline_at)} />
-          <Field label="入札日" name="bid_at" type="date" defaultValue={dateValue(candidate.bid_at)} />
+          <Field label="物件日" name="bid_at" type="date" defaultValue={dateValue(candidate.bid_at)} />
           <Field label="必要資格" name="required_qualification" defaultValue={candidate.required_qualification ?? ""} />
           <Field label="元URL" name="source_url" defaultValue={candidate.source_url} required />
           <Field label="PDF URL" name="pdf_url" defaultValue={candidate.pdf_url ?? ""} />
@@ -311,7 +311,7 @@ function isBulkApprovable(candidate: TenderCandidate) {
   if (candidate.duplicate_candidate_id) return false;
   if (candidate.tender_type === "unknown" || candidate.tender_type === "construction") return false;
   const target = `${candidate.title} ${candidate.raw_text ?? ""} ${candidate.source_url}`;
-  if (/契約|調達|入札|公告|公募|公示|見積|オープンカウンタ|売払/.test(target)) return true;
+  if (/契約|調達|物件|公告|公募|公示|見積|オープンカウンタ|売払/.test(target)) return true;
   return !/採用|広報|イベント|SNS|アクセス|お問い合わせ|部隊紹介|沿革|サイトマップ|プライバシーポリシー|オープンキャンパス|ポスター|リーフレット/.test(target);
 }
 

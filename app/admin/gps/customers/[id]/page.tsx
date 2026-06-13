@@ -35,15 +35,15 @@ export default async function GpsCustomerDetailPage({ params }: { params: Promis
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-lg font-black text-slate-950">紐付け車両・端末</h3>
+        <h3 className="text-lg font-black text-slate-950">紐付け物件・管理対象</h3>
         <div className="mt-3 divide-y divide-slate-200">
           {vehicles.map((vehicle) => (
             <div key={vehicle.id} className="py-3 text-sm">
               <Link href={`/admin/gps/vehicles/${vehicle.id}`} className="font-bold text-brand-700">
-                {[vehicle.maker, vehicle.model_name, vehicle.license_plate].filter(Boolean).join(" / ") || "車両詳細"}
+                {[vehicle.maker, vehicle.model_name, vehicle.license_plate].filter(Boolean).join(" / ") || "物件詳細"}
               </Link>
               <p className="mt-1 text-slate-600">
-                端末: {devices.filter((device) => device.vehicle_id === vehicle.id).map((device) => device.device_name).join(", ") || "-"}
+                管理対象: {devices.filter((device) => device.vehicle_id === vehicle.id).map((device) => device.device_name).join(", ") || "-"}
               </p>
             </div>
           ))}

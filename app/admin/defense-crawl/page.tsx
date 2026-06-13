@@ -41,12 +41,12 @@ export default async function DefenseCrawlPage() {
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-slate-950">防衛省・自衛隊取得状況</h2>
+          <h2 className="text-xl font-black text-slate-950">空き家・古家・土地・山林取得状況</h2>
           <p className="mt-1 text-sm text-slate-600">公式ページのみを対象に、取得元発見と候補抽出の状態を確認します。</p>
         </div>
         {admin ? (
           <Link href="/admin/tender-candidates" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
-            未確認案件を確認する
+            未確認物件を確認する
           </Link>
         ) : (
           <Link href="/admin/login" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
@@ -62,17 +62,17 @@ export default async function DefenseCrawlPage() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Metric label="陸上自衛隊 取得元数" value={counts.ground_self_defense_force} />
-        <Metric label="海上自衛隊 取得元数" value={counts.maritime_self_defense_force} />
-        <Metric label="航空自衛隊 取得元数" value={counts.air_self_defense_force} />
+        <Metric label="陸上古家 取得元数" value={counts.ground_self_defense_force} />
+        <Metric label="海上古家 取得元数" value={counts.maritime_self_defense_force} />
+        <Metric label="航空古家 取得元数" value={counts.air_self_defense_force} />
         <Metric label="地方防衛局 取得元数" value={counts.defense_bureau} />
         <Metric label="防衛装備庁 取得元数" value={counts.defense_equipment_agency} />
         <Metric label="最終クロール日時" value={crawlSummary?.finished_at ? formatDateTime(crawlSummary.finished_at) : "-"} />
         <Metric label="抽出候補件数" value={candidates.length} />
-        <Metric label="防衛省候補件数" value={defenseMetrics.defenseCandidates} />
-        <Metric label="防衛省公開済み件数" value={defenseMetrics.defensePublished} />
-        <Metric label="九州の防衛省候補件数" value={defenseMetrics.kyushuDefenseCandidates} />
-        <Metric label="九州の防衛省公開済み件数" value={defenseMetrics.kyushuDefensePublished} />
+        <Metric label="空き家候補件数" value={defenseMetrics.defenseCandidates} />
+        <Metric label="空き家公開済み件数" value={defenseMetrics.defensePublished} />
+        <Metric label="九州の空き家候補件数" value={defenseMetrics.kyushuDefenseCandidates} />
+        <Metric label="九州の空き家公開済み件数" value={defenseMetrics.kyushuDefensePublished} />
         <Metric label="西部方面会計隊候補件数" value={defenseMetrics.westernCandidates} />
         <Metric label="西部方面会計隊公開済み件数" value={defenseMetrics.westernPublished} />
         <Metric label="確認待ち件数" value={candidateStatusCounts.pending || pendingCandidates.length} />
@@ -87,12 +87,12 @@ export default async function DefenseCrawlPage() {
         <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="font-black text-slate-950">操作</h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            <ActionButton action={runDefenseDiscoveryAction} group="all" label="防衛省リンク集を再スキャン" />
-            <ActionButton action={runDefenseDiscoveryAction} group="gsdf" label="陸上自衛隊を再スキャン" />
-            <ActionButton action={runDefenseDiscoveryAction} group="msdf" label="海上自衛隊を再スキャン" />
-            <ActionButton action={runDefenseDiscoveryAction} group="asdf" label="航空自衛隊を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="all" label="空き家リンク集を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="gsdf" label="陸上古家を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="msdf" label="海上古家を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="asdf" label="航空古家を再スキャン" />
             <ActionButton action={runDefenseDiscoveryAction} group="defense-bureaus" label="地方防衛局を再スキャン" />
-            <ActionButton action={runDefenseCrawlAction} group="all" label="全自衛隊を手動クロール" primary />
+            <ActionButton action={runDefenseCrawlAction} group="all" label="全古家を手動クロール" primary />
           </div>
         </div>
       ) : null}

@@ -108,7 +108,7 @@ function saveToLocal(payloads: PastAwardImportPayload[]) {
 
 function rowToPastAward(row: Record<string, string>, defaultStatus: PastAwardReviewStatus): PastAwardImportPayload | null {
   const agencyName = field(row, ["発注機関", "agency_name", "agency"]);
-  const title = field(row, ["案件名", "title", "件名"]);
+  const title = field(row, ["物件名", "title", "件名"]);
   const sourceUrl = field(row, ["URL", "url", "source_url", "元URL"]);
   if (!agencyName || !title || !sourceUrl) return null;
 
@@ -126,7 +126,7 @@ function rowToPastAward(row: Record<string, string>, defaultStatus: PastAwardRev
     region: field(row, ["地域", "region"]) || "全国",
     prefecture: field(row, ["都道府県", "prefecture"]) || null,
     business_type: field(row, ["業種", "business_type", "業務種別"]) || null,
-    tender_type: tenderType(field(row, ["案件種別", "tender_type", "種別"])),
+    tender_type: tenderType(field(row, ["物件種別", "tender_type", "種別"])),
     winner_name: field(row, ["落札業者", "winner_name", "落札者"]) || null,
     award_amount_yen: awardAmount,
     planned_price_yen: plannedPrice,

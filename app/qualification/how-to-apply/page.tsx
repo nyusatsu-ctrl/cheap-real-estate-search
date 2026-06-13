@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
 const officialLinks = [
-  ["公式サイトで全省庁統一資格を確認する", "https://www.p-portal.go.jp/pps-web-biz/geps-chotatujoho/resources/app/html/shikaku.html"],
+  ["公式サイトでエリア検索を確認する", "https://www.p-portal.go.jp/pps-web-biz/geps-chotatujoho/resources/app/html/shikaku.html"],
   ["インターネット申請ページを開く", "https://www.p-portal.go.jp/pps-web-biz/geps-chotatujoho/resources/app/html/shinsei_internet.html"],
   ["受付・審査窓口を確認する", "https://www.p-portal.go.jp/pps-web-biz/geps-chotatujoho/resources/app/html/uketsuke.html"],
   ["有資格者名簿を確認する", "https://www.p-portal.go.jp/pps-web-biz/UZA01/OZA0101"]
@@ -12,7 +12,7 @@ export default function QualificationHowToApplyPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <p className="text-sm font-bold text-brand-700">申請準備</p>
-      <h1 className="mt-2 text-3xl font-black text-slate-950">全省庁統一資格の取得方法</h1>
+      <h1 className="mt-2 text-3xl font-black text-slate-950">エリア検索の取得方法</h1>
       <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
         インターネット申請、郵送・持参申請、受付・審査窓口の確認、必要書類の準備までを公式情報で確認しながら進めます。
       </p>
@@ -31,7 +31,7 @@ export default function QualificationHowToApplyPage() {
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black text-slate-950">申請前チェックリスト</h2>
           <ul className="mt-4 grid gap-2 text-sm leading-7 text-slate-700">
-            {["会社情報・個人事業主情報に誤りがない", "必要書類の発行日が古すぎない", "物品の販売、役務の提供等の区分を確認した", "参加したい地域と案件条件を確認した", "公式ページで最新情報を確認した"].map((item) => (
+            {["会社情報・個人事業主情報に誤りがない", "必要書類の発行日が古すぎない", "物品の販売、役務の提供等の区分を確認した", "参加したい地域と物件条件を確認した", "公式ページで最新情報を確認した"].map((item) => (
               <li key={item}>・{item}</li>
             ))}
           </ul>
@@ -53,7 +53,7 @@ export default function QualificationHowToApplyPage() {
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link href="/scrivener" className="rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">
-          全省庁統一資格の取得代行を依頼する
+          エリア検索の取得代行を依頼する
         </Link>
       </div>
     </div>

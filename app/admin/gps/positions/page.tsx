@@ -17,9 +17,9 @@ export default async function GpsPositionsPage() {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-3">車両</th>
+                <th className="px-3 py-3">物件</th>
                 <th className="px-3 py-3">顧客</th>
-                <th className="px-3 py-3">端末</th>
+                <th className="px-3 py-3">管理対象</th>
                 <th className="px-3 py-3">位置</th>
                 <th className="px-3 py-3">速度</th>
                 <th className="px-3 py-3">方位</th>

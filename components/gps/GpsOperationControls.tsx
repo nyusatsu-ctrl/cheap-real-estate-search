@@ -35,7 +35,7 @@ export function GpsOperationControls({ deviceId, vehicleId }: { deviceId: string
     <div className="rounded-lg border border-rose-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-black text-slate-950">遠隔制御</h2>
       <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">
-        実機制御は未接続・安全確認前です。現在は端末へ送信せず、確認ダイアログ後に操作ログだけ保存します。
+        実機制御は未接続・安全確認前です。現在は管理対象へ送信せず、確認ダイアログ後に操作ログだけ保存します。
       </div>
       <p className="mt-1 text-sm text-slate-600">
         初期状態では実機への送信は無効です。走行中停止は禁止し、将来はRELAY,2#相当の安全カットのみを基本にします。

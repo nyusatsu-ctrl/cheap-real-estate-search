@@ -6,9 +6,9 @@ export default async function ScrivenerPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <p className="text-sm font-bold text-brand-700">提携行政書士による申請サポート</p>
-      <h1 className="mt-2 text-3xl font-black text-slate-950">全省庁統一資格の取得代行依頼</h1>
+      <h1 className="mt-2 text-3xl font-black text-slate-950">エリア検索の取得代行依頼</h1>
       <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
-        物品・役務案件に参加するための全省庁統一資格について、提携行政書士へ取得代行を依頼できます。個人事業主（個人）と法人で必要情報・添付書類が異なります。
+        物品・役務物件に参加するためのエリア検索について、提携行政書士へ取得代行を依頼できます。個人事業主（個人）と法人で必要情報・添付書類が異なります。
       </p>
       {params.sent ? <p className="mt-5 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">取得代行依頼を送信しました。</p> : null}
 

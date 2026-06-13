@@ -1,15 +1,15 @@
 import Link from "next/link";
-import { Bell, CreditCard, FileSearch, LogOut, Star, UserRoundCheck } from "lucide-react";
+import { Bell, CreditCard, FileSearch, LogOut, MapPinned, Star } from "lucide-react";
 import { signOutMemberAction } from "@/app/auth/actions";
 import { formatDate } from "@/lib/format";
-import { getPublishedTenders } from "@/lib/tenders";
+import { getPublishedProperties } from "@/lib/properties";
 import { requireActiveMember } from "@/lib/user";
 
 export default async function DashboardPage() {
   const member = await requireActiveMember();
-  const tenders = await getPublishedTenders({ sort: "new" });
-  const deadlineSoonCount = tenders.filter((tender) => tender.is_deadline_soon).length;
-  const openCounterCount = tenders.filter((tender) => tender.tender_type === "open_counter").length;
+  const properties = await getPublishedProperties({ maxPrice: 3000000 });
+  const zeroYenCount = properties.filter((property) => property.price_yen === 0).length;
+  const prefectureCount = new Set(properties.map((property) => property.prefecture).filter(Boolean)).size;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -33,23 +33,23 @@ export default async function DashboardPage() {
           <p className="mt-2 text-sm text-slate-700">無料期間終了: {formatDate(member.trialEndsAt)}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm font-bold text-slate-500">公開案件</p>
-          <p className="mt-2 text-2xl font-black text-slate-950">{tenders.length}件</p>
-          <p className="mt-2 text-sm text-slate-700">締切間近: {deadlineSoonCount}件</p>
+          <p className="text-sm font-bold text-slate-500">公開物件</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{properties.length}件</p>
+          <p className="mt-2 text-sm text-slate-700">対象エリア: {prefectureCount}都道府県</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm font-bold text-slate-500">オープンカウンター</p>
-          <p className="mt-2 text-2xl font-black text-brand-700">{openCounterCount}件</p>
-          <p className="mt-2 text-sm text-slate-700">初心者向け案件を優先確認</p>
+          <p className="text-sm font-bold text-slate-500">0円物件</p>
+          <p className="mt-2 text-2xl font-black text-brand-700">{zeroYenCount}件</p>
+          <p className="mt-2 text-sm text-slate-700">掘り出し物件を優先確認</p>
         </div>
       </section>
 
       <section className="mt-6 grid gap-4 md:grid-cols-2">
         {[
-          [FileSearch, "案件検索", "地域、都道府県、案件種別、資格有無、キーワードで検索します。", "/tenders"],
-          [Star, "お気に入り案件", "気になる案件を保存し、対応ステータスとメモを管理します。", "/favorites"],
-          [Bell, "通知設定", "新着案件や締切間近案件の通知条件を登録します。", "/notifications"],
-          [UserRoundCheck, "全省庁統一資格", "資格の概要、取得方法、公式申請リンクを確認します。", "/qualification"],
+          [FileSearch, "物件検索", "0円物件、300万円以下、地域、物件種別で検索します。", "/properties?maxPrice=3000000"],
+          [Star, "お気に入り物件", "気になる物件を保存し、検討ステータスとメモを管理します。", "/favorites"],
+          [Bell, "通知設定", "新着物件や条件に合う物件の通知条件を登録します。", "/notifications"],
+          [MapPinned, "エリア検索", "都道府県、市区町村、空き家・古家・土地・山林の条件で探します。", "/properties?maxPrice=3000000"],
           [CreditCard, "課金管理", "Stripe Checkout と契約状態を確認します。", "/billing"]
         ].map(([Icon, title, text, href]) => (
           <Link key={title as string} href={href as string} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm focus-ring">

@@ -79,8 +79,8 @@ export function classifyTenderCandidate(input: { title: string; rawText?: string
     return { tenderType: "construction", confidence: 0.85, originalLabel };
   }
   if (originalLabel) return { tenderType: originalLabel.includes("少額") ? "small_discretionary" : "open_counter", confidence: 0.9, originalLabel };
-  if (input.qualificationRequired || /全省庁統一資格|競争参加資格|資格必要/.test(text)) return { tenderType: "qualification_required", confidence: 0.8, originalLabel };
-  if (/購入|買入|物品|備品|消耗品|車両|タイヤ|パソコン|印刷|制服|食料品|工具|機器|LED|照明|机|椅子|コピー用紙|トナー|什器/.test(text)) {
+  if (input.qualificationRequired || /エリア検索|競争参加資格|エリア指定/.test(text)) return { tenderType: "qualification_required", confidence: 0.8, originalLabel };
+  if (/購入|買入|物品|備品|消耗品|物件|タイヤ|パソコン|印刷|制服|食料品|工具|機器|LED|照明|机|椅子|コピー用紙|トナー|什器/.test(text)) {
     return { tenderType: "goods", confidence: 0.75, originalLabel };
   }
   if (/業務|委託|清掃|草刈|除草|点検|保守|警備|修繕|運搬|廃棄物|施設管理|リース|レンタル|維持管理|調査|受付|コールセンター/.test(text)) {

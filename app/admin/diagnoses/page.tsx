@@ -223,7 +223,7 @@ function AdminHeader({ email }: { email: string }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-slate-500">建設業売上アップ診断</p>
+        <p className="text-sm font-semibold text-slate-500">格安不動産サーチ</p>
         <p className="mt-1 text-xs text-slate-500">{email}</p>
       </div>
       <div className="flex items-center gap-2">

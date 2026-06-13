@@ -19,10 +19,10 @@ export default async function GpsVehicleDetailPage({ params }: { params: Promise
     <div className="space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-2xl font-black text-slate-950">
-          {[vehicle.maker, vehicle.model_name].filter(Boolean).join(" ") || "車両詳細"}
+          {[vehicle.maker, vehicle.model_name].filter(Boolean).join(" ") || "物件詳細"}
         </h2>
         <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
-          <Info label="車両区分" value={GPS_VEHICLE_TYPE_LABELS[vehicle.vehicle_type]} />
+          <Info label="物件区分" value={GPS_VEHICLE_TYPE_LABELS[vehicle.vehicle_type]} />
           <Info label="年式" value={vehicle.model_year ? String(vehicle.model_year) : null} />
           <Info label="車台番号" value={vehicle.vin} />
           <Info label="ナンバー" value={vehicle.license_plate} />
@@ -34,7 +34,7 @@ export default async function GpsVehicleDetailPage({ params }: { params: Promise
       {primaryDevice && <GpsOperationControls deviceId={primaryDevice.id} vehicleId={vehicle.id} />}
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-lg font-black text-slate-950">端末</h3>
+        <h3 className="text-lg font-black text-slate-950">管理対象</h3>
         <div className="mt-3 divide-y divide-slate-200">
           {devices.map((device) => (
             <div key={device.id} className="py-3 text-sm">

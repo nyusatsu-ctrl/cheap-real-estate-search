@@ -35,14 +35,14 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
   },
   gps_vehicles: {
     table: "gps_vehicles",
-    label: "GPS車両",
+    label: "GPS物件",
     orderColumn: "updated_at",
     allowedFields: ["customer_id", "vehicle_type", "maker", "model_name", "model_year", "vin", "license_plate", "status"],
     sampleRows: sampleGpsVehicles as unknown as Record<string, unknown>[]
   },
   gps_devices: {
     table: "gps_devices",
-    label: "GPS端末",
+    label: "GPS管理対象",
     orderColumn: "updated_at",
     allowedFields: [
       "vehicle_id",
@@ -117,7 +117,7 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
   },
   device_command_queue: {
     table: "device_command_queue",
-    label: "端末コマンドキュー",
+    label: "管理対象コマンドキュー",
     orderColumn: "queued_at",
     allowedFields: [
       "operation_log_id",

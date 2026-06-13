@@ -26,7 +26,7 @@ export function GpsMapPanel({ positions }: { positions: GpsLatestPosition[] }) {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-3">車両</th>
+                <th className="px-3 py-3">物件</th>
                 <th className="px-3 py-3">顧客</th>
                 <th className="px-3 py-3">緯度</th>
                 <th className="px-3 py-3">経度</th>

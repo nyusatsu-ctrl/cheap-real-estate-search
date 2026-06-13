@@ -47,7 +47,7 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
           <Info label="ICCID" value={device.iccid} />
           <Info label="最終通信" value={formatDateTime(device.last_seen_at)} />
           <Info label="顧客" value={customer?.full_name ?? null} />
-          <Info label="車両" value={[vehicle?.maker, vehicle?.model_name, vehicle?.license_plate].filter(Boolean).join(" / ") || null} />
+          <Info label="物件" value={[vehicle?.maker, vehicle?.model_name, vehicle?.license_plate].filter(Boolean).join(" / ") || null} />
           <Info label="接続状態" value={GPS_CONNECTION_STATUS_LABELS[device.connection_status]} />
           <Info label="Device ID" value={device.device_identifier} />
           <Info label="IMEI" value={device.imei} />
@@ -58,7 +58,7 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-black text-slate-950">最新位置</h3>
-            <p className="mt-1 text-sm text-slate-600">GPS端末から最後に取得した位置です。</p>
+            <p className="mt-1 text-sm text-slate-600">GPS管理対象から最後に取得した位置です。</p>
           </div>
           {latestPosition && (
             <a
@@ -80,7 +80,7 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
             <Info label="受信日時" value={formatDateTime(latestPosition.received_at)} />
             <Info label="ACC" value={GPS_ACC_STATUS_LABELS[latestPosition.acc_status]} />
             <Info label="リレー" value={GPS_RELAY_STATUS_LABELS[latestPosition.relay_status]} />
-            <Info label="車両電圧" value={latestPosition.vehicle_voltage ? `${latestPosition.vehicle_voltage} V` : null} />
+            <Info label="物件電圧" value={latestPosition.vehicle_voltage ? `${latestPosition.vehicle_voltage} V` : null} />
           </dl>
         ) : (
           <p className="mt-3 text-sm text-slate-500">位置情報はまだありません。</p>

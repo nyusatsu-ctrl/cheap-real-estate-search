@@ -16,7 +16,7 @@ export default async function GpsOperationsPage() {
             <tr>
               <th className="px-3 py-3">日時</th>
               <th className="px-3 py-3">操作</th>
-              <th className="px-3 py-3">対象端末</th>
+              <th className="px-3 py-3">対象管理対象</th>
               <th className="px-3 py-3">Device ID</th>
               <th className="px-3 py-3">理由</th>
               <th className="px-3 py-3">状態</th>

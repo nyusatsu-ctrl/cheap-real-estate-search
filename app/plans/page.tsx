@@ -3,16 +3,14 @@ import { Bell, Check, FileSearch, ShieldCheck, Star } from "lucide-react";
 import { MONTHLY_PRICE_YEN, TRIAL_DAYS } from "@/lib/billing/stripe";
 
 const features = [
-  "官公庁案件一覧の閲覧",
-  "地域・都道府県・案件種別フィルター",
-  "資格必要/不要の切替",
-  "防衛省・自衛隊案件の絞り込み",
-  "オープンカウンター案件の絞り込み",
+  "全国の格安不動産一覧の閲覧",
+  "0円物件・300万円以下物件の絞り込み",
+  "空き家・古家付き土地・山林・土地の絞り込み",
+  "地域・都道府県・市区町村フィルター",
   "キーワード検索",
-  "案件詳細と公式URL/PDF URLの確認",
-  "お気に入り保存と対応ステータス管理",
-  "新着・締切間近の通知設定",
-  "全省庁統一資格ガイド"
+  "物件詳細と元サイトURLの確認",
+  "お気に入り保存と検討ステータス管理",
+  "新着物件の通知設定"
 ];
 
 export default function PlansPage() {
@@ -26,10 +24,10 @@ export default function PlansPage() {
               {TRIAL_DAYS}日間無料、その後は必要な方だけ継続
             </p>
             <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight text-slate-950 md:text-5xl">
-              官公庁案件リサーチを、月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円で。
+              全国の格安不動産を、月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円で。
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
-              無料トライアル中は全機能を利用できます。トライアル終了後、未課金ユーザーは案件詳細閲覧・お気に入り・通知機能を制限します。
+              全国の0円物件・空き家・古家付き土地・山林・300万円以下の格安不動産をまとめて探せるサービスです。無料トライアル中は全機能を利用できます。
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link href="/signup" className="inline-flex items-center justify-center rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">14日間無料で始める</Link>
@@ -87,9 +85,9 @@ export default function PlansPage() {
       <section className="border-t border-slate-200 bg-white">
         <div className="mx-auto grid max-w-6xl gap-4 px-4 py-8 md:grid-cols-3">
           {[
-            [FileSearch, "案件を見つける", "物品・役務・オープンカウンター案件を横断的に確認します。"],
-            [Star, "検討を管理する", "お気に入りと対応ステータスで案件対応を整理します。"],
-            [Bell, "見逃しを減らす", "新着と締切間近の条件通知で確認漏れを減らします。"]
+            [FileSearch, "物件を見つける", "0円物件、空き家、土地、山林をまとめて確認します。"],
+            [Star, "検討を管理する", "お気に入りと検討ステータスで気になる物件を整理します。"],
+            [Bell, "見逃しを減らす", "新着物件や条件に合う物件の確認漏れを減らします。"]
           ].map(([Icon, title, text]) => (
             <div key={title as string} className="rounded-lg border border-slate-200 p-4">
               <Icon className="h-5 w-5 text-brand-700" />

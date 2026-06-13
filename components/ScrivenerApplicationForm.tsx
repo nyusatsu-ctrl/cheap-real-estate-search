@@ -9,7 +9,7 @@ export function ScrivenerApplicationForm() {
 
   return (
     <form action={submitScrivenerInquiryAction} className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <input type="hidden" name="request_type" value="全省庁統一資格の取得代行依頼" />
+      <input type="hidden" name="request_type" value="エリア検索の取得代行依頼" />
       <input type="hidden" name="business_type" value={businessType} />
       <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -65,7 +65,7 @@ export function ScrivenerApplicationForm() {
 
         <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
           相談・補足事項
-          <textarea name="message" rows={5} placeholder="取得したい案件、急ぎの期限、不安な点など" className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
+          <textarea name="message" rows={5} placeholder="取得したい物件、急ぎの期限、不安な点など" className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
         </label>
         <label className="flex items-start gap-2 rounded border border-slate-200 px-3 py-2 text-sm font-semibold leading-6 text-slate-700 md:col-span-2">
           <input name="consent_privacy" type="checkbox" required className="mt-1" />

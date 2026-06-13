@@ -9,17 +9,17 @@ type BulkApproveFormProps = {
 };
 
 const buttons = [
-  ["visible", "表示中の案件を一括承認"],
-  ["defense", "防衛省・自衛隊案件を一括承認"],
-  ["gsdf", "陸上自衛隊案件を一括承認"],
-  ["msdf", "海上自衛隊案件を一括承認"],
-  ["asdf", "航空自衛隊案件を一括承認"],
-  ["open_counter", "オープンカウンターだけ一括承認"],
+  ["visible", "表示中の物件を一括承認"],
+  ["defense", "空き家・古家・土地・山林物件を一括承認"],
+  ["gsdf", "陸上古家物件を一括承認"],
+  ["msdf", "海上古家物件を一括承認"],
+  ["asdf", "航空古家物件を一括承認"],
+  ["open_counter", "0円物件だけ一括承認"],
   ["goods_services", "物品・役務だけ一括承認"],
-  ["kyushu_defense", "九州の防衛省・自衛隊案件を一括承認"],
-  ["western_area", "西部方面会計隊案件を一括承認"],
-  ["kyushu_goods_services", "九州の物品・役務案件を一括承認"],
-  ["kyushu_open_counter", "九州のオープンカウンター案件を一括承認"]
+  ["kyushu_defense", "九州の空き家・古家・土地・山林物件を一括承認"],
+  ["western_area", "西部方面会計隊物件を一括承認"],
+  ["kyushu_goods_services", "九州の物品・役務物件を一括承認"],
+  ["kyushu_open_counter", "九州の0円物件物件を一括承認"]
 ];
 
 export function BulkApproveForm({ action, candidateIds, counts }: BulkApproveFormProps) {
@@ -31,7 +31,7 @@ export function BulkApproveForm({ action, candidateIds, counts }: BulkApproveFor
         const submitter = event.nativeEvent.submitter as HTMLButtonElement | null;
         const scope = submitter?.value ?? "visible";
         const count = counts[scope] ?? 0;
-        if (!window.confirm(`表示中の${count}件を公開案件に登録します。よろしいですか？`)) {
+        if (!window.confirm(`表示中の${count}件を公開物件に登録します。よろしいですか？`)) {
           event.preventDefault();
         }
       }}

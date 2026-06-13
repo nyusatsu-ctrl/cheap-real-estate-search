@@ -62,7 +62,7 @@ export const sampleGpsDevices: GpsDevice[] = [
   {
     id: GPS_MOCK_IDS.device,
     vehicle_id: GPS_MOCK_IDS.vehicle,
-    device_name: "MV930G-デモ端末",
+    device_name: "MV930G-デモ管理対象",
     imei: "359339080000001",
     device_identifier: "13912345678",
     sim_phone_number: "080-0000-0001",
@@ -160,7 +160,7 @@ export const sampleDeviceCommandQueue: DeviceCommand[] = [
 
 export const sampleGpsLatestPositions: GpsLatestPosition[] = sampleGpsPositions.map((position) => ({
   ...position,
-  device_name: "MV930G-デモ端末",
+  device_name: "MV930G-デモ管理対象",
   imei: "359339080000001",
   device_identifier: "13912345678",
   connection_status: "online",

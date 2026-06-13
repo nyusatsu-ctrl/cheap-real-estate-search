@@ -20,7 +20,7 @@ export default async function HomePage() {
               全国の格安不動産を、条件で探しやすく。
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
-              空き家、土地、古家付き土地、山林、別荘などの格安案件を毎日収集し、元サイトへ確認しに行ける形で整理します。
+              空き家、土地、古家付き土地、山林、別荘などの格安物件を毎日収集し、元サイトへ確認しに行ける形で整理します。
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">

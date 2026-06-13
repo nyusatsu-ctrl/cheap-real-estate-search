@@ -30,8 +30,8 @@ type SearchParams = {
 const TENDER_TYPE_OPTIONS = [
   ["goods", "物品"],
   ["service", "役務"],
-  ["open_counter", "オープンカウンター"],
-  ["unified_qualification", "全省庁統一資格必要案件"],
+  ["open_counter", "0円物件"],
+  ["unified_qualification", "エリア検索必要物件"],
   ["construction", "工事"],
   ["other", "その他"]
 ];
@@ -87,7 +87,7 @@ export default async function AdminPastAwardsPage({ searchParams }: { searchPara
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
               <tr>
-                <th className="px-3 py-3">案件</th>
+                <th className="px-3 py-3">物件</th>
                 <th className="px-3 py-3">発注機関</th>
                 <th className="px-3 py-3">地域</th>
                 <th className="px-3 py-3">業種</th>
@@ -127,11 +127,11 @@ function FilterForm({ filters, perPage }: { filters: AdminPastAwardFilters; perP
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           キーワード
-          <input name="keyword" defaultValue={filters.keyword} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="案件名・落札業者など" />
+          <input name="keyword" defaultValue={filters.keyword} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="物件名・落札業者など" />
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           発注機関
-          <input name="agencyName" defaultValue={filters.agencyName} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="防衛省、国土交通省など" />
+          <input name="agencyName" defaultValue={filters.agencyName} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="空き家、国土交通省など" />
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           地域
@@ -152,7 +152,7 @@ function FilterForm({ filters, perPage }: { filters: AdminPastAwardFilters; perP
           <input name="businessType" defaultValue={filters.businessType} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="清掃、保守、物品など" />
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
-          案件種別
+          物件種別
           <select name="tenderType" defaultValue={filters.tenderType} className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring">
             <option value="">すべて</option>
             {TENDER_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -204,7 +204,7 @@ function CsvImportForm() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-black text-slate-950">CSVインポート</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">ヘッダー例: 発注機関,案件名,地域,都道府県,業種,案件種別,落札業者,落札額,予定価格,落札率,公告日,開札日,URL</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">ヘッダー例: 発注機関,物件名,地域,都道府県,業種,物件種別,落札業者,落札額,予定価格,落札率,公告日,開札日,URL</p>
         </div>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           確認状態
@@ -221,7 +221,7 @@ function CsvImportForm() {
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           CSV貼り付け
-          <textarea name="csv_text" rows={5} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="発注機関,案件名,地域,業種,落札業者,落札額,予定価格,落札率,公告日,開札日,URL" />
+          <textarea name="csv_text" rows={5} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" placeholder="発注機関,物件名,地域,業種,落札業者,落札額,予定価格,落札率,公告日,開札日,URL" />
         </label>
       </div>
       <button className="mt-4 rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">インポートする</button>

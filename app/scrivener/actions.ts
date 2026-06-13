@@ -48,7 +48,7 @@ function buildApplicationMessage(formData: FormData) {
         ];
 
   return [
-    "全省庁統一資格の取得代行依頼",
+    "エリア検索の取得代行依頼",
     `料金表示: 通常88,000円 -> 49,800円`,
     `申請区分: ${businessType === "corporation" ? "法人" : "個人事業主（個人）"}`,
     `開業/設立直後: ${formData.get("newly_established") === "on" ? "はい" : "いいえ"}`,

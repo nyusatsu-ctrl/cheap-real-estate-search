@@ -21,9 +21,9 @@ export default async function AdminEstimatesPage() {
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-slate-950">見積もり依頼管理</h2>
+          <h2 className="text-xl font-black text-slate-950">問い合わせ管理</h2>
           <p className="mt-1 text-sm text-slate-600">
-            お客様には金額と概要だけを表示し、業者情報・手数料は運営者側で管理します。
+            物件購入前後の相談内容、対応状況、提携先からの回答を運営者側で管理します。
           </p>
         </div>
         <div className="flex gap-2">
@@ -31,7 +31,7 @@ export default async function AdminEstimatesPage() {
             業者登録
           </Link>
           <Link href="/partners/quotes/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
-            見積入力
+            回答入力
           </Link>
         </div>
       </div>
@@ -67,7 +67,7 @@ export default async function AdminEstimatesPage() {
                   <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
                     <tr>
                       <th className="px-3 py-2">業者</th>
-                      <th className="px-3 py-2">見積概要</th>
+                      <th className="px-3 py-2">回答概要</th>
                       <th className="px-3 py-2">顧客表示金額</th>
                       <th className="px-3 py-2">手数料</th>
                       <th className="px-3 py-2">状態</th>
@@ -89,7 +89,7 @@ export default async function AdminEstimatesPage() {
                     ) : (
                       <tr>
                         <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
-                          まだ見積もりは提出されていません。
+                          まだ回答は提出されていません。
                         </td>
                       </tr>
                     )}

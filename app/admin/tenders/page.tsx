@@ -12,7 +12,7 @@ export default async function AdminTendersPage() {
       <div className="mx-auto max-w-2xl px-4 py-10">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h1 className="text-2xl font-black text-slate-950">管理画面</h1>
-          <p className="mt-2 text-slate-700">案件管理には管理者ログインが必要です。</p>
+          <p className="mt-2 text-slate-700">物件管理には管理者ログインが必要です。</p>
           <Link href="/admin/login" className="mt-5 inline-block rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring">ログインへ</Link>
         </div>
       </div>
@@ -24,14 +24,14 @@ export default async function AdminTendersPage() {
   return (
     <AdminShell email={admin.email}>
       <div className="mb-4 flex justify-end">
-        <Link href="/admin/tenders/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">案件を新規登録</Link>
+        <Link href="/admin/tenders/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">物件を新規登録</Link>
       </div>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-3">案件</th>
+                <th className="px-3 py-3">物件</th>
                 <th className="px-3 py-3">機関</th>
                 <th className="px-3 py-3">種別</th>
                 <th className="px-3 py-3">締切</th>

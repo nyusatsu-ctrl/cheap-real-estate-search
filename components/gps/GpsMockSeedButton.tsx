@@ -28,7 +28,7 @@ export function GpsMockSeedButton() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-black text-slate-950">モックデータ投入</h2>
-      <p className="mt-1 text-sm text-slate-600">実機到着前に顧客、車両、端末、最新位置、rawログ、操作ログを作成します。</p>
+      <p className="mt-1 text-sm text-slate-600">実機到着前に顧客、物件、管理対象、最新位置、rawログ、操作ログを作成します。</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"

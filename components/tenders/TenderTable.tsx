@@ -11,7 +11,7 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
             <tr>
-              <th className="px-3 py-3">案件名</th>
+              <th className="px-3 py-3">物件名</th>
               <th className="px-3 py-3">発注機関</th>
               <th className="px-3 py-3">種別</th>
               <th className="px-3 py-3">地域</th>
@@ -27,8 +27,8 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                 <td className="min-w-72 px-3 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     {tender.is_new ? <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">新着</span> : null}
-                    {tender.is_deadline_soon ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">締切間近</span> : null}
-                    {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">防衛省・自衛隊</span> : null}
+                    {tender.is_deadline_soon ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">新着</span> : null}
+                    {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">空き家・古家・土地・山林</span> : null}
                     {tender.tender_type === "open_counter" ? <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">初心者向け</span> : null}
                     {tender.is_admin_verified ? <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">管理者確認済み</span> : null}
                   </div>
@@ -49,7 +49,7 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                 <td className="px-3 py-3 font-bold text-slate-900">{formatDate(tender.deadline_at)}</td>
                 <td className="px-3 py-3">
                   <span className={`rounded px-2 py-1 text-xs font-bold ${tender.qualification_required ? "bg-violet-100 text-violet-700" : "bg-emerald-100 text-emerald-700"}`}>
-                    {tender.qualification_required ? "資格必要" : "資格不要"}
+                    {tender.qualification_required ? "エリア指定" : "資格不要"}
                   </span>
                 </td>
                 <td className="px-3 py-3">

@@ -116,7 +116,7 @@ function inferTransactionType(text, priceYen) {
 
 function inferRiskTags(text) {
   const rules = [
-    ["農地", /農地|田|畑/],
+    ["農地", /農地|農用地|田畑|田んぼ|畑地|水田/],
     ["山林", /山林|森林|立木|原野/],
     ["別荘地", /別荘地|管理費/],
     ["再建築注意", /再建築不可|未接道|接道なし|道路なし/],

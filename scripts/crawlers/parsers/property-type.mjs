@@ -30,6 +30,9 @@ function classifyText(value) {
     return { propertyType: "land", propertyCategory: "old_house_with_land" };
   }
   if (/山林|森林|原野|立木/.test(text)) return { propertyType: "land", propertyCategory: "forest" };
+  if (/別荘地|リゾート地|分譲地/.test(text) && /一区画|区画|土地|宅地|更地|売地|敷地|山林|原野|分譲地|別荘地/.test(text)) {
+    return { propertyType: "land", propertyCategory: "vacation_house" };
+  }
   if (/農地|農用地|田畑|田んぼ|畑地|水田/.test(text)) return { propertyType: "land", propertyCategory: "farmland" };
   if (/土地|宅地|更地|売地|雑草地/.test(text)) return { propertyType: "land", propertyCategory: "land" };
   if (/空き家|空家/.test(text)) return { propertyType: "detached_house", propertyCategory: "vacant_house" };

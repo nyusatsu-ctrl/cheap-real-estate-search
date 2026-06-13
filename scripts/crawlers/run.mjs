@@ -7,7 +7,7 @@ import { checkRobots } from "./core/robots.mjs";
 import { waitForRateLimit } from "./core/rate-limit.mjs";
 import { normalizeCandidates } from "./core/normalize.mjs";
 import { createRunResult, formatCrawlerError, printSourceResult, toDiagnosticCandidate } from "./core/crawl-log.mjs";
-import { upsertCandidates } from "./core/upsert.mjs";
+import { persistCrawlResult } from "./core/upsert.mjs";
 
 const DEFAULT_LIMIT = 20;
 const ADAPTERS = {
@@ -142,7 +142,7 @@ async function main() {
     totals.inserted += result.inserted ?? 0;
     totals.updated += result.updated ?? 0;
     totals.skipped += result.skipped;
-    totals.failed += result.failed + result.errors.length;
+    totals.failed += result.failed;
     if (!jsonOutput) {
       printSourceResult(result, { verbose });
       console.log("");
@@ -162,36 +162,52 @@ async function main() {
 
 async function runSource(source) {
   const result = createRunResult(source);
+  result.startedAt = new Date().toISOString();
   const adapter = ADAPTERS[source.adapterName];
   if (!adapter) {
     result.failed += 1;
     result.errors.push({ errorType: "AdapterNotFound", message: `adapter not found: ${source.adapterName}` });
-    return result;
+  } else {
+    try {
+      result.robots = await checkRobots(source);
+      if (source.crawlPolicy === "disallow" || result.robots.status === "disallowed") {
+        result.skipped += 1;
+        result.warnings.push("crawl_policy または robots.txt によりスキップしました。");
+      } else {
+        const crawled = await adapter(source, { limit, args });
+        result.found = crawled.found ?? 0;
+        result.warnings.push(...(crawled.warnings ?? []));
+        result.failed += crawled.failed ?? 0;
+        const normalized = normalizeCandidates(crawled.candidates ?? [], source);
+        const eligible = normalized.filter((candidate) => candidate.price_yen !== null && candidate.price_yen <= 3000000);
+        result.skipped += normalized.length - eligible.length;
+        result.candidates = eligible.slice(0, limit);
+      }
+    } catch (error) {
+      result.failed += 1;
+      result.errors.push(formatCrawlerError(error, { sourceKey: source.id, url: source.listUrl }));
+    }
   }
 
-  try {
-    result.robots = await checkRobots(source);
-    if (source.crawlPolicy === "disallow" || result.robots.status === "disallowed") {
-      result.skipped += 1;
-      result.warnings.push("crawl_policy または robots.txt によりスキップしました。");
-      return result;
+  if (commit) {
+    try {
+      const saved = await persistCrawlResult({
+        source,
+        candidates: result.candidates,
+        commit,
+        found: result.found,
+        skipped: result.skipped,
+        failed: result.failed,
+        errors: result.errors,
+        startedAt: result.startedAt
+      });
+      result.inserted = saved.inserted;
+      result.updated = saved.updated;
+      result.failed += saved.failed ?? 0;
+    } catch (error) {
+      result.failed += 1;
+      result.errors.push(formatCrawlerError(error, { sourceKey: source.id, url: source.listUrl }));
     }
-
-    const crawled = await adapter(source, { limit, args });
-    result.found = crawled.found ?? 0;
-    result.warnings.push(...(crawled.warnings ?? []));
-    result.failed += crawled.failed ?? 0;
-    const normalized = normalizeCandidates(crawled.candidates ?? [], source);
-    const eligible = normalized.filter((candidate) => candidate.price_yen !== null && candidate.price_yen <= 3000000);
-    result.skipped += normalized.length - eligible.length;
-    result.candidates = eligible.slice(0, limit);
-
-    const saved = await upsertCandidates({ source, candidates: result.candidates, commit });
-    result.inserted = saved.inserted;
-    result.updated = saved.updated;
-  } catch (error) {
-    result.failed += 1;
-    result.errors.push(formatCrawlerError(error, { sourceKey: source.id, url: source.listUrl }));
   }
 
   return result;

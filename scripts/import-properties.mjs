@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_MAX_PRICE = 30000000;
@@ -7,10 +8,17 @@ const DEFAULT_PAGES = 3;
 const DEFAULT_LIMIT = 5000;
 const SOURCE_FILE = "data/property-import-sources.json";
 const IMPORT_METADATA_COLUMNS = [
+  "property_category",
   "transaction_type",
   "listed_at",
+  "source_published_at",
   "source_updated_at",
   "scraped_at",
+  "first_detected_at",
+  "last_checked_at",
+  "last_changed_at",
+  "has_updates",
+  "previous_snapshot_hash",
   "price_band",
   "risk_tags",
   "remarks"
@@ -178,16 +186,25 @@ async function importSource(source) {
   const sourceId = await ensureSource(source);
   const canSaveImportMetadata = await hasPropertyImportMetadataColumns();
   for (const property of candidates) {
-    const existing = await findExistingProperty(property);
+    const existing = await findExistingProperty(property, canSaveImportMetadata);
+    const now = new Date().toISOString();
     const status = existing?.status === "sold" ? "sold" : publish ? "published" : "draft";
-    const publishedAt = status === "published" ? existing?.published_at ?? new Date().toISOString() : null;
+    const publishedAt = status === "published" ? existing?.published_at ?? now : null;
+    const snapshotHash = buildPropertySnapshotHash(property);
+    const changed = existing ? hasPropertyChanged(existing, property, snapshotHash) : false;
     const payload = stripRuntimeFields(
       stripUnsupportedImportMetadata({
       ...property,
       source_id: sourceId,
       publication_permission: "unknown",
       status,
-      published_at: publishedAt
+      published_at: publishedAt,
+      source_published_at: property.source_published_at ?? property.listed_at ?? null,
+      last_checked_at: now,
+      last_changed_at: existing ? (changed ? now : existing.last_changed_at ?? null) : now,
+      has_updates: existing ? changed : false,
+      previous_snapshot_hash: snapshotHash,
+      ...(existing ? {} : { first_detected_at: now })
       }, canSaveImportMetadata)
     );
 
@@ -776,10 +793,14 @@ function parseProperty(source, html, sourceUrl) {
 
 function enrichProperty(source, property, text = "") {
   const combined = `${source.name}\n${property.title}\n${property.address_display}\n${text}`;
+  const sourcePublishedAt = property.source_published_at ?? property.listed_at ?? extractDate(text, ["掲載日", "登録日", "公開日"]);
+
   return {
     ...property,
+    property_category: property.property_category ?? inferPropertyCategory(combined, property.property_type),
     transaction_type: property.transaction_type ?? inferTransactionType(combined),
-    listed_at: property.listed_at ?? extractDate(text, ["掲載日", "登録日", "公開日"]),
+    listed_at: property.listed_at ?? sourcePublishedAt,
+    source_published_at: sourcePublishedAt,
     source_updated_at: property.source_updated_at ?? extractDate(text, ["更新日", "最終更新日"]),
     scraped_at: new Date().toISOString(),
     price_band: buildPriceBand(property.price_yen),
@@ -988,6 +1009,15 @@ function inferPropertyType(text, landArea, buildingArea) {
   return "other";
 }
 
+function inferPropertyCategory(text, fallbackType) {
+  if (/山林|森林|立木/.test(text)) return "forest";
+  if (/農地|田|畑/.test(text)) return "farmland";
+  if (/別荘/.test(text)) return "vacation_house";
+  if (/古家|古屋|古民家/.test(text)) return "old_house_land";
+  if (/空き家|空家/.test(text)) return "vacant_house";
+  return fallbackType;
+}
+
 async function ensureSource(source) {
   const { data: existing, error: selectError } = await supabase
     .from("property_sources")
@@ -1009,10 +1039,13 @@ async function ensureSource(source) {
   return data.id;
 }
 
-async function findExistingProperty(property) {
+async function findExistingProperty(property, canSaveImportMetadata) {
+  const selectColumns = canSaveImportMetadata
+    ? "id,status,published_at,first_detected_at,last_changed_at,previous_snapshot_hash,title,property_category,price_yen,prefecture,city,address_display,land_area_m2,building_area_m2,source_url,remarks"
+    : "id,status,published_at";
   const { data, error } = await supabase
     .from("properties")
-    .select("id,status,published_at")
+    .select(selectColumns)
     .eq("source_url", property.source_url)
     .limit(1)
     .maybeSingle();
@@ -1022,7 +1055,7 @@ async function findExistingProperty(property) {
 
   let query = supabase
     .from("properties")
-    .select("id,status,published_at")
+    .select(selectColumns)
     .eq("address_display", property.address_display)
     .eq("price_yen", property.price_yen);
 
@@ -1066,6 +1099,47 @@ function stripRuntimeFields(payload) {
   const stripped = { ...payload };
   delete stripped.raw_text;
   return stripped;
+}
+
+function buildPropertySnapshotHash(property) {
+  return createHash("sha256")
+    .update(JSON.stringify(buildPropertySnapshot(property)))
+    .digest("hex");
+}
+
+function buildPropertySnapshot(property) {
+  return {
+    title: normalizeSnapshotValue(property.title),
+    property_category: normalizeSnapshotValue(property.property_category),
+    price_yen: property.price_yen ?? null,
+    prefecture: normalizeSnapshotValue(property.prefecture),
+    city: normalizeSnapshotValue(property.city),
+    address_display: normalizeSnapshotValue(property.address_display),
+    land_area_m2: normalizeSnapshotNumber(property.land_area_m2),
+    building_area_m2: normalizeSnapshotNumber(property.building_area_m2),
+    source_url: normalizeSnapshotValue(property.source_url),
+    remarks: normalizeSnapshotValue(property.remarks)
+  };
+}
+
+function hasPropertyChanged(existing, property, snapshotHash) {
+  if (existing.previous_snapshot_hash) return existing.previous_snapshot_hash !== snapshotHash;
+
+  return Object.entries(buildPropertySnapshot(property)).some(([key, value]) => {
+    if (key === "land_area_m2" || key === "building_area_m2") return normalizeSnapshotNumber(existing[key]) !== value;
+    if (key === "price_yen") return Number(existing[key] ?? 0) !== value;
+    return normalizeSnapshotValue(existing[key]) !== value;
+  });
+}
+
+function normalizeSnapshotValue(value) {
+  return cleanupText(value ?? "");
+}
+
+function normalizeSnapshotNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
 }
 
 async function fetchHtml(url) {

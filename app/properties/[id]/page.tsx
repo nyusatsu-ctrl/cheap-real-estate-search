@@ -10,6 +10,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const property = await getPublishedProperty(id);
   if (!property) notFound();
+  const propertyCategory = property.property_category ?? property.property_type;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -21,10 +22,16 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-            {PROPERTY_TYPE_LABELS[property.property_type]}
+            {PROPERTY_TYPE_LABELS[propertyCategory]}
           </span>
           {property.price_yen === 0 ? (
             <span className="rounded bg-rose-100 px-2 py-1 text-xs font-bold text-rose-700">0円物件</span>
+          ) : null}
+          {property.price_yen <= 3000000 ? (
+            <span className="rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">300万円以下</span>
+          ) : null}
+          {property.has_updates ? (
+            <span className="rounded bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">更新あり</span>
           ) : null}
         </div>
         <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{property.title}</h1>
@@ -40,7 +47,9 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             ["土地面積", formatArea(property.land_area_m2)],
             ["建物面積", formatArea(property.building_area_m2)],
             ["築年", property.construction_year ? `${property.construction_year}年` : "-"],
-            ["登録日", formatDate(property.published_at)],
+            ["アプリ検知日", formatDate(property.first_detected_at ?? null)],
+            ["元サイト掲載日", formatDate(property.source_published_at ?? property.listed_at ?? null)],
+            ["最終確認日", formatDate(property.last_checked_at ?? null)],
             ["情報元", property.property_sources?.name ?? "未設定"],
             ["掲載許諾", property.publication_permission],
             ["公開状態", "公開中"]

@@ -19,7 +19,7 @@ export default async function FavoritesPage() {
           <h1 className="text-2xl font-black text-slate-950">お気に入り物件</h1>
           <p className="mt-1 text-sm text-slate-600">気になる格安不動産を保存し、検討状況を整理するための画面です。</p>
         </div>
-        <Link href="/properties?maxPrice=3000000" className="inline-flex items-center gap-2 rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+        <Link href="/properties?priceRange=under300" className="inline-flex items-center gap-2 rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
           <Search className="h-4 w-4" />
           物件を探す
         </Link>

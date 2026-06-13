@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
+import { SearchFilters } from "@/components/SearchFilters";
 import { STATUS_LABELS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatDate, formatPrice } from "@/lib/format";
 import { getCurrentAdmin } from "@/lib/admin";
-import { getAdminProperties } from "@/lib/properties";
+import { normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
+import { getAdminProperties, getAdminPropertyLocations } from "@/lib/properties";
 
-export default async function AdminPropertiesPage() {
+export default async function AdminPropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const admin = await getCurrentAdmin();
+  const resolvedSearchParams = await searchParams;
 
   if (!admin) {
     return (
@@ -22,10 +25,24 @@ export default async function AdminPropertiesPage() {
     );
   }
 
-  const properties = await getAdminProperties();
+  const filters = normalizePropertyFilters(resolvedSearchParams);
+  const [properties, locations] = await Promise.all([getAdminProperties(filters), getAdminPropertyLocations()]);
 
   return (
     <AdminShell email={admin.email}>
+      <div className="mb-4">
+        <SearchFilters
+          action="/admin/properties"
+          locations={locations}
+          region={filters.region}
+          prefecture={filters.prefecture}
+          city={filters.city}
+          priceRange={filters.priceRange}
+          propertyType={filters.propertyType}
+          keyword={filters.keyword}
+        />
+        <p className="mt-3 text-sm font-semibold text-slate-700">{properties.length}件</p>
+      </div>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1080px] table-fixed divide-y divide-slate-200 text-sm">
@@ -59,7 +76,7 @@ export default async function AdminPropertiesPage() {
                   <td className="px-3 py-3 align-top text-slate-700">
                     <div className="line-clamp-2 leading-6">{property.prefecture}{property.city}</div>
                   </td>
-                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{PROPERTY_TYPE_LABELS[property.property_type]}</td>
+                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{PROPERTY_TYPE_LABELS[property.property_category ?? property.property_type]}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{STATUS_LABELS[property.status]}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{formatDate(property.updated_at)}</td>
                   <td className="px-3 py-3 align-top whitespace-nowrap">

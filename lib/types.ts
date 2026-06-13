@@ -9,6 +9,13 @@ export type PropertyType =
   | "store"
   | "other";
 
+export type PropertyCategory =
+  | PropertyType
+  | "vacant_house"
+  | "forest"
+  | "farmland"
+  | "vacation_house";
+
 export type PropertySource = {
   id: string;
   name: string;
@@ -27,6 +34,7 @@ export type Property = {
   id: string;
   title: string;
   property_type: PropertyType;
+  property_category?: PropertyCategory | null;
   price_yen: number;
   prefecture: string;
   city: string;
@@ -40,8 +48,14 @@ export type Property = {
   source_url: string;
   transaction_type?: string | null;
   listed_at?: string | null;
+  source_published_at?: string | null;
   source_updated_at?: string | null;
   scraped_at?: string | null;
+  first_detected_at?: string | null;
+  last_checked_at?: string | null;
+  last_changed_at?: string | null;
+  has_updates?: boolean | null;
+  previous_snapshot_hash?: string | null;
   price_band?: string | null;
   risk_tags?: string[];
   remarks?: string | null;
@@ -54,10 +68,19 @@ export type Property = {
 };
 
 export type PropertyFilters = {
+  region?: string;
   prefecture?: string;
+  city?: string;
   minPrice?: number;
   maxPrice?: number;
-  propertyType?: PropertyType;
+  propertyType?: PropertyCategory;
+  priceRange?: string;
+  keyword?: string;
+};
+
+export type PropertyLocationOption = {
+  prefecture: string;
+  city: string;
 };
 
 export type TenderType = "goods" | "service" | "open_counter" | "unified_qualification";

@@ -25,7 +25,7 @@ export default async function NotificationsPage() {
         <div className="mt-5 rounded border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
           メール通知やLINE通知は本番運用時に接続します。現在は条件を決めるための画面です。
         </div>
-        <Link href="/properties?maxPrice=3000000" className="mt-5 inline-block rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
+        <Link href="/properties?priceRange=under300" className="mt-5 inline-block rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
           条件に近い物件を見る
         </Link>
       </div>

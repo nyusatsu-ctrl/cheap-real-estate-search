@@ -1,5 +1,5 @@
 import { savePropertyAction } from "@/app/admin/actions";
-import { PERMISSION_LABELS, PREFECTURES, PROPERTY_TYPE_LABELS, STATUS_LABELS } from "@/lib/constants";
+import { PERMISSION_LABELS, PREFECTURES, PROPERTY_BASE_TYPE_LABELS, PROPERTY_TYPE_LABELS, STATUS_LABELS } from "@/lib/constants";
 import type { Property } from "@/lib/types";
 
 export function PropertyForm({ property }: { property?: Property | null }) {
@@ -8,7 +8,8 @@ export function PropertyForm({ property }: { property?: Property | null }) {
       <input type="hidden" name="id" value={property?.id ?? ""} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="タイトル" name="title" defaultValue={property?.title} required className="md:col-span-2" />
-        <Select label="物件種別" name="property_type" defaultValue={property?.property_type} options={PROPERTY_TYPE_LABELS} />
+        <Select label="基本種別" name="property_type" defaultValue={property?.property_type} options={PROPERTY_BASE_TYPE_LABELS} />
+        <Select label="詳細種別" name="property_category" defaultValue={property?.property_category ?? property?.property_type} options={PROPERTY_TYPE_LABELS} />
         <Field label="価格（円）" name="price_yen" type="number" min={0} max={30000000} defaultValue={property?.price_yen ?? 0} required />
         <Select label="都道府県" name="prefecture" defaultValue={property?.prefecture} options={Object.fromEntries(PREFECTURES.map((name) => [name, name]))} />
         <Field label="市区町村" name="city" defaultValue={property?.city} required />

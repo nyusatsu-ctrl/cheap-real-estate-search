@@ -1,5 +1,6 @@
 import type {
   FavoriteTenderStatus,
+  PropertyCategory,
   PropertyStatus,
   PropertyType,
   PublicationPermission,
@@ -15,13 +16,21 @@ import type {
   TenderType
 } from "@/lib/types";
 
-export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
+export const PROPERTY_BASE_TYPE_LABELS: Record<PropertyType, string> = {
   land: "土地",
   old_house_land: "古家付き土地",
   detached_house: "戸建て",
   warehouse: "倉庫",
   store: "店舗",
   other: "その他"
+};
+
+export const PROPERTY_TYPE_LABELS: Record<PropertyCategory, string> = {
+  ...PROPERTY_BASE_TYPE_LABELS,
+  vacant_house: "空き家",
+  forest: "山林",
+  farmland: "農地",
+  vacation_house: "別荘",
 };
 
 export const STATUS_LABELS: Record<PropertyStatus, string> = {
@@ -87,7 +96,60 @@ export const PREFECTURES = [
   "沖縄県"
 ];
 
-export const REGIONS = ["全国", "北海道", "東北", "関東", "中部", "近畿", "中国", "四国", "九州", "沖縄"];
+export const PROPERTY_REGION_OPTIONS = [
+  {
+    value: "hokkaido",
+    label: "北海道",
+    prefectures: ["北海道"]
+  },
+  {
+    value: "tohoku",
+    label: "東北",
+    prefectures: ["青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県"]
+  },
+  {
+    value: "kanto",
+    label: "関東",
+    prefectures: ["茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県"]
+  },
+  {
+    value: "chubu",
+    label: "中部",
+    prefectures: ["新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県"]
+  },
+  {
+    value: "kinki",
+    label: "近畿",
+    prefectures: ["三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県"]
+  },
+  {
+    value: "chugoku",
+    label: "中国",
+    prefectures: ["鳥取県", "島根県", "岡山県", "広島県", "山口県"]
+  },
+  {
+    value: "shikoku",
+    label: "四国",
+    prefectures: ["徳島県", "香川県", "愛媛県", "高知県"]
+  },
+  {
+    value: "kyushu-okinawa",
+    label: "九州・沖縄",
+    prefectures: ["福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"]
+  }
+] as const;
+
+export const REGIONS = ["全国", ...PROPERTY_REGION_OPTIONS.map((region) => region.label)];
+
+export const PROPERTY_PRICE_RANGE_OPTIONS = [
+  { value: "zero", label: "0円", minPrice: 0, maxPrice: 0 },
+  { value: "under300", label: "300万円以下", minPrice: undefined, maxPrice: 3000000 },
+  { value: "1-50", label: "1円〜50万円", minPrice: 1, maxPrice: 500000 },
+  { value: "50-100", label: "50万円〜100万円", minPrice: 500000, maxPrice: 1000000 },
+  { value: "100-300", label: "100万円〜300万円", minPrice: 1000000, maxPrice: 3000000 },
+  { value: "300-500", label: "300万円〜500万円", minPrice: 3000000, maxPrice: 5000000 },
+  { value: "500-plus", label: "500万円以上", minPrice: 5000000, maxPrice: undefined }
+] as const;
 
 export const TENDER_TYPE_LABELS: Record<TenderType, string> = {
   goods: "物品",

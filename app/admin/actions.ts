@@ -66,6 +66,7 @@ export async function savePropertyAction(formData: FormData) {
   const payload = {
     title: requiredString(formData, "title"),
     property_type: requiredString(formData, "property_type"),
+    property_category: requiredString(formData, "property_category"),
     price_yen: Number(requiredString(formData, "price_yen")),
     prefecture: requiredString(formData, "prefecture"),
     city: requiredString(formData, "city"),

@@ -46,10 +46,10 @@ export default async function DashboardPage() {
 
       <section className="mt-6 grid gap-4 md:grid-cols-2">
         {[
-          [FileSearch, "物件検索", "0円物件、300万円以下、地域、物件種別で検索します。", "/properties?maxPrice=3000000"],
+          [FileSearch, "物件検索", "0円物件、300万円以下、地域、物件種別で検索します。", "/properties?priceRange=under300"],
           [Star, "お気に入り物件", "気になる物件を保存し、検討ステータスとメモを管理します。", "/favorites"],
           [Bell, "通知設定", "新着物件や条件に合う物件の通知条件を登録します。", "/notifications"],
-          [MapPinned, "エリア検索", "都道府県、市区町村、空き家・古家・土地・山林の条件で探します。", "/properties?maxPrice=3000000"],
+          [MapPinned, "エリア検索", "地方ブロック、都道府県、市区町村、空き家・古家・土地・山林の条件で探します。", "/properties"],
           [CreditCard, "課金管理", "Stripe Checkout と契約状態を確認します。", "/billing"]
         ].map(([Icon, title, text, href]) => (
           <Link key={title as string} href={href as string} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm focus-ring">

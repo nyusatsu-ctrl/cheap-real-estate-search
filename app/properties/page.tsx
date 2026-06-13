@@ -1,25 +1,12 @@
 import { PropertyCard } from "@/components/PropertyCard";
 import { SearchFilters } from "@/components/SearchFilters";
-import { getPublishedProperties } from "@/lib/properties";
-import type { PropertyType } from "@/lib/types";
+import { normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
+import { getPublishedProperties, getPublishedPropertyLocations } from "@/lib/properties";
 
-type SearchParams = {
-  prefecture?: string;
-  minPrice?: string;
-  maxPrice?: string;
-  propertyType?: string;
-};
-
-export default async function PropertiesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const resolvedSearchParams = await searchParams;
-  const minPrice = resolvedSearchParams.minPrice ? Number(resolvedSearchParams.minPrice) : undefined;
-  const maxPrice = resolvedSearchParams.maxPrice ? Number(resolvedSearchParams.maxPrice) : undefined;
-  const properties = await getPublishedProperties({
-    prefecture: resolvedSearchParams.prefecture || undefined,
-    minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
-    maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
-    propertyType: (resolvedSearchParams.propertyType || undefined) as PropertyType | undefined
-  });
+  const filters = normalizePropertyFilters(resolvedSearchParams);
+  const [properties, locations] = await Promise.all([getPublishedProperties(filters), getPublishedPropertyLocations()]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -27,7 +14,15 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         <h1 className="text-2xl font-black text-slate-950">物件一覧</h1>
         <p className="mt-1 text-sm text-slate-600">公開中の物件のみ表示しています。</p>
       </div>
-      <SearchFilters {...resolvedSearchParams} />
+      <SearchFilters
+        locations={locations}
+        region={filters.region}
+        prefecture={filters.prefecture}
+        city={filters.city}
+        priceRange={filters.priceRange}
+        propertyType={filters.propertyType}
+        keyword={filters.keyword}
+      />
       <div className="mt-5 flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-700">{properties.length}件</p>
       </div>

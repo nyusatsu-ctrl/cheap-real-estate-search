@@ -27,7 +27,7 @@ export default async function HomePage() {
                 <Search className="h-4 w-4" />
                 14日間無料で始める
               </Link>
-              <Link href="/properties?maxPrice=3000000" className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
+              <Link href="/properties?priceRange=under300" className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
                 物件を見る
               </Link>
               <Link href="/admin/properties" className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
@@ -85,7 +85,7 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="text-xl font-black text-slate-950">新着物件</h2>
-          <Link href="/properties?maxPrice=3000000" className="text-sm font-bold text-brand-700">
+          <Link href="/properties?priceRange=under300" className="text-sm font-bold text-brand-700">
             すべて見る
           </Link>
         </div>

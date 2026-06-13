@@ -32,6 +32,24 @@ var WEBAPP_CALL_HISTORY_COLUMNS = [
   '話した内容のメモ',
   '記録者'
 ];
+var WEBAPP_EMAIL_LOG_SHEET_NAME = 'メール送信履歴';
+var WEBAPP_EMAIL_LOG_COLUMNS = [
+  '送信日時',
+  '顧客キー',
+  '申込行',
+  '送信先メールアドレス',
+  'お客様名',
+  'メール種別',
+  '件名',
+  'ステータス',
+  '実行者',
+  'エラーメッセージ'
+];
+var WEBAPP_PREMIUM_DENIAL_EMAIL_TYPE = 'プレミア否決';
+var WEBAPP_PREMIUM_DENIAL_EMAIL_SUBJECT = '仮審査結果のご連絡';
+var WEBAPP_PREMIUM_DENIAL_EMAIL_FROM = 'info@ecoloop-loan.net';
+var WEBAPP_PREMIUM_DENIAL_EMAIL_FROM_NAME = '株式会社エコループ';
+var WEBAPP_PREMIUM_DENIAL_EMAIL_ALIAS_ERROR = 'info@ecoloop-loan.net がGmailの送信元エイリアスに登録されていないため、送信できません。Gmail設定で送信元アドレスを追加してください。';
 
 var WEBAPP_APPLICATION_TYPE_OPTIONS = ['仮審査申込', 'お問い合わせ'];
 var WEBAPP_ASSIGNEE_OPTIONS = ['高山', '中武', '嶋本', '直接入力'];
@@ -393,6 +411,7 @@ function getDashboardData() {
   var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
   var callHistoryMap = getCallHistoryMap_();
+  var premiumDenialEmailMap = getPremiumDenialEmailLogMap_();
 
   if (lastRow <= 1) {
     return {
@@ -420,7 +439,7 @@ function getDashboardData() {
     }
 
     var rowNumber = i + 2;
-    var customer = buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHistoryMap, hasBikeMarketCsv);
+    var customer = buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHistoryMap, hasBikeMarketCsv, premiumDenialEmailMap);
     if (parseReceivedAtTime_(customer.receivedAt) < WEBAPP_DISPLAY_START_TIME) {
       continue;
     }
@@ -502,13 +521,15 @@ function setupManagementColumns() {
   }
 
   var historyResult = setupCallHistorySheet_();
+  var emailLogResult = setupEmailLogSheet_();
 
   return {
     addedColumns: addedColumns,
     callHistorySheetCreated: historyResult.created,
-    message: addedColumns.length === 0 && !historyResult.created
+    emailLogSheetCreated: emailLogResult.created,
+    message: addedColumns.length === 0 && !historyResult.created && !emailLogResult.created
       ? '管理列はすでに作成済みです。'
-      : addedColumns.length + '個の管理列を追加し、架電履歴シートを確認しました。'
+      : addedColumns.length + '個の管理列を追加し、架電履歴・メール送信履歴シートを確認しました。'
   };
 }
 
@@ -656,6 +677,161 @@ function addCallHistory(payload) {
   return {
     message: '架電履歴を追加しました。'
   };
+}
+
+function getPremiumDenialEmailPreview(payload) {
+  var customer = getCustomerForPremiumDenialEmail_(payload);
+  return buildPremiumDenialEmailPreview_(customer);
+}
+
+function sendPremiumDenialEmail(payload) {
+  var customer = getCustomerForPremiumDenialEmail_(payload);
+  var preview = buildPremiumDenialEmailPreview_(customer);
+  var recipient = preview.to;
+  if (!recipient) {
+    throw new Error('送信先メールアドレスが空のため、メールを送信できません。');
+  }
+  if (!isValidEmailAddress_(recipient)) {
+    throw new Error('送信先メールアドレスの形式が正しくありません: ' + recipient);
+  }
+
+  var existingLog = getPremiumDenialEmailLogForRowKey_(customer.rowKey);
+  var allowResend = Boolean(payload && payload.allowResend);
+  if (existingLog && !allowResend) {
+    throw new Error('このお客様にはすでにプレミア否決メールを送信済みです。再送信する場合は確認画面から再送信してください。');
+  }
+
+  var actor = Session.getActiveUser().getEmail() || 'unknown';
+  var now = new Date();
+  var sentAt = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+  var senderOptions = getPremiumDenialEmailSenderOptions_();
+
+  GmailApp.sendEmail(recipient, preview.subject, preview.body, senderOptions);
+
+  var emailLogSheet = getOrCreateEmailLogSheet_();
+  emailLogSheet.appendRow([
+    sentAt,
+    customer.rowKey,
+    customer.rowNumber,
+    recipient,
+    preview.customerName,
+    WEBAPP_PREMIUM_DENIAL_EMAIL_TYPE,
+    preview.subject,
+    '送信済み',
+    actor,
+    ''
+  ]);
+
+  updatePremiumDenialStatus_(customer.sheet, customer.rowNumber, customer.headerMap, actor, sentAt);
+
+  return {
+    message: 'プレミア否決メールを送信し、対応状況を更新しました。',
+    sentAt: sentAt,
+    to: recipient,
+    customerName: preview.customerName,
+    subject: preview.subject,
+    body: preview.body,
+    status: 'プレミア否決',
+    review1: '否決',
+    premiumDenialEmailSentAt: sentAt,
+    premiumDenialEmailSentTo: recipient,
+    premiumDenialEmailSentBy: actor
+  };
+}
+
+function getCustomerForPremiumDenialEmail_(payload) {
+  if (!payload || !payload.rowKey) {
+    throw new Error('メール送信対象が指定されていません。画面を再読み込みしてください。');
+  }
+
+  var sheet = getMainSheet_();
+  var headerMap = getHeaderMap_(sheet);
+  var managementMap = getManagementColumnMap_(headerMap);
+  if (hasMissingManagementColumns_(managementMap)) {
+    throw new Error('管理列が未作成です。先に「管理列を作成」を実行してください。');
+  }
+
+  var rowNumber = findCurrentRowNumber_(sheet, payload);
+  if (!rowNumber) {
+    throw new Error('対象の申込行が見つかりません。画面を再読み込みしてください。');
+  }
+
+  var row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  return {
+    sheet: sheet,
+    headerMap: headerMap,
+    rowNumber: rowNumber,
+    rowKey: payload.rowKey,
+    name: trimFullWidth(String(getCellByHeader_(row, headerMap, 'お名前') || '')),
+    email: trimFullWidth(String(getCellByHeader_(row, headerMap, 'メールアドレス') || ''))
+  };
+}
+
+function buildPremiumDenialEmailPreview_(customer) {
+  var customerName = customer && customer.name ? customer.name : 'お客様';
+  var salutation = customer && customer.name ? customer.name + '様' : 'お客様';
+  var body = [
+    salutation,
+    '',
+    'この度は、株式会社エコループへ仮審査のお申し込みをいただき、誠にありがとうございます。',
+    '',
+    'ご入力いただいた内容をもとに確認を行いましたが、誠に恐縮ながら、今回は現在ご案内可能なローンでのお手続きが難しい結果となりました。',
+    '',
+    'ご希望に添えず、大変申し訳ございません。',
+    '',
+    'なお、審査内容および判断理由につきましては、個別でのご回答を差し控えさせていただいております。何卒ご了承くださいますようお願い申し上げます。',
+    '',
+    'この度はお申し込みいただき、誠にありがとうございました。',
+    '',
+    '株式会社エコループ',
+    'TEL：096-201-7191'
+  ].join('\n');
+
+  return {
+    to: customer && customer.email ? customer.email : '',
+    customerName: customerName,
+    subject: WEBAPP_PREMIUM_DENIAL_EMAIL_SUBJECT,
+    body: body
+  };
+}
+
+function isValidEmailAddress_(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ''));
+}
+
+function getPremiumDenialEmailSenderOptions_() {
+  var aliases = GmailApp.getAliases() || [];
+  var targetAlias = WEBAPP_PREMIUM_DENIAL_EMAIL_FROM.toLowerCase();
+  var hasTargetAlias = aliases.some(function(alias) {
+    return String(alias || '').toLowerCase() === targetAlias;
+  });
+
+  if (!hasTargetAlias) {
+    throw new Error(WEBAPP_PREMIUM_DENIAL_EMAIL_ALIAS_ERROR);
+  }
+
+  return {
+    from: WEBAPP_PREMIUM_DENIAL_EMAIL_FROM,
+    name: WEBAPP_PREMIUM_DENIAL_EMAIL_FROM_NAME,
+    replyTo: WEBAPP_PREMIUM_DENIAL_EMAIL_FROM
+  };
+}
+
+function updatePremiumDenialStatus_(sheet, rowNumber, headerMap, actor, sentAt) {
+  var managementMap = getManagementColumnMap_(headerMap);
+  var updates = {
+    '対応状況': 'プレミア否決',
+    'プレミアファイナンス審査結果': '否決',
+    '最終更新日時': sentAt,
+    '最終更新者': actor
+  };
+
+  Object.keys(updates).forEach(function(columnName) {
+    var columnNumber = managementMap[columnName] || headerMap[columnName];
+    if (columnNumber) {
+      sheet.getRange(rowNumber, columnNumber).setValue(updates[columnName]);
+    }
+  });
 }
 
 function fixPhoneNumbersFromWeb() {
@@ -1575,7 +1751,7 @@ function hasMissingManagementColumns_(managementMap) {
   return false;
 }
 
-function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHistoryMap, hasBikeMarketCsv) {
+function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHistoryMap, hasBikeMarketCsv, premiumDenialEmailMap) {
   var rowKey = buildApplicationRowKey_(row, headerMap);
   var callHistory = callHistoryMap[rowKey] || [];
   var latestCall = callHistory.length > 0 ? callHistory[callHistory.length - 1] : null;
@@ -1583,6 +1759,7 @@ function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHis
   var status = normalizeStatusLabel_(getManagedCell_(row, managementMap, '対応状況') || getManagedCell_(row, managementMap, '対応ステータス') || '新規受付');
   var marketState = buildBikeMarketState_(row, headerMap, hasBikeMarketCsv);
   var marketAggregation = marketState.priceAggregation || {};
+  var premiumDenialEmail = premiumDenialEmailMap && premiumDenialEmailMap[rowKey] ? premiumDenialEmailMap[rowKey] : null;
 
   return {
     rowNumber: rowNumber,
@@ -1630,6 +1807,9 @@ function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHis
     memo: getManagedCell_(row, managementMap, '対応メモ'),
     updatedAt: getManagedCell_(row, managementMap, '最終更新日時'),
     updatedBy: getManagedCell_(row, managementMap, '最終更新者'),
+    premiumDenialEmailSentAt: premiumDenialEmail ? premiumDenialEmail.sentAt : '',
+    premiumDenialEmailSentTo: premiumDenialEmail ? premiumDenialEmail.to : '',
+    premiumDenialEmailSentBy: premiumDenialEmail ? premiumDenialEmail.actor : '',
     market: marketState,
     market_status: marketState.marketStatus || '',
     market_reference_price: marketAggregation.reference_market_price || 0,
@@ -6675,6 +6855,69 @@ function setupCallHistorySheet_() {
 
 function getOrCreateCallHistorySheet_() {
   return setupCallHistorySheet_().sheet;
+}
+
+function setupEmailLogSheet_() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(WEBAPP_EMAIL_LOG_SHEET_NAME);
+  var created = false;
+  if (!sheet) {
+    sheet = ss.insertSheet(WEBAPP_EMAIL_LOG_SHEET_NAME);
+    created = true;
+  }
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(WEBAPP_EMAIL_LOG_COLUMNS);
+    sheet.getRange(1, 1, 1, WEBAPP_EMAIL_LOG_COLUMNS.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+
+  return {
+    sheet: sheet,
+    created: created
+  };
+}
+
+function getOrCreateEmailLogSheet_() {
+  return setupEmailLogSheet_().sheet;
+}
+
+function getPremiumDenialEmailLogMap_() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(WEBAPP_EMAIL_LOG_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return {};
+  }
+
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, WEBAPP_EMAIL_LOG_COLUMNS.length).getDisplayValues();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var rowKey = row[1];
+    var mailType = row[5];
+    var status = row[7];
+    if (!rowKey || mailType !== WEBAPP_PREMIUM_DENIAL_EMAIL_TYPE || status !== '送信済み') {
+      continue;
+    }
+
+    map[rowKey] = {
+      sentAt: row[0],
+      rowNumber: row[2],
+      to: row[3],
+      customerName: row[4],
+      mailType: mailType,
+      subject: row[6],
+      status: status,
+      actor: row[8]
+    };
+  }
+
+  return map;
+}
+
+function getPremiumDenialEmailLogForRowKey_(rowKey) {
+  var map = getPremiumDenialEmailLogMap_();
+  return map[rowKey] || null;
 }
 
 function getCallHistoryMap_() {

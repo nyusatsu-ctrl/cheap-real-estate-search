@@ -27,11 +27,18 @@ const PERMISSION_OPTIONS = [
   ["unknown", "unknown / 未確認"]
 ] as const;
 
+const CRAWL_STATUS_LABELS: Record<string, string> = {
+  candidate: "取込候補",
+  checked: "確認済み",
+  rejected: "却下済み",
+  test_reverted: "テスト戻し"
+};
+
 const CRAWL_STATUS_OPTIONS = [
-  ["candidate", "candidate"],
-  ["checked", "checked"],
-  ["test_reverted", "test_reverted"],
-  ["rejected", "rejected"]
+  ["candidate", CRAWL_STATUS_LABELS.candidate],
+  ["checked", CRAWL_STATUS_LABELS.checked],
+  ["test_reverted", CRAWL_STATUS_LABELS.test_reverted],
+  ["rejected", CRAWL_STATUS_LABELS.rejected]
 ] as const;
 
 export default async function CrawlerCandidatesPage({ searchParams }: { searchParams: Promise<CrawlerCandidateSearchParams> }) {
@@ -62,7 +69,7 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
             <SelectField name="source" label="収集元" value={filters.source} options={sources.map((source) => [source.source_key, `${source.source_key} / ${source.name}`])} />
             <SelectField name="status" label="公開状態" value={filters.status} options={STATUS_OPTIONS} />
             <SelectField name="permission" label="承認状態" value={filters.permission} options={PERMISSION_OPTIONS} />
-            <SelectField name="crawlStatus" label="crawl_status" value={filters.crawlStatus} options={CRAWL_STATUS_OPTIONS} />
+            <SelectField name="crawlStatus" label="取込状態" value={filters.crawlStatus} options={CRAWL_STATUS_OPTIONS} />
 
             <SelectField name="region" label="地方ブロック" value={filters.region} emptyLabel="全国" options={PROPERTY_REGION_OPTIONS.map((region) => [region.value, region.label])} />
             <SelectField name="prefecture" label="都道府県" value={filters.prefecture} emptyLabel="全国" options={prefectures.map((prefecture) => [prefecture, prefecture])} />
@@ -119,7 +126,7 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
                 <th className="px-3 py-3">収集元</th>
                 <th className="px-3 py-3">状態</th>
                 <th className="px-3 py-3">承認状態</th>
-                <th className="px-3 py-3">crawl</th>
+                <th className="px-3 py-3">取込状態</th>
                 <th className="px-3 py-3">初回検知</th>
                 <th className="px-3 py-3">最終確認</th>
                 <th className="px-3 py-3">更新あり</th>
@@ -147,7 +154,7 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
                   </td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{STATUS_LABELS[candidate.status as keyof typeof STATUS_LABELS] ?? candidate.status}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{permissionLabel(candidate.publication_permission)}</td>
-                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{candidate.crawl_status ?? "-"}</td>
+                  <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{crawlStatusLabel(candidate.crawl_status)}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{formatDateTime(candidate.first_detected_at)}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{formatDateTime(candidate.last_checked_at)}</td>
                   <td className="px-3 py-3 align-top text-slate-700 whitespace-nowrap">{candidate.has_updates ? "あり" : "なし"}</td>
@@ -244,6 +251,11 @@ function permissionLabel(value: string) {
   if (value === "pending") return "pending / 確認中";
   if (value === "unknown") return "unknown / 未確認";
   return value;
+}
+
+function crawlStatusLabel(value?: string | null) {
+  if (!value) return "-";
+  return CRAWL_STATUS_LABELS[value] ?? value;
 }
 
 function formatList(value?: string[] | null) {

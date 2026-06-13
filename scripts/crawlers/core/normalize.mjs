@@ -1,6 +1,6 @@
 import { cleanupText } from "./fetch.mjs";
-import { extractPrefecture, extractCity } from "../parsers/address.mjs";
-import { inferPropertyCategory, inferPropertyType } from "../parsers/property-type.mjs";
+import { extractPrefecture, extractCity, normalizeCity } from "../parsers/address.mjs";
+import { inferPropertyClassification } from "../parsers/property-type.mjs";
 import { buildDuplicateKey } from "../utils/duplicate-key.mjs";
 import { buildContentHash } from "../utils/content-hash.mjs";
 import { getAreaBlock } from "../utils/region.mjs";
@@ -8,7 +8,7 @@ import { getAreaBlock } from "../utils/region.mjs";
 export function normalizeCandidate(raw, source) {
   const address = cleanupText(raw.address_display ?? raw.address ?? "");
   const prefecture = raw.prefecture ?? extractPrefecture(address) ?? source.prefecture ?? "都道府県未確認";
-  const city = raw.city ?? extractCity(address, prefecture, source.cityFallback ?? "市区町村未確認");
+  const city = normalizeCity(raw.city ?? extractCity(address, prefecture, source.cityFallback ?? "市区町村未確認"), source.cityFallback ?? "市区町村未確認");
   const searchText = [
     source.name,
     raw.title,
@@ -17,8 +17,21 @@ export function normalizeCandidate(raw, source) {
     raw.property_category,
     address
   ].filter(Boolean).join("\n");
-  const propertyType = raw.property_type ?? inferPropertyType(searchText, raw.land_area_m2, raw.building_area_m2);
-  const propertyCategory = raw.property_category ?? inferPropertyCategory(searchText, propertyType);
+  const classification = inferPropertyClassification({
+    title: raw.title,
+    text: searchText,
+    landAreaM2: raw.land_area_m2,
+    buildingAreaM2: raw.building_area_m2
+  });
+  const propertyType = raw.property_type ?? classification.propertyType;
+  const propertyCategory = raw.property_category ?? classification.propertyCategory;
+  const parseWarnings = buildParseWarnings({
+    raw,
+    prefecture,
+    city,
+    propertyCategory,
+    fallbackCity: source.cityFallback ?? "市区町村未確認"
+  });
 
   const candidate = {
     source_key: source.id,
@@ -50,7 +63,8 @@ export function normalizeCandidate(raw, source) {
     risk_tags: raw.risk_tags ?? inferRiskTags(searchText),
     remarks: cleanupText(raw.remarks ?? `${source.name}から取得候補を検出。詳細本文と画像は保存せず、元URLへ送客。`).slice(0, 160),
     area_block: getAreaBlock(prefecture),
-    crawl_status: "candidate"
+    crawl_status: "candidate",
+    parse_warnings: parseWarnings
   };
 
   candidate.duplicate_key = buildDuplicateKey(candidate);
@@ -115,4 +129,15 @@ function inferRiskTags(text) {
   ];
 
   return rules.filter(([, pattern]) => pattern.test(text)).map(([tag]) => tag);
+}
+
+function buildParseWarnings({ raw, prefecture, city, propertyCategory, fallbackCity }) {
+  const warnings = [];
+  if (raw.price_yen === null || raw.price_yen === undefined) warnings.push("price_not_numeric");
+  if (!raw.raw_price_text) warnings.push("raw_price_text_missing");
+  if (!raw.source_url) warnings.push("source_url_missing");
+  if (!prefecture || prefecture === "都道府県未確認") warnings.push("prefecture_missing");
+  if (!city || city === fallbackCity) warnings.push("city_missing");
+  if (!propertyCategory || propertyCategory === "unknown") warnings.push("property_type_unknown");
+  return warnings;
 }

@@ -6,7 +6,7 @@ import { crawl as crawlNtaKoubai } from "./adapters/nta-koubai.mjs";
 import { checkRobots } from "./core/robots.mjs";
 import { waitForRateLimit } from "./core/rate-limit.mjs";
 import { normalizeCandidates } from "./core/normalize.mjs";
-import { createRunResult, formatCrawlerError, printSourceResult } from "./core/crawl-log.mjs";
+import { createRunResult, formatCrawlerError, printSourceResult, toDiagnosticCandidate } from "./core/crawl-log.mjs";
 import { upsertCandidates } from "./core/upsert.mjs";
 
 const DEFAULT_LIMIT = 20;
@@ -104,7 +104,9 @@ const SOURCES = [
 ];
 
 const args = parseArgs(process.argv.slice(2));
-const commit = args.commit === true;
+const jsonOutput = args.json === true;
+const verbose = args.verbose === true;
+const commit = args.commit === true && !jsonOutput;
 const limit = toPositiveInteger(args.limit, DEFAULT_LIMIT);
 const sourceFilter = typeof args.source === "string" ? args.source : "all";
 
@@ -117,30 +119,45 @@ async function main() {
   const sources = selectSources();
   if (sources.length === 0) throw new Error(`対象の収集元がありません: ${sourceFilter}`);
 
-  console.log(`Mode: ${commit ? "commit-draft" : "dry-run"}`);
-  console.log(`Sources: ${sources.map((source) => source.id).join(", ")}`);
-  console.log(`Limit per source: ${limit}`);
-  if (!commit) console.log("DB保存: なし (--commit がないため)");
-  if (commit) console.log("DB保存: draft / pending として保存します。published にはしません。");
+  if (jsonOutput && args.commit === true) {
+    console.error("WARN --json では安全のため --commit を無視し、DB保存しません。");
+  }
+
+  if (!jsonOutput) {
+    console.log(`Mode: ${commit ? "commit-draft" : "dry-run"}`);
+    console.log(`Sources: ${sources.map((source) => source.id).join(", ")}`);
+    console.log(`Limit per source: ${limit}`);
+    if (!commit) console.log("DB保存: なし (--commit がないため)");
+    if (commit) console.log("DB保存: draft / pending として保存します。published にはしません。");
+  }
 
   const totals = { found: 0, candidates: 0, inserted: 0, updated: 0, skipped: 0, failed: 0 };
+  const results = [];
 
   for (const source of sources) {
     const result = await runSource(source);
+    results.push(result);
     totals.found += result.found;
     totals.candidates += result.candidates.length;
     totals.inserted += result.inserted ?? 0;
     totals.updated += result.updated ?? 0;
     totals.skipped += result.skipped;
     totals.failed += result.failed + result.errors.length;
-    printSourceResult(result);
-    console.log("");
+    if (!jsonOutput) {
+      printSourceResult(result, { verbose });
+      console.log("");
+    }
     await waitForRateLimit(source);
   }
 
-  console.log(
-    `Completed. sources=${sources.length} found=${totals.found} candidates=${totals.candidates} inserted=${totals.inserted} updated=${totals.updated} skipped=${totals.skipped} failed=${totals.failed}`
-  );
+  if (jsonOutput) {
+    const diagnostics = results.flatMap((result) => result.candidates.map((candidate) => toDiagnosticCandidate(candidate, result)));
+    console.log(JSON.stringify(diagnostics, null, 2));
+  } else {
+    console.log(
+      `Completed. sources=${sources.length} found=${totals.found} candidates=${totals.candidates} inserted=${totals.inserted} updated=${totals.updated} skipped=${totals.skipped} failed=${totals.failed}`
+    );
+  }
 }
 
 async function runSource(source) {

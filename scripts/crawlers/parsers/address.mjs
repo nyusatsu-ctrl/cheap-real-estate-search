@@ -15,9 +15,10 @@ export function extractPrefecture(text) {
 }
 
 export function extractCity(text, prefecture, fallback = "市区町村未確認") {
-  const value = String(text ?? "");
+  const value = cleanupLocationText(text);
   const withoutPrefecture = prefecture ? value.replace(prefecture, "") : value;
-  return withoutPrefecture.match(/([^\s　,、]+?(?:市|区|町|村))/)?.[1] ?? fallback;
+  const city = withoutPrefecture.match(/([^\s　,、|｜／\/]+?(?:市|区|町|村))/)?.[1];
+  return normalizeCity(city, fallback);
 }
 
 export function extractAddress(text, fallbackPrefecture = null, fallbackCity = "市区町村未確認") {
@@ -25,7 +26,24 @@ export function extractAddress(text, fallbackPrefecture = null, fallbackCity = "
   const labeled = findValueAfterLabel(lines, ["所在地", "住所", "所在", "所在地番"]);
   const withPrefecture = lines.find((line) => extractPrefecture(line));
   const address = labeled && extractPrefecture(labeled) ? labeled : withPrefecture ?? labeled ?? `${fallbackPrefecture ?? ""}${fallbackCity}`;
-  return address.replace(/\s+/g, " ").trim().slice(0, 120);
+  return cleanupLocationText(address).slice(0, 120);
+}
+
+export function normalizeCity(value, fallback = "市区町村未確認") {
+  const city = cleanupLocationText(value)
+    .replace(/^(所在地|住所|所在|所在地番)[:：\s]*/, "")
+    .replace(/^(物件名|物件|名称)[:：\s]*/, "")
+    .replace(/[「」『』]/g, "")
+    .trim();
+  return city || fallback;
+}
+
+function cleanupLocationText(value) {
+  return String(value ?? "")
+    .replace(/[【】\[\]［］（）()]/g, " ")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function findValueAfterLabel(lines, labels) {

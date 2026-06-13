@@ -1,6 +1,8 @@
 import { toHalfWidth } from "../core/fetch.mjs";
 
-export function extractAreaM2(text, labels = []) {
+export function extractAreaM2(text, labels = [], options = {}) {
+  const fallbackToFirst = options.fallbackToFirst ?? true;
+
   for (const label of labels) {
     const nextLine = text.match(new RegExp(`${label}\\s*\\n\\s*([0-9０-９,.，．]+)\\s*(?:㎡|m2|m²|平方メートル)`, "i"))?.[1];
     if (nextLine) return parseAreaM2(nextLine);
@@ -10,7 +12,7 @@ export function extractAreaM2(text, labels = []) {
     if (area) return parseAreaM2(area);
   }
 
-  return extractFirstAreaM2(text);
+  return fallbackToFirst ? extractFirstAreaM2(text) : null;
 }
 
 export function extractFirstAreaM2(text) {

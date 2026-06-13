@@ -47,7 +47,7 @@ function parseDetail(source, html, sourceUrl) {
     city: extractCity(address, prefecture),
     address_display: address,
     land_area_m2: extractAreaM2(text, ["土地面積", "敷地面積", "宅地面積", "土地"]),
-    building_area_m2: extractAreaM2(text, ["建物面積", "延床面積", "延べ床面積", "建物"]),
+    building_area_m2: extractAreaM2(text, ["建物面積", "延床面積", "延べ床面積", "建物"], { fallbackToFirst: false }),
     source_published_at: extractDate(text, ["掲載日", "登録日", "公開日"]),
     source_updated_at: extractDate(text, ["更新日", "最終更新日"]),
     transaction_type: "無償譲渡",

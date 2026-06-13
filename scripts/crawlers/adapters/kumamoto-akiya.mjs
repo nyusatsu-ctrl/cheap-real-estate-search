@@ -55,7 +55,7 @@ function parseDetail(source, html, sourceUrl) {
     city: extractCity(address, "熊本県"),
     address_display: address,
     land_area_m2: extractAreaM2(text, ["土地面積", "土地", "敷地面積"]),
-    building_area_m2: extractAreaM2(text, ["建物面積", "延床面積", "建物"]),
+    building_area_m2: extractAreaM2(text, ["建物面積", "延床面積", "建物"], { fallbackToFirst: false }),
     construction_year: extractConstructionYear(text),
     source_published_at: extractDate(text, ["登録日", "掲載日", "公開日"]),
     source_updated_at: extractDate(text, ["更新日", "最終更新日"]),

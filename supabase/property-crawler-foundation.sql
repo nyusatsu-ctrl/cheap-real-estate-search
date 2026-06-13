@@ -31,7 +31,7 @@ create table if not exists public.property_crawl_sources (
 
 create table if not exists public.property_crawl_runs (
   id uuid primary key default gen_random_uuid(),
-  source_id uuid references public.property_crawl_sources(id) on delete set null,
+  source_id uuid references public.property_crawl_sources(id),
   source_key text,
   mode text not null default 'dry_run' check (mode in ('dry_run', 'commit')),
   status text not null default 'running' check (status in ('running', 'success', 'partial_success', 'failed', 'skipped')),
@@ -50,9 +50,9 @@ create table if not exists public.property_crawl_runs (
 
 create table if not exists public.property_snapshots (
   id uuid primary key default gen_random_uuid(),
-  property_id uuid references public.properties(id) on delete set null,
-  crawl_run_id uuid references public.property_crawl_runs(id) on delete set null,
-  source_id uuid references public.property_crawl_sources(id) on delete set null,
+  property_id uuid references public.properties(id),
+  crawl_run_id uuid references public.property_crawl_runs(id),
+  source_id uuid references public.property_crawl_sources(id),
   source_key text,
   source_url text not null,
   duplicate_key text,
@@ -77,8 +77,8 @@ create table if not exists public.property_snapshots (
 
 create table if not exists public.property_crawl_errors (
   id uuid primary key default gen_random_uuid(),
-  source_id uuid references public.property_crawl_sources(id) on delete set null,
-  crawl_run_id uuid references public.property_crawl_runs(id) on delete set null,
+  source_id uuid references public.property_crawl_sources(id),
+  crawl_run_id uuid references public.property_crawl_runs(id),
   source_key text,
   url text,
   error_type text not null default 'unknown',
@@ -90,7 +90,7 @@ create table if not exists public.property_crawl_errors (
 );
 
 alter table public.properties
-  add column if not exists crawler_source_id uuid references public.property_crawl_sources(id) on delete set null,
+  add column if not exists crawler_source_id uuid references public.property_crawl_sources(id),
   add column if not exists source_external_id text,
   add column if not exists source_listing_url text,
   add column if not exists raw_price_text text,
@@ -100,7 +100,7 @@ alter table public.properties
   add column if not exists area_block text,
   add column if not exists duplicate_key text,
   add column if not exists content_hash text,
-  add column if not exists changed_fields text[] not null default '{}',
+  add column if not exists changed_fields text[] default '{}',
   add column if not exists source_removed_at timestamptz,
   add column if not exists crawl_status text;
 
@@ -153,21 +153,28 @@ grant select on public.property_crawl_runs to authenticated;
 grant select on public.property_snapshots to authenticated;
 grant select on public.property_crawl_errors to authenticated;
 
-grant select, insert, update, delete on public.property_crawl_sources to authenticated;
-grant select, insert, update, delete on public.property_crawl_runs to authenticated;
-grant select, insert, update, delete on public.property_snapshots to authenticated;
-grant select, insert, update, delete on public.property_crawl_errors to authenticated;
+grant select, insert, update on public.property_crawl_sources to authenticated;
+grant select, insert, update on public.property_crawl_runs to authenticated;
+grant select, insert, update on public.property_snapshots to authenticated;
+grant select, insert, update on public.property_crawl_errors to authenticated;
 
-grant all on public.property_crawl_sources to service_role;
-grant all on public.property_crawl_runs to service_role;
-grant all on public.property_snapshots to service_role;
-grant all on public.property_crawl_errors to service_role;
+grant select, insert, update on public.property_crawl_sources to service_role;
+grant select, insert, update on public.property_crawl_runs to service_role;
+grant select, insert, update on public.property_snapshots to service_role;
+grant select, insert, update on public.property_crawl_errors to service_role;
 
-select
-  table_name,
-  column_name,
-  data_type,
-  is_nullable
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+  and table_name in (
+    'property_crawl_sources',
+    'property_crawl_runs',
+    'property_snapshots',
+    'property_crawl_errors'
+  )
+order by table_name;
+
+select table_name, column_name, data_type, is_nullable, column_default
 from information_schema.columns
 where table_schema = 'public'
   and table_name in (
@@ -177,3 +184,34 @@ where table_schema = 'public'
     'property_crawl_errors'
   )
 order by table_name, ordinal_position;
+
+select tablename, indexname, indexdef
+from pg_indexes
+where schemaname = 'public'
+  and (
+    tablename in (
+      'property_crawl_sources',
+      'property_crawl_runs',
+      'property_snapshots',
+      'property_crawl_errors'
+    )
+    or indexname in (
+      'properties_crawler_source_id_idx',
+      'properties_source_external_id_idx',
+      'properties_duplicate_key_idx',
+      'properties_content_hash_idx',
+      'properties_area_block_idx'
+    )
+  )
+order by tablename, indexname;
+
+select 'property_crawl_sources' as table_name, count(*) as row_count from public.property_crawl_sources
+union all
+select 'property_crawl_runs', count(*) from public.property_crawl_runs
+union all
+select 'property_snapshots', count(*) from public.property_snapshots
+union all
+select 'property_crawl_errors', count(*) from public.property_crawl_errors
+union all
+select 'properties', count(*) from public.properties
+order by table_name;

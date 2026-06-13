@@ -1,4 +1,4 @@
-import { fetchJson } from "../core/fetch.mjs";
+import { cleanupText, fetchJson } from "../core/fetch.mjs";
 import { extractFirstAreaM2 } from "../parsers/area.mjs";
 
 export async function crawl(source, options = {}) {
@@ -59,5 +59,5 @@ function parseItem(item, source) {
 }
 
 function cleanup(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
+  return cleanupText(value);
 }

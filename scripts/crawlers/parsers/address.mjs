@@ -1,3 +1,5 @@
+import { cleanupText } from "../core/fetch.mjs";
+
 export const PREFECTURES = [
   "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
   "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
@@ -39,7 +41,7 @@ export function normalizeCity(value, fallback = "市区町村未確認") {
 }
 
 function cleanupLocationText(value) {
-  return String(value ?? "")
+  return cleanupText(value)
     .replace(/[【】\[\]［］（）()]/g, " ")
     .replace(/[\r\n\t]+/g, " ")
     .replace(/\s+/g, " ")

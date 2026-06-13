@@ -54,19 +54,44 @@ export function htmlToText(html) {
 
 export function cleanupText(value) {
   return decodeEntities(String(value).replace(/<[^>]+>/g, " "))
+    .replace(/[\u00a0\u2007\u202f]/g, " ")
+    .replace(/[−–—]/g, "-")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 export function decodeEntities(value) {
-  return String(value)
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#39;/g, "'")
-    .replace(/&#x2F;/g, "/");
+  let decoded = String(value ?? "");
+  for (let index = 0; index < 2; index += 1) {
+    decoded = decoded.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]+);/gi, (entity, body) => {
+      const lower = body.toLowerCase();
+      if (lower.startsWith("#x")) return decodeCodePoint(Number.parseInt(lower.slice(2), 16), entity);
+      if (lower.startsWith("#")) return decodeCodePoint(Number.parseInt(lower.slice(1), 10), entity);
+      return NAMED_ENTITIES[lower] ?? entity;
+    });
+  }
+  return decoded
+    .replace(/[\u00a0\u2007\u202f]/g, " ")
+    .replace(/[−–—]/g, "-");
+}
+
+const NAMED_ENTITIES = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  ndash: "-",
+  mdash: "-",
+  minus: "-",
+  quot: "\"",
+  yen: "円",
+  copy: "(c)"
+};
+
+function decodeCodePoint(codePoint, fallback) {
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return fallback;
+  return String.fromCodePoint(codePoint);
 }
 
 export function toHalfWidth(value) {

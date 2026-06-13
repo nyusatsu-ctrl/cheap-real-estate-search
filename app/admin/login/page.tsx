@@ -7,9 +7,9 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-bold text-brand-700">建設業売上アップ診断</p>
+        <p className="text-sm font-bold text-brand-700">格安不動産サーチ</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
-        <p className="mt-2 text-sm text-slate-600">診断者一覧を確認する管理者アカウントでログインしてください。</p>
+        <p className="mt-2 text-sm text-slate-600">物件管理を行う管理者アカウントでログインしてください。</p>
         {!hasSupabaseEnv() ? (
           <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Supabase 環境変数が未設定です。.env.local を設定するとログインできます。

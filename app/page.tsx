@@ -1,47 +1,97 @@
 import Link from "next/link";
-import { BarChart3, Building2, ClipboardCheck, Hammer, LineChart, ShieldCheck } from "lucide-react";
+import { ArrowRight, BadgeCheck, Search } from "lucide-react";
+import { PropertyCard } from "@/components/PropertyCard";
+import { getPublishedProperties } from "@/lib/properties";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const properties = await getPublishedProperties({ maxPrice: 3000000 });
+  const featured = properties.slice(0, 3);
+
   return (
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-10">
-          <div className="max-w-5xl">
+        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[1.15fr_0.85fr] md:items-center md:py-12">
+          <div>
             <p className="mb-3 inline-flex items-center gap-2 rounded bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700">
-              <Hammer className="h-4 w-4" />
-              建設業者・職人・専門工事業者向け
+              <BadgeCheck className="h-4 w-4" />
+              0円物件と300万円以下の不動産に特化
             </p>
-            <h1 className="text-3xl font-black leading-tight text-slate-950 md:text-5xl">建設業売上アップ診断</h1>
-            <p className="mt-5 max-w-3xl text-base leading-8 text-slate-700">
-              現在の月商、受注経路、元請・下請比率、利益管理、集客状況をもとに、売上アップのために最初に取り組むべき方向性を自動診断します。
+            <h1 className="text-3xl font-black leading-tight text-slate-950 md:text-5xl">
+              全国の格安不動産を、条件で探しやすく。
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+              空き家、土地、古家付き土地、山林、別荘などの格安案件を毎日収集し、元サイトへ確認しに行ける形で整理します。
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link href="/diagnosis" className="inline-flex items-center justify-center rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
-                無料診断を始める
+              <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
+                <Search className="h-4 w-4" />
+                14日間無料で始める
               </Link>
-              <Link href="/admin/diagnoses" className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
-                管理画面
+              <Link href="/properties?maxPrice=3000000" className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
+                物件を見る
+              </Link>
+              <Link href="/admin/properties" className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
+                管理画面へ
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <dl className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded bg-white p-3">
+                <dt className="text-xs font-semibold text-slate-500">公開物件</dt>
+                <dd className="mt-1 text-2xl font-black text-slate-950">{properties.length}</dd>
+              </div>
+              <div className="rounded bg-white p-3">
+                <dt className="text-xs font-semibold text-slate-500">0円物件</dt>
+                <dd className="mt-1 text-2xl font-black text-rose-700">{properties.filter((property) => property.price_yen === 0).length}</dd>
+              </div>
+              <div className="rounded bg-white p-3">
+                <dt className="text-xs font-semibold text-slate-500">上限価格</dt>
+                <dd className="mt-1 text-2xl font-black text-brand-700">300万</dd>
+              </div>
+            </dl>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            [ClipboardCheck, "20項目で自動診断", "業種、月商、利益、集客、営業、組織体制から最適な売上アップタイプを判定します。"],
-            [BarChart3, "メイン課題とサブ課題", "最も高いスコアをメイン診断タイプ、2番目をサブ課題として表示します。"],
-            [LineChart, "30日・90日の行動", "診断結果ごとに、最初にやるべきことと短期行動を具体化します。"],
-            [Building2, "建設業向け設計", "元請化、協力業者拡大、公共工事、利益改善、集客強化などの現場課題に対応します。"],
-            [ShieldCheck, "回答を保存", "Supabaseに回答内容と診断結果を保存し、管理画面から確認できます。"],
-            [Hammer, "相談につなげるCTA", "個別相談の意欲を記録し、優先してフォローすべき診断者を把握できます。"]
-          ].map(([Icon, title, body]) => (
-            <div key={String(title)} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <Icon className="h-5 w-5 text-brand-700" />
-              <h2 className="mt-3 text-lg font-black text-slate-950">{String(title)}</h2>
-              <p className="mt-2 text-sm leading-7 text-slate-700">{String(body)}</p>
+      <section className="border-y border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-950">14日間無料で全機能を体験</h2>
+              <p className="mt-1 text-sm text-slate-600">無料期間後は自動課金されません。継続する場合だけ月額2,980円の有料プランに申し込みます。</p>
             </div>
+            <Link href="/plans" className="text-sm font-bold text-brand-700">
+              プランを見る
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              ["無料体験", "14日間0円", "期間中は物件検索を利用可能"],
+              ["有料プラン", "月額2,980円", "詳細検索、保存、新着確認、更新チェック"],
+              ["見積相談", "相談導線", "解体、残置物、リフォーム、登記などを相談"]
+            ].map(([name, price, description]) => (
+              <div key={name} className="rounded-lg border border-slate-200 p-4">
+                <p className="text-sm font-bold text-slate-500">{name}</p>
+                <p className="mt-2 text-2xl font-black text-slate-950">{price}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="text-xl font-black text-slate-950">新着物件</h2>
+          <Link href="/properties?maxPrice=3000000" className="text-sm font-bold text-brand-700">
+            すべて見る
+          </Link>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {featured.map((property) => (
+            <PropertyCard key={property.id} property={property} />
           ))}
         </div>
       </section>

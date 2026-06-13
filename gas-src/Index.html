@@ -563,6 +563,80 @@
         display: block;
       }
 
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.45);
+      }
+
+      .modal-backdrop.visible {
+        display: flex;
+      }
+
+      .email-confirm-modal {
+        width: min(760px, 100%);
+        max-height: calc(100vh - 40px);
+        overflow: auto;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+        padding: 18px;
+      }
+
+      .email-confirm-modal h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+
+      .email-preview-grid {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr);
+        gap: 8px 12px;
+        margin: 14px 0;
+      }
+
+      .email-preview-grid dt {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .email-preview-grid dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .email-preview-body {
+        max-height: 320px;
+        overflow: auto;
+        white-space: pre-wrap;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #f8fafc;
+        padding: 12px;
+        font-family: inherit;
+        line-height: 1.7;
+      }
+
+      .email-warning {
+        display: none;
+        border: 1px solid #fedf89;
+        border-radius: 6px;
+        background: #fffaeb;
+        color: #92400e;
+        padding: 10px 12px;
+        margin-top: 12px;
+      }
+
+      .email-warning.visible {
+        display: block;
+      }
+
       .history-list {
         display: grid;
         gap: 8px;
@@ -1037,6 +1111,29 @@
     </main>
 
     <div id="toast" class="toast"></div>
+    <div id="premiumDenialEmailModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="premiumDenialEmailTitle">
+      <div class="email-confirm-modal">
+        <h2 id="premiumDenialEmailTitle">プレミア否決メール送信</h2>
+        <p>このお客様へプレミア否決の定型メールを送信します。よろしいですか？</p>
+        <div id="premiumDenialEmailWarning" class="email-warning"></div>
+        <dl class="email-preview-grid">
+          <dt>送信先メールアドレス</dt>
+          <dd id="premiumDenialEmailTo">-</dd>
+          <dt>お客様名</dt>
+          <dd id="premiumDenialEmailName">-</dd>
+          <dt>メール件名</dt>
+          <dd id="premiumDenialEmailSubject">-</dd>
+        </dl>
+        <div class="field">
+          <label>メール本文プレビュー</label>
+          <pre id="premiumDenialEmailBody" class="email-preview-body"></pre>
+        </div>
+        <div class="actions">
+          <button type="button" id="premiumDenialEmailCancelButton">キャンセル</button>
+          <button type="button" id="premiumDenialEmailSendButton" class="danger">送信する</button>
+        </div>
+      </div>
+    </div>
 
     <script>
       const IS_MARKET_ADMIN = document.body.dataset.marketAdmin === '1';
@@ -1128,6 +1225,14 @@
         setupNotice: document.getElementById('setupNotice'),
         setupNoticeButton: document.getElementById('setupNoticeButton'),
         refreshButton: document.getElementById('refreshButton'),
+        premiumDenialEmailModal: document.getElementById('premiumDenialEmailModal'),
+        premiumDenialEmailWarning: document.getElementById('premiumDenialEmailWarning'),
+        premiumDenialEmailTo: document.getElementById('premiumDenialEmailTo'),
+        premiumDenialEmailName: document.getElementById('premiumDenialEmailName'),
+        premiumDenialEmailSubject: document.getElementById('premiumDenialEmailSubject'),
+        premiumDenialEmailBody: document.getElementById('premiumDenialEmailBody'),
+        premiumDenialEmailCancelButton: document.getElementById('premiumDenialEmailCancelButton'),
+        premiumDenialEmailSendButton: document.getElementById('premiumDenialEmailSendButton'),
         toast: document.getElementById('toast')
       };
 
@@ -1149,6 +1254,13 @@
         safeAddEventListener(els.fixPhonesButton, 'click', fixPhoneNumbers);
         safeAddEventListener(els.setupNoticeButton, 'click', setupColumns);
         safeAddEventListener(els.refreshButton, 'click', loadDashboard);
+        safeAddEventListener(els.premiumDenialEmailCancelButton, 'click', closePremiumDenialEmailModal);
+        safeAddEventListener(els.premiumDenialEmailSendButton, 'click', sendPremiumDenialEmailForSelected);
+        safeAddEventListener(els.premiumDenialEmailModal, 'click', (event) => {
+          if (event.target === els.premiumDenialEmailModal) {
+            closePremiumDenialEmailModal();
+          }
+        });
       }
 
       function safeAddEventListener(element, eventName, handler) {
@@ -2310,6 +2422,7 @@
             ${readonlyField('税込年収', customer.annualIncome)}
             <div class="actions">
               <button type="button" id="premiumPdfButton" class="primary">プレミア申込書を作成</button>
+              <button type="button" id="premiumDenialEmailButton" class="danger">プレミア否決メール送信</button>
             </div>
           </div>
 
@@ -2380,6 +2493,7 @@
         document.getElementById('saveButton').addEventListener('click', saveSelected);
         document.getElementById('deleteCustomerButton').addEventListener('click', deleteSelectedCustomer);
         document.getElementById('premiumPdfButton').addEventListener('click', createPremiumApplicationPdf);
+        document.getElementById('premiumDenialEmailButton').addEventListener('click', openPremiumDenialEmailModal);
         document.getElementById('marketSearchButton').addEventListener('click', searchMarketForSelected);
         document.querySelectorAll('[data-market-candidate]').forEach((button) => {
           button.addEventListener('click', () => searchMarketCandidate(button.dataset.marketCandidate || ''));
@@ -2392,6 +2506,104 @@
         bindLoanPreviewEvents();
         bindAssigneeFields();
         bindCustomerRateFields();
+      }
+
+      function buildPremiumDenialEmailPreview(customer) {
+        const rawName = String(customer && customer.name ? customer.name : '').trim();
+        const customerName = rawName || 'お客様';
+        const salutation = rawName ? `${rawName}様` : 'お客様';
+        const body = [
+          salutation,
+          '',
+          'この度は、株式会社エコループへ仮審査のお申し込みをいただき、誠にありがとうございます。',
+          '',
+          'ご入力いただいた内容をもとに確認を行いましたが、誠に恐縮ながら、今回は現在ご案内可能なローンでのお手続きが難しい結果となりました。',
+          '',
+          'ご希望に添えず、大変申し訳ございません。',
+          '',
+          'なお、審査内容および判断理由につきましては、個別でのご回答を差し控えさせていただいております。何卒ご了承くださいますようお願い申し上げます。',
+          '',
+          'この度はお申し込みいただき、誠にありがとうございました。',
+          '',
+          '株式会社エコループ',
+          'TEL：096-201-7191'
+        ].join('\n');
+
+        return {
+          to: String(customer && customer.email ? customer.email : '').trim(),
+          customerName,
+          subject: '仮審査結果のご連絡',
+          body
+        };
+      }
+
+      function openPremiumDenialEmailModal() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+        const preview = buildPremiumDenialEmailPreview(state.selected);
+        const alreadySentAt = state.selected.premiumDenialEmailSentAt || '';
+        const warningMessages = [];
+        if (!preview.to) {
+          warningMessages.push('送信先メールアドレスが空のため、メールを送信できません。');
+        }
+        if (alreadySentAt) {
+          warningMessages.push(`このお客様にはすでにプレミア否決メールを送信済みです。再送信しますか？\n送信日時: ${alreadySentAt}`);
+        }
+
+        els.premiumDenialEmailTo.textContent = preview.to || '-';
+        els.premiumDenialEmailName.textContent = preview.customerName;
+        els.premiumDenialEmailSubject.textContent = preview.subject;
+        els.premiumDenialEmailBody.textContent = preview.body;
+        els.premiumDenialEmailWarning.textContent = warningMessages.join('\n\n');
+        els.premiumDenialEmailWarning.classList.toggle('visible', warningMessages.length > 0);
+        els.premiumDenialEmailSendButton.disabled = !preview.to;
+        els.premiumDenialEmailSendButton.textContent = alreadySentAt ? '再送信する' : '送信する';
+        els.premiumDenialEmailModal.classList.add('visible');
+      }
+
+      function closePremiumDenialEmailModal() {
+        if (els.premiumDenialEmailModal) {
+          els.premiumDenialEmailModal.classList.remove('visible');
+        }
+      }
+
+      function sendPremiumDenialEmailForSelected() {
+        if (!state.selected || state.saving) {
+          return;
+        }
+        const payload = {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey,
+          allowResend: Boolean(state.selected.premiumDenialEmailSentAt)
+        };
+
+        state.saving = true;
+        setBusy(true);
+        const button = els.premiumDenialEmailSendButton;
+        const originalText = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = '送信中...';
+        }
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            showToast(result.message || 'プレミア否決メールを送信しました。');
+            closePremiumDenialEmailModal();
+            state.saving = false;
+            loadDashboard();
+          })
+          .withFailureHandler((error) => {
+            state.saving = false;
+            setBusy(false);
+            if (button) {
+              button.disabled = false;
+              button.textContent = originalText || '送信する';
+            }
+            showToast(error.message || String(error));
+          })
+          .sendPremiumDenialEmail(payload);
       }
 
       async function createPremiumApplicationPdf() {

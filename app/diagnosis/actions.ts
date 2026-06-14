@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import {
   DIAGNOSIS_QUESTIONS,
+  SUPPLEMENTAL_ANSWER_FIELDS,
   getDiagnosisClient,
   normalizeLeadSource,
   normalizeSeminarInterest,
@@ -19,6 +20,17 @@ export async function submitConstructionDiagnosisAction(formData: FormData) {
   const answers: Record<string, string> = {};
   for (const question of DIAGNOSIS_QUESTIONS) {
     answers[question.key] = requiredString(formData, question.key);
+  }
+  for (const field of SUPPLEMENTAL_ANSWER_FIELDS) {
+    const value = String(formData.get(field.key) ?? "").trim();
+    const isTriggered = Boolean(
+      field.triggerQuestion
+      && field.triggerValues?.includes(answers[field.triggerQuestion])
+    );
+    if (isTriggered && field.requiredWhenTriggered && !value) {
+      throw new Error(`${field.label} is required`);
+    }
+    if (value) answers[field.key] = value;
   }
 
   const name = requiredString(formData, "name");

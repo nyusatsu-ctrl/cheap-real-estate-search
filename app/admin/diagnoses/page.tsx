@@ -106,7 +106,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                 <th className="px-3 py-3">電話番号</th>
                 <th className="px-3 py-3">メール</th>
                 <th className="px-3 py-3">業種</th>
-                <th className="px-3 py-3">月商</th>
+                <th className="px-3 py-3">平均年商</th>
                 <th className="px-3 py-3">診断タイプ</th>
                 <th className="px-3 py-3">相談意欲</th>
                 <th className="px-3 py-3">説明会意向</th>
@@ -223,7 +223,7 @@ function AdminHeader({ email }: { email: string }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-slate-500">格安不動産サーチ</p>
+        <p className="text-sm font-semibold text-slate-500">建設業売上アップ診断</p>
         <p className="mt-1 text-xs text-slate-500">{email}</p>
       </div>
       <div className="flex items-center gap-2">

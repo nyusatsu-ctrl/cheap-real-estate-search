@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { submitConstructionDiagnosisAction } from "@/app/diagnosis/actions";
-import { DIAGNOSIS_QUESTIONS, normalizeLeadSource } from "@/lib/construction-diagnosis";
+import { DiagnosisQuestionField } from "@/components/diagnoses/DiagnosisQuestionField";
+import { DIAGNOSIS_QUESTIONS, getSupplementalFieldsForQuestion, normalizeLeadSource } from "@/lib/construction-diagnosis";
 import { CalendarCheck, ClipboardCheck, HardHat } from "lucide-react";
 
 type DiagnosisSearchParams = Promise<{
@@ -27,9 +28,9 @@ export default async function DiagnosisFormPage({ searchParams }: { searchParams
                 <HardHat className="h-4 w-4" />
                 20項目診断
               </p>
-              <h1 className="mt-3 text-3xl font-black leading-tight text-slate-950 md:text-4xl">格安不動産サーチ</h1>
+              <h1 className="mt-3 text-3xl font-black leading-tight text-slate-950 md:text-4xl">建設業売上アップ診断</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700">
-                現在の受注状況、集客、利益管理、組織体制を入力すると、売上アップに向けた優先タイプを自動判定します。
+                現在の受注状況、集客、利益管理、組織体制などを入力すると、売上アップに向けた優先課題と改善タイプを自動判定します。
               </p>
             </div>
             <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
@@ -53,34 +54,18 @@ export default async function DiagnosisFormPage({ searchParams }: { searchParams
             <TextField name="company_name" label="会社名・屋号" />
             <TextField name="phone" label="電話番号" type="tel" />
             <TextField name="email" label="メールアドレス" type="email" required />
+            <TextField name="service_area" label="対応エリア" placeholder="例: 熊本県内、九州一円、熊本市周辺など" />
           </div>
         </div>
 
         <div className="mt-6 grid gap-4">
           {DIAGNOSIS_QUESTIONS.map((question, index) => (
-            <fieldset key={question.key} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <legend className="text-base font-black text-slate-950">
-                <span className="mr-2 text-brand-700">{index + 1}.</span>
-                {question.label}
-              </legend>
-              {question.type === "textarea" ? (
-                <textarea
-                  name={question.key}
-                  required
-                  rows={4}
-                  className="mt-4 w-full rounded border border-slate-300 px-3 py-2 text-sm focus-ring"
-                />
-              ) : (
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {question.options?.map((option) => (
-                    <label key={option.value} className="flex min-h-12 cursor-pointer items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-800">
-                      <input name={question.key} type="radio" value={option.value} required className="h-4 w-4 accent-brand-700" />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </fieldset>
+            <DiagnosisQuestionField
+              key={question.key}
+              question={question}
+              index={index}
+              supplementalFields={getSupplementalFieldsForQuestion(question.key)}
+            />
           ))}
         </div>
 
@@ -100,7 +85,7 @@ export default async function DiagnosisFormPage({ searchParams }: { searchParams
             ))}
           </div>
           <div className="mt-5 max-w-xl">
-            <TextField name="preferred_contact_time" label="連絡がつきやすい時間帯" placeholder="例: 平日10時-12時、夕方以降など" />
+            <TextField name="preferred_contact_time" label="連絡がつきやすい時間帯（任意）" placeholder="例: 平日10時〜12時、13時〜17時、夕方以降、土曜午前中など" />
           </div>
         </fieldset>
 

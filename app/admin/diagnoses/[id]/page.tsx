@@ -13,6 +13,7 @@ import {
   getLeadSourceLabel,
   getLeadStatusLabel,
   getSeminarInterestLabel,
+  getSupplementalAnswerEntries,
   getQuestionLabel
 } from "@/lib/construction-diagnosis";
 
@@ -39,6 +40,7 @@ export default async function AdminDiagnosisDetailPage({ params }: { params: Pro
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];
   const sub = DIAGNOSIS_TYPES[diagnosis.sub_type];
   const scoreEntries = Object.entries(diagnosis.scores).sort((a, b) => b[1] - a[1]);
+  const supplementalEntries = getSupplementalAnswerEntries(diagnosis.answers);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -149,6 +151,19 @@ export default async function AdminDiagnosisDetailPage({ params }: { params: Pro
               </div>
             ))}
           </div>
+          {supplementalEntries.length > 0 ? (
+            <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4">
+              <h3 className="text-base font-black text-slate-950">補足入力</h3>
+              <div className="mt-3 divide-y divide-slate-200">
+                {supplementalEntries.map((entry) => (
+                  <div key={entry.key} className="grid gap-1 py-3 text-sm md:grid-cols-[260px_1fr]">
+                    <p className="font-bold text-slate-600">{entry.label}</p>
+                    <p className="font-semibold text-slate-950">{entry.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </div>

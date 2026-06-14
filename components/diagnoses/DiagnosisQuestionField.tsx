@@ -25,17 +25,20 @@ type SupplementalAnswerField = {
 export function DiagnosisQuestionField({
   question,
   index,
-  supplementalFields
+  supplementalFields,
+  fieldErrors = {}
 }: {
   question: DiagnosisQuestion;
   index: number;
   supplementalFields: SupplementalAnswerField[];
+  fieldErrors?: Record<string, string>;
 }) {
   const [selectedValue, setSelectedValue] = useState("");
   const activeFields = useMemo(
     () => supplementalFields.filter((field) => field.triggerValues?.includes(selectedValue)),
     [selectedValue, supplementalFields]
   );
+  const questionError = fieldErrors[question.key];
 
   return (
     <fieldset className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -60,6 +63,7 @@ export function DiagnosisQuestionField({
                 value={option.value}
                 required
                 onChange={() => setSelectedValue(option.value)}
+                aria-invalid={Boolean(questionError)}
                 className="h-4 w-4 accent-brand-700"
               />
               <span>{option.label}</span>
@@ -67,20 +71,29 @@ export function DiagnosisQuestionField({
           ))}
         </div>
       )}
+      {questionError ? <p className="mt-3 text-xs font-bold text-red-700">{questionError}</p> : null}
 
       {activeFields.length > 0 ? (
         <div className="mt-4 grid gap-4 rounded border border-brand-100 bg-brand-50/40 p-4">
-          {activeFields.map((field) => (
-            <label key={field.key} className="grid gap-1 text-sm font-bold text-slate-700">
-              {field.label}
-              <input
-                name={field.key}
-                required={field.requiredWhenTriggered}
-                placeholder={field.placeholder}
-                className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring"
-              />
-            </label>
-          ))}
+          {activeFields.map((field) => {
+            const error = fieldErrors[field.key];
+            const errorId = `${field.key}-error`;
+
+            return (
+              <label key={field.key} className="grid gap-1 text-sm font-bold text-slate-700">
+                {field.label}
+                <input
+                  name={field.key}
+                  required={field.requiredWhenTriggered}
+                  placeholder={field.placeholder}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? errorId : undefined}
+                  className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring aria-[invalid=true]:border-red-500"
+                />
+                {error ? <span id={errorId} className="text-xs font-bold text-red-700">{error}</span> : null}
+              </label>
+            );
+          })}
         </div>
       ) : null}
     </fieldset>

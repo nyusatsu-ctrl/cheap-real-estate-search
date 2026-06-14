@@ -10,41 +10,72 @@ import {
   scoreDiagnosis
 } from "@/lib/construction-diagnosis";
 
-function requiredString(formData: FormData, key: string) {
+export type DiagnosisFormState = {
+  formError?: string;
+  fieldErrors?: Record<string, string>;
+};
+
+function getString(formData: FormData, key: string) {
+  return String(formData.get(key) ?? "").trim();
+}
+
+function setRequiredError(fieldErrors: Record<string, string>, key: string, label: string) {
+  fieldErrors[key] = `${label}を入力してください`;
+}
+
+function requiredString(formData: FormData, key: string, label: string, fieldErrors: Record<string, string>) {
   const value = String(formData.get(key) ?? "").trim();
-  if (!value) throw new Error(`${key} is required`);
+  if (!value) setRequiredError(fieldErrors, key, label);
   return value;
 }
 
-export async function submitConstructionDiagnosisAction(formData: FormData) {
+export async function submitConstructionDiagnosisAction(_previousState: DiagnosisFormState, formData: FormData): Promise<DiagnosisFormState> {
+  const fieldErrors: Record<string, string> = {};
   const answers: Record<string, string> = {};
+
   for (const question of DIAGNOSIS_QUESTIONS) {
-    answers[question.key] = requiredString(formData, question.key);
+    const value = getString(formData, question.key);
+    if (!value) fieldErrors[question.key] = `${question.label}を選択してください`;
+    answers[question.key] = value;
   }
+
   for (const field of SUPPLEMENTAL_ANSWER_FIELDS) {
-    const value = String(formData.get(field.key) ?? "").trim();
+    const value = getString(formData, field.key);
     const isTriggered = Boolean(
       field.triggerQuestion
       && field.triggerValues?.includes(answers[field.triggerQuestion])
     );
     if (isTriggered && field.requiredWhenTriggered && !value) {
-      throw new Error(`${field.label} is required`);
+      setRequiredError(fieldErrors, field.key, field.label);
     }
     if (value) answers[field.key] = value;
   }
 
-  const name = requiredString(formData, "name");
-  const email = requiredString(formData, "email");
-  const companyName = String(formData.get("company_name") ?? "").trim() || null;
-  const phone = String(formData.get("phone") ?? "").trim() || null;
-  const leadSource = normalizeLeadSource(String(formData.get("lead_source") ?? ""));
-  const sourceCampaign = String(formData.get("source_campaign") ?? "").trim() || null;
-  const seminarInterest = normalizeSeminarInterest(String(formData.get("seminar_interest") ?? ""));
-  const preferredContactTime = String(formData.get("preferred_contact_time") ?? "").trim() || null;
+  const name = requiredString(formData, "name", "氏名", fieldErrors);
+  const email = requiredString(formData, "email", "メールアドレス", fieldErrors);
+  const companyName = getString(formData, "company_name") || null;
+  const phone = getString(formData, "phone") || null;
+  const leadSource = normalizeLeadSource(getString(formData, "lead_source"));
+  const sourceCampaign = getString(formData, "source_campaign") || null;
+  const seminarInterest = normalizeSeminarInterest(getString(formData, "seminar_interest"));
+  const preferredContactTime = getString(formData, "preferred_contact_time") || null;
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return {
+      formError: "未入力の項目があります。赤字の項目を確認してください。",
+      fieldErrors
+    };
+  }
+
   const { scores, mainType, subType } = scoreDiagnosis(answers);
 
   const supabase = await getDiagnosisClient();
-  if (!supabase) throw new Error("Supabase environment variables are not set.");
+  if (!supabase) {
+    return {
+      formError: "診断結果を保存できませんでした。時間をおいて再度お試しください。",
+      fieldErrors: {}
+    };
+  }
 
   const { data, error } = await supabase
     .from("construction_diagnoses")
@@ -68,7 +99,12 @@ export async function submitConstructionDiagnosisAction(formData: FormData) {
     .select("id")
     .single();
 
-  if (error || !data) throw new Error(error?.message ?? "診断結果を保存できませんでした。");
+  if (error || !data) {
+    return {
+      formError: "診断結果を保存できませんでした。時間をおいて再度お試しください。",
+      fieldErrors: {}
+    };
+  }
 
   redirect(`/diagnosis/results/${data.id}`);
 }

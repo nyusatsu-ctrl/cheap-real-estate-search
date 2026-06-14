@@ -10,6 +10,7 @@ import {
   getConstructionDiagnoses,
   getLeadSourceLabel,
   getLeadStatusLabel,
+  getPublicWorksRoutePlan,
   getSeminarInterestLabel,
   normalizeLeadSource,
   normalizeLeadStatus,
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
     ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => field.label),
     "診断タイプ",
     "サブ課題",
+    "推奨参入ルート",
+    "推奨アクション",
+    "platform提案",
     "相談意欲",
     "説明会意向",
     "流入元",
@@ -45,28 +49,35 @@ export async function GET(request: Request) {
     "リード更新日時",
     "診断日時"
   ];
-  const rows = diagnoses.map((diagnosis) => [
-    diagnosis.name,
-    diagnosis.company_name ?? "",
-    diagnosis.phone ?? "",
-    diagnosis.email,
-    getAnswerLabel("business_type", diagnosis.business_type),
-    getAnswerLabel("monthly_sales", diagnosis.monthly_sales),
-    ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => diagnosis.answers[field.key] ?? ""),
-    DIAGNOSIS_TYPES[diagnosis.main_type].name,
-    DIAGNOSIS_TYPES[diagnosis.sub_type].name,
-    CONSULTATION_LABELS[diagnosis.wants_consultation] ?? diagnosis.wants_consultation,
-    getSeminarInterestLabel(diagnosis.seminar_interest),
-    getLeadSourceLabel(diagnosis.lead_source),
-    diagnosis.source_campaign ?? "",
-    diagnosis.preferred_contact_time ?? "",
-    getLeadStatusLabel(diagnosis.lead_status),
-    diagnosis.admin_memo ?? "",
-    formatNullableDiagnosisDate(diagnosis.admin_memo_updated_at),
-    formatNullableDiagnosisDate(diagnosis.last_contacted_at),
-    formatNullableDiagnosisDate(diagnosis.lead_updated_at),
-    formatDiagnosisDate(diagnosis.created_at)
-  ]);
+  const rows = diagnoses.map((diagnosis) => {
+    const routePlan = getPublicWorksRoutePlan(diagnosis);
+
+    return [
+      diagnosis.name,
+      diagnosis.company_name ?? "",
+      diagnosis.phone ?? "",
+      diagnosis.email,
+      getAnswerLabel("business_type", diagnosis.business_type),
+      getAnswerLabel("monthly_sales", diagnosis.monthly_sales),
+      ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => diagnosis.answers[field.key] ?? ""),
+      DIAGNOSIS_TYPES[diagnosis.main_type].name,
+      DIAGNOSIS_TYPES[diagnosis.sub_type].name,
+      routePlan.routeTitle,
+      routePlan.firstActions.join(" / "),
+      routePlan.platformSuggestions.join(" / "),
+      CONSULTATION_LABELS[diagnosis.wants_consultation] ?? diagnosis.wants_consultation,
+      getSeminarInterestLabel(diagnosis.seminar_interest),
+      getLeadSourceLabel(diagnosis.lead_source),
+      diagnosis.source_campaign ?? "",
+      diagnosis.preferred_contact_time ?? "",
+      getLeadStatusLabel(diagnosis.lead_status),
+      diagnosis.admin_memo ?? "",
+      formatNullableDiagnosisDate(diagnosis.admin_memo_updated_at),
+      formatNullableDiagnosisDate(diagnosis.last_contacted_at),
+      formatNullableDiagnosisDate(diagnosis.lead_updated_at),
+      formatDiagnosisDate(diagnosis.created_at)
+    ];
+  });
 
   const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
   return new NextResponse(`\uFEFF${csv}`, {

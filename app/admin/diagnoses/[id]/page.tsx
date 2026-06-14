@@ -12,6 +12,7 @@ import {
   getConstructionDiagnosis,
   getLeadSourceLabel,
   getLeadStatusLabel,
+  getPublicWorksRoutePlan,
   getSeminarInterestLabel,
   getSupplementalAnswerEntries,
   getQuestionLabel
@@ -39,6 +40,7 @@ export default async function AdminDiagnosisDetailPage({ params }: { params: Pro
 
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];
   const sub = DIAGNOSIS_TYPES[diagnosis.sub_type];
+  const routePlan = getPublicWorksRoutePlan(diagnosis);
   const scoreEntries = Object.entries(diagnosis.scores).sort((a, b) => b[1] - a[1]);
   const supplementalEntries = getSupplementalAnswerEntries(diagnosis.answers);
 
@@ -141,30 +143,51 @@ export default async function AdminDiagnosisDetailPage({ params }: { params: Pro
           </section>
         </aside>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-black text-slate-950">回答内容</h2>
-          <div className="mt-4 divide-y divide-slate-200">
-            {DIAGNOSIS_QUESTIONS.map((question) => (
-              <div key={question.key} className="grid gap-1 py-3 text-sm md:grid-cols-[260px_1fr]">
-                <p className="font-bold text-slate-600">{getQuestionLabel(question.key)}</p>
-                <p className="font-semibold text-slate-950">{getAnswerLabel(question.key, diagnosis.answers[question.key] ?? "")}</p>
-              </div>
-            ))}
-          </div>
-          {supplementalEntries.length > 0 ? (
-            <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4">
-              <h3 className="text-base font-black text-slate-950">補足入力</h3>
-              <div className="mt-3 divide-y divide-slate-200">
-                {supplementalEntries.map((entry) => (
-                  <div key={entry.key} className="grid gap-1 py-3 text-sm md:grid-cols-[260px_1fr]">
-                    <p className="font-bold text-slate-600">{entry.label}</p>
-                    <p className="font-semibold text-slate-950">{entry.value}</p>
-                  </div>
-                ))}
-              </div>
+        <div className="space-y-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-black text-slate-950">結果ページ表示内容</h2>
+            <div className="mt-4 grid gap-4">
+              <RecommendationBlock
+                title="公共工事参入ルート"
+                body={routePlan.routeSummary}
+                items={[routePlan.routeTitle, ...routePlan.routeItems]}
+              />
+              {routePlan.permitBarrier ? (
+                <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-7 text-amber-950">
+                  {routePlan.permitBarrier}
+                </div>
+              ) : null}
+              <RecommendationBlock title="推奨アクション" items={routePlan.firstActions} />
+              <RecommendationBlock title="90日以内の行動プラン" items={routePlan.action90Days} />
+              <RecommendationBlock title="platform導入提案" items={routePlan.platformSuggestions} />
             </div>
-          ) : null}
-        </section>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-black text-slate-950">回答内容</h2>
+            <div className="mt-4 divide-y divide-slate-200">
+              {DIAGNOSIS_QUESTIONS.map((question) => (
+                <div key={question.key} className="grid gap-1 py-3 text-sm md:grid-cols-[260px_1fr]">
+                  <p className="font-bold text-slate-600">{getQuestionLabel(question.key)}</p>
+                  <p className="font-semibold text-slate-950">{getAnswerLabel(question.key, diagnosis.answers[question.key] ?? "")}</p>
+                </div>
+              ))}
+            </div>
+            {supplementalEntries.length > 0 ? (
+              <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-base font-black text-slate-950">補足入力</h3>
+                <div className="mt-3 divide-y divide-slate-200">
+                  {supplementalEntries.map((entry) => (
+                    <div key={entry.key} className="grid gap-1 py-3 text-sm md:grid-cols-[260px_1fr]">
+                      <p className="font-bold text-slate-600">{entry.label}</p>
+                      <p className="font-semibold text-slate-950">{entry.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -195,6 +218,23 @@ function TypeBox({ label, value }: { label: string; value: string }) {
     <div className="rounded border border-slate-200 bg-slate-50 p-3">
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className="mt-1 font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function RecommendationBlock({ title, body, items }: { title: string; body?: string; items: string[] }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 p-4">
+      <h3 className="text-base font-black text-slate-950">{title}</h3>
+      {body ? <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">{body}</p> : null}
+      <ul className="mt-3 grid gap-2">
+        {items.map((item) => (
+          <li key={item} className="flex gap-2 text-sm font-semibold leading-6 text-slate-800">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-700" />
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

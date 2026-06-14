@@ -94,6 +94,25 @@ export type AdminDiagnosisFilters = {
   leadStatus?: LeadStatus;
 };
 
+export type PublicWorksRoutePlan = {
+  emphasisLabel: string;
+  routeTitle: string;
+  routeSummary: string;
+  routeItems: string[];
+  currentIssues: string[];
+  firstActions: string[];
+  action90Days: string[];
+  platformSuggestions: string[];
+  permitBarrier?: string;
+};
+
+type PublicWorksRouteInput = {
+  answers: Record<string, string>;
+  main_type?: DiagnosisTypeCode;
+  wants_consultation?: string | null;
+  seminar_interest?: string | null;
+};
+
 export const DIAGNOSIS_TYPES: Record<DiagnosisTypeCode, {
   code: DiagnosisTypeCode;
   name: string;
@@ -671,6 +690,205 @@ export function getSeminarInterestLabel(value: string | null | undefined) {
 
 export function getLeadStatusLabel(value: string | null | undefined) {
   return LEAD_STATUS_LABELS[normalizeLeadStatus(value)];
+}
+
+export function getPublicWorksRoutePlan(diagnosis: PublicWorksRouteInput): PublicWorksRoutePlan {
+  const answers = diagnosis.answers;
+  const licenseStatus = answers.license_status ?? "";
+  const publicWorksInterest = answers.public_works_interest ?? "";
+  const biggestProblem = answers.biggest_problem ?? "";
+  const hasLicense = ["licensed", "yes"].includes(licenseStatus);
+  const wantsLicense = ["preparing", "want"].includes(licenseStatus);
+  const highPublicInterest = ["high", "conditional", "researching", "already", "medium"].includes(publicWorksInterest)
+    || biggestProblem === "want_public"
+    || diagnosis.main_type === "C";
+  const lowPublicInterest = publicWorksInterest === "low";
+  const hasSalesIssue = biggestProblem === "no_leads"
+    || ["none", "do_not_know", "sometimes"].includes(answers.sales_activity ?? "")
+    || ["none", "exists", "not_updated"].includes(answers.website_status ?? "")
+    || ["none", "not_used", "basic"].includes(answers.google_maps_status ?? "")
+    || ["one", "two_three"].includes(answers.client_count ?? "");
+  const hasPermitBarrier = wantsLicense
+    || (!hasLicense && licenseStatus !== "no_plan")
+    || ["sole_solo"].includes(answers.business_form ?? "")
+    || ["owner_small", "other", "none"].includes(answers.team_status ?? "")
+    || biggestProblem === "business_unclear";
+
+  let routeTitle: string;
+  let routeSummary: string;
+  let routeItems: string[];
+  let currentIssues: string[];
+  let firstActions: string[];
+  let action90Days: string[];
+
+  if (hasLicense) {
+    routeTitle = "経審・全省庁資格から国発注機関へ広げるルート";
+    routeSummary = "すでに建設業許可をお持ちのため、次は経審・全省庁統一資格・国の発注機関への入札参加資格を整えることで、案件の選択肢を広げられる可能性があります。市町村・県案件に加えて、国土交通省、防衛省、法務省、財務局、文部科学省など国の発注機関まで対象を広げる進め方です。";
+    routeItems = [
+      "現在の許可業種と対応できる工種を確認する",
+      "経審・全省庁統一資格・国発注機関の参加資格状況を確認する",
+      "市町村・県案件に加えて、国土交通省、防衛省、法務省、財務局、文部科学省などの発注情報を確認する",
+      "案件収集と入札管理の担当・期限・判断基準を決める"
+    ];
+    currentIssues = [
+      "市町村・県案件だけに絞ると、案件探索の幅が限られる可能性があります。",
+      "許可業種、経審、全省庁統一資格、各発注機関の資格状況を一体で確認する必要があります。"
+    ];
+    firstActions = [
+      "現在の許可業種と対応できる工事範囲を整理する",
+      "経審・全省庁統一資格・国発注機関の参加資格状況を確認する",
+      "自社所在地から狙える市町村・県・国発注機関を洗い出す"
+    ];
+    action90Days = [
+      "現在の許可業種を確認する",
+      "経審・全省庁・国発注機関の参加資格状況を確認する",
+      "対象機関を整理する",
+      "案件収集・入札管理体制を作る"
+    ];
+  } else if (wantsLicense) {
+    routeTitle = "建設業許可取得から公共工事へ段階的に広げるルート";
+    routeSummary = "建設業許可 → 経審 → 全省庁統一資格 → 国発注機関の入札参加資格という段階的ルートで、要件とスケジュールを整理する進め方です。無料説明会や個別相談で、取得可能性と優先順位を確認できます。";
+    routeItems = [
+      "建設業許可の要件と必要書類を整理する",
+      "技術者要件・実務経験・資格者の有無を確認する",
+      "許可取得後に経審と全省庁統一資格へ進む準備をする",
+      "国発注機関の入札参加資格まで広げるスケジュールを作る"
+    ];
+    currentIssues = [
+      "許可取得の要件、技術者要件、実務経験、資格者の有無を整理する必要があります。",
+      "公共工事に進むには、許可取得後の経審・全省庁統一資格・発注機関別資格まで見据えた計画が必要です。"
+    ];
+    firstActions = [
+      "必要書類と建設業許可の要件を整理する",
+      "技術者要件・実務経験・資格者の有無を確認する",
+      "許可取得から入札参加資格までの大まかなスケジュールを作る"
+    ];
+    action90Days = [
+      "必要書類と要件を整理する",
+      "技術者要件を確認する",
+      "許可取得までのスケジュールを作る",
+      "無料説明会または個別相談で取得可能性を確認する"
+    ];
+  } else if (lowPublicInterest && hasSalesIssue) {
+    routeTitle = "民間集客を整えつつ、許可不要案件を試すルート";
+    routeSummary = "今は公共工事を強く進めるより、民間集客強化で問い合わせ導線を整え、負担の小さいオープンカウンターを確認し、将来的な公共工事参入へ広げる順番が現実的です。";
+    routeItems = [
+      "民間工事の問い合わせ導線と施工事例を整える",
+      "許可不要で参加できる可能性があるオープンカウンター・役務・物品案件を確認する",
+      "無理なく試せる案件から公共発注の流れに慣れる",
+      "将来的に建設業許可取得を目指すか判断する"
+    ];
+    currentIssues = [
+      "現時点では公共工事よりも、民間集客と既存営業導線の整備を優先した方が取り組みやすい状態です。",
+      "将来的な受注機会を増やすには、許可不要案件の確認と許可取得可能性の整理を並行して進める余地があります。"
+    ];
+    firstActions = [
+      "民間集客で強化する工種と対応エリアを決める",
+      "ホームページ・Googleマップ・施工事例の不足を確認する",
+      "オープンカウンター・役務・物品案件で試せる入口を探す"
+    ];
+    action90Days = [
+      "オープンカウンター・役務・物品案件から始める",
+      "建設業許可取得の可否を確認する",
+      "技術者・実務経験・資格者の有無を整理する",
+      "将来的な許可取得ルートを設計する"
+    ];
+  } else {
+    routeTitle = "オープンカウンター・役務・物品案件から始めるルート";
+    routeSummary = "まずは許可不要で参加できる可能性があるオープンカウンター、役務、物品案件から始め、将来的に建設業許可取得を目指す流れを設計するルートです。";
+    routeItems = [
+      "許可不要で参加できる可能性がある案件を確認する",
+      "オープンカウンター・役務・物品案件から公共発注の流れに慣れる",
+      "技術者・実務経験・資格者の有無を整理する",
+      "将来的に建設業許可取得を目指すか判断する"
+    ];
+    currentIssues = [
+      "建設業許可が必要な工事案件へすぐ参加する前に、許可不要で参加できる可能性がある案件の見極めが必要です。",
+      "許可取得を目指す場合は、技術者要件・実務経験・資格者の確認が重要です。"
+    ];
+    firstActions = [
+      "オープンカウンター・役務・物品案件の対象範囲を確認する",
+      "許可が必要な工事と不要で参加できる可能性がある案件を切り分ける",
+      "建設業許可取得に必要な要件を整理する"
+    ];
+    action90Days = [
+      "オープンカウンター・役務・物品案件から始める",
+      "建設業許可取得の可否を確認する",
+      "技術者・実務経験・資格者の有無を整理する",
+      "将来的な許可取得ルートを設計する"
+    ];
+  }
+
+  if (highPublicInterest) {
+    currentIssues = [
+      ...currentIssues,
+      "公共工事への関心が高いため、公共工事参入型として優先的に準備する価値があります。",
+      "所在地の市町村・県だけでは案件数が限られるため、国の発注機関まで広げることで、案件探索の幅を広げられます。"
+    ];
+  }
+
+  const platformSuggestions = buildPlatformSuggestions({
+    hasLicense,
+    wantsLicense,
+    highPublicInterest,
+    lowPublicInterest,
+    hasSalesIssue,
+    wantsConsultation: diagnosis.wants_consultation ?? answers.wants_consultation,
+    seminarInterest: diagnosis.seminar_interest
+  });
+
+  return {
+    emphasisLabel: highPublicInterest ? "公共工事参入型を優先" : "段階的な参入準備",
+    routeTitle,
+    routeSummary,
+    routeItems,
+    currentIssues,
+    firstActions,
+    action90Days,
+    platformSuggestions,
+    permitBarrier: hasPermitBarrier
+      ? "許可取得の障壁: 技術者要件・実務経験・資格者の確認が必要です。個別相談で取得可能性を整理できます。"
+      : undefined
+  };
+}
+
+function buildPlatformSuggestions({
+  hasLicense,
+  wantsLicense,
+  highPublicInterest,
+  lowPublicInterest,
+  hasSalesIssue,
+  wantsConsultation,
+  seminarInterest
+}: {
+  hasLicense: boolean;
+  wantsLicense: boolean;
+  highPublicInterest: boolean;
+  lowPublicInterest: boolean;
+  hasSalesIssue: boolean;
+  wantsConsultation: string | null | undefined;
+  seminarInterest: string | null | undefined;
+}) {
+  const suggestions: string[] = [];
+  const add = (value: string) => {
+    if (!suggestions.includes(value)) suggestions.push(value);
+  };
+
+  if (hasLicense || wantsLicense || highPublicInterest || !lowPublicInterest) {
+    add("案件収集platformで、市町村・県・国発注機関の案件探索を継続的に行う");
+  }
+  if (hasLicense || wantsLicense || highPublicInterest) {
+    add("入札参加資格の進捗管理で、経審・全省庁統一資格・各発注機関の期限を管理する");
+  }
+  if (hasSalesIssue || lowPublicInterest) {
+    add("見込み客管理platformで、問い合わせ・紹介・営業先の対応漏れを減らす");
+  }
+  if (["yes", "maybe", "overview"].includes(wantsConsultation ?? "") || ["wants_to_join", "wants_schedule", "wants_materials"].includes(seminarInterest ?? "")) {
+    add("説明会参加者・個別相談者の管理で、次回連絡と提案状況を整理する");
+  }
+  add("ステータス管理、メモ、CSV出力、流入元分析で、営業リードと案件対応の状況を見える化する");
+
+  return suggestions;
 }
 
 export async function getDiagnosisClient() {

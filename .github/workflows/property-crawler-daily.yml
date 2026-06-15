@@ -1,0 +1,46 @@
+name: Daily property crawler
+
+on:
+  schedule:
+    # 06:00 JST every day. GitHub Actions cron uses UTC.
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-property-crawler
+  cancel-in-progress: false
+
+jobs:
+  crawl-properties:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Crawl zero-estate candidates
+        run: npm run crawl:properties -- --source=zero-estate --limit=30 --commit
+
+      - name: Crawl akisol-zero candidates
+        run: npm run crawl:properties -- --source=akisol-zero --limit=30 --commit
+
+      - name: Crawl zenkoku-zero-fudosan candidates
+        run: npm run crawl:properties -- --source=zenkoku-zero-fudosan --limit=30 --commit
+
+      - name: Crawl kumamoto-akiya candidates
+        run: npm run crawl:properties -- --source=kumamoto-akiya --limit=30 --commit

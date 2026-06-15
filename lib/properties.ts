@@ -79,7 +79,8 @@ export async function getPublishedProperty(id: string) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    return sampleProperties.find((property) => property.id === id && property.status === "published") ?? null;
+    const property = sampleProperties.find((candidate) => candidate.id === id && candidate.status === "published");
+    return property ? sanitizePublicDetailProperty(property) : null;
   }
 
   const { data, error } = await supabase
@@ -90,7 +91,7 @@ export async function getPublishedProperty(id: string) {
     .single();
 
   if (error) return null;
-  return data as Property;
+  return sanitizePublicDetailProperty(data as Property);
 }
 
 export async function getAdminProperties(filters: PropertyFilters = {}) {
@@ -170,12 +171,50 @@ function matchesKeyword(property: Property, keyword: string) {
 }
 
 function sanitizePublicListProperties(properties: Property[]) {
-  return properties.map((property) => ({
-    ...property,
-    source_url: "",
+  return properties.map((property) => sanitizePublicProperty(property, { keepSourceUrl: false }));
+}
+
+function sanitizePublicDetailProperty(property: Property) {
+  return sanitizePublicProperty(property, { keepSourceUrl: true });
+}
+
+function sanitizePublicProperty(property: Property, { keepSourceUrl }: { keepSourceUrl: boolean }): Property {
+  return {
+    id: property.id,
+    title: property.title,
+    property_type: property.property_type,
+    property_category: property.property_category ?? null,
+    price_yen: property.price_yen,
+    prefecture: property.prefecture,
+    city: property.city,
+    address_display: property.address_display,
+    land_area_m2: property.land_area_m2,
+    building_area_m2: property.building_area_m2,
+    construction_year: property.construction_year,
+    latitude: property.latitude,
+    longitude: property.longitude,
+    source_id: null,
+    source_url: keepSourceUrl ? property.source_url : "",
+    transaction_type: property.transaction_type ?? null,
+    listed_at: property.listed_at ?? null,
+    source_published_at: property.source_published_at ?? null,
+    source_updated_at: property.source_updated_at ?? null,
+    scraped_at: property.scraped_at ?? null,
+    first_detected_at: property.first_detected_at ?? null,
+    last_checked_at: property.last_checked_at ?? null,
+    last_changed_at: property.last_changed_at ?? null,
+    has_updates: property.has_updates ?? false,
+    previous_snapshot_hash: null,
+    price_band: property.price_band ?? null,
+    risk_tags: [],
+    remarks: null,
+    publication_permission: property.publication_permission,
+    status: property.status,
+    published_at: property.published_at,
+    updated_at: property.updated_at,
     property_sources: null,
     property_images: []
-  }));
+  };
 }
 
 function uniqueLocations(properties: Pick<Property, "prefecture" | "city">[]) {

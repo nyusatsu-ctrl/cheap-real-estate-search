@@ -1,5 +1,5 @@
 import { PREFECTURES, PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS } from "@/lib/constants";
-import type { PropertyCategory, PropertyFilters, PropertyLocationOption } from "@/lib/types";
+import type { PropertyCategory, PropertyFilters, PropertyLocationOption, PropertySort } from "@/lib/types";
 
 type SearchParamValue = string | string[] | undefined;
 type PriceRangeOption = {
@@ -14,6 +14,7 @@ export type PropertySearchParams = {
   city?: SearchParamValue;
   propertyType?: SearchParamValue;
   priceRange?: SearchParamValue;
+  sort?: SearchParamValue;
   keyword?: SearchParamValue;
   minPrice?: SearchParamValue;
   maxPrice?: SearchParamValue;
@@ -33,6 +34,7 @@ export function normalizePropertyFilters(params: PropertySearchParams, options: 
     city: firstString(params.city),
     propertyType: firstString(params.propertyType) as PropertyCategory | undefined,
     priceRange,
+    sort: normalizePropertySort(firstString(params.sort)),
     keyword: firstString(params.keyword),
     minPrice,
     maxPrice
@@ -78,4 +80,9 @@ function parseOptionalNumber(value?: string) {
   if (!value) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizePropertySort(value?: string): PropertySort {
+  if (value === "source-newest" || value === "price-asc" || value === "price-desc") return value;
+  return "newest";
 }

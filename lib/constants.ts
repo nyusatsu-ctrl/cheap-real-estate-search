@@ -153,6 +153,13 @@ export const PROPERTY_PRICE_RANGE_OPTIONS = [
 
 export const PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS = PROPERTY_PRICE_RANGE_OPTIONS.filter((option) => option.value !== "500-plus");
 
+export const PROPERTY_SORT_OPTIONS = [
+  { value: "newest", label: "新着順" },
+  { value: "source-newest", label: "元サイト掲載日が新しい順" },
+  { value: "price-asc", label: "価格が安い順" },
+  { value: "price-desc", label: "価格が高い順" }
+] as const;
+
 export const TENDER_TYPE_LABELS: Record<TenderType, string> = {
   goods: "物品",
   service: "役務",

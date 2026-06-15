@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Search } from "lucide-react";
-import { PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
+import { PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_SORT_OPTIONS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { getCityOptions, getRegionPrefectures } from "@/lib/property-filters";
-import type { PropertyLocationOption } from "@/lib/types";
+import type { PropertyLocationOption, PropertySort } from "@/lib/types";
 
 type PriceRangeOption = {
   value: string;
@@ -20,6 +20,7 @@ type Props = {
   priceRange?: string;
   priceRangeOptions?: readonly PriceRangeOption[];
   propertyType?: string;
+  sort?: PropertySort;
   keyword?: string;
 };
 
@@ -32,6 +33,7 @@ export function SearchFilters({
   priceRange,
   priceRangeOptions = PROPERTY_PRICE_RANGE_OPTIONS,
   propertyType,
+  sort = "newest",
   keyword
 }: Props) {
   const [selectedRegion, setSelectedRegion] = useState(region ?? "");
@@ -45,7 +47,7 @@ export function SearchFilters({
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <form action={action}>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             地方ブロック
             <select
@@ -133,7 +135,18 @@ export function SearchFilters({
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-4">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            並び順
+            <select name="sort" defaultValue={sort} className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring">
+              {PROPERTY_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-5">
             キーワード
             <input
               name="keyword"

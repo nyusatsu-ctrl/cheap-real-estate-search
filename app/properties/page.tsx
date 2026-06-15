@@ -23,6 +23,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         priceRange={filters.priceRange}
         priceRangeOptions={PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS}
         propertyType={filters.propertyType}
+        sort={filters.sort}
         keyword={filters.keyword}
       />
       <div className="mt-5 flex items-center justify-between">

@@ -1,13 +1,14 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sampleProperties } from "@/lib/sample-data";
 import { getRegionPrefectures } from "@/lib/property-filters";
-import type { Property, PropertyFilters, PropertyLocationOption } from "@/lib/types";
+import type { Property, PropertyFilters, PropertyLocationOption, PropertySort } from "@/lib/types";
 
 type PropertyQuery<T> = {
   eq: (column: string, value: string | number) => T;
   gte: (column: string, value: number) => T;
   lte: (column: string, value: number) => T;
   in: (column: string, values: readonly string[]) => T;
+  order: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => T;
 };
 
 export async function getPublishedProperties(filters: PropertyFilters = {}) {
@@ -20,10 +21,10 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
   let query = supabase
     .from("properties")
     .select("*")
-    .eq("status", "published")
-    .order("published_at", { ascending: false });
+    .eq("status", "published");
 
   query = applyServerFilters(query, filters);
+  query = applyServerSort(query, filters.sort);
 
   const { data, error } = await query;
   if (error) {
@@ -31,7 +32,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
     return getFallbackPublishedProperties(filters);
   }
 
-  return sanitizePublicListProperties(filterProperties((data ?? []) as Property[], filters));
+  return sanitizePublicListProperties(sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort));
 }
 
 export async function getPublishedPropertyLocations() {
@@ -96,21 +97,21 @@ export async function getPublishedProperty(id: string) {
 
 export async function getAdminProperties(filters: PropertyFilters = {}) {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return filterProperties(sampleProperties, filters);
+  if (!supabase) return sortProperties(filterProperties(sampleProperties, filters), filters.sort);
 
   let query = supabase
     .from("properties")
-    .select("*, property_sources(name, website_url)")
-    .order("updated_at", { ascending: false });
+    .select("*, property_sources(name, website_url)");
 
   query = applyServerFilters(query, filters);
+  query = applyServerSort(query, filters.sort);
 
   const { data, error } = await query;
   if (error) {
     logPropertyQueryError("admin properties", error);
-    return filterProperties(sampleProperties, filters);
+    return sortProperties(filterProperties(sampleProperties, filters), filters.sort);
   }
-  return filterProperties((data ?? []) as Property[], filters);
+  return sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort);
 }
 
 export async function getAdminProperty(id: string) {
@@ -143,7 +144,7 @@ function filterProperties(properties: Property[], filters: PropertyFilters) {
 }
 
 function getFallbackPublishedProperties(filters: PropertyFilters) {
-  return sanitizePublicListProperties(filterProperties(sampleProperties.filter((property) => property.status === "published"), filters));
+  return sanitizePublicListProperties(sortProperties(filterProperties(sampleProperties.filter((property) => property.status === "published"), filters), filters.sort));
 }
 
 function getFallbackPropertyLocations(publishedOnly: boolean) {
@@ -168,6 +169,80 @@ function matchesKeyword(property: Property, keyword: string) {
   ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(keyword));
+}
+
+function applyServerSort<T extends PropertyQuery<T>>(query: T, sort: PropertySort = "newest"): T {
+  if (sort === "source-newest") {
+    return applyNewestTieBreakers(query.order("source_published_at", { ascending: false, nullsFirst: false }), { includeSourcePublishedAt: false });
+  }
+
+  if (sort === "price-asc") {
+    return applyNewestTieBreakers(query.order("price_yen", { ascending: true, nullsFirst: false }));
+  }
+
+  if (sort === "price-desc") {
+    return applyNewestTieBreakers(query.order("price_yen", { ascending: false, nullsFirst: false }));
+  }
+
+  return applyNewestTieBreakers(query);
+}
+
+function applyNewestTieBreakers<T extends PropertyQuery<T>>(query: T, options: { includeSourcePublishedAt?: boolean } = {}): T {
+  const includeSourcePublishedAt = options.includeSourcePublishedAt ?? true;
+  let sorted = query.order("first_detected_at", { ascending: false, nullsFirst: false });
+  if (includeSourcePublishedAt) {
+    sorted = sorted.order("source_published_at", { ascending: false, nullsFirst: false });
+  }
+  return sorted
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false, nullsFirst: false });
+}
+
+function sortProperties(properties: Property[], sort: PropertySort = "newest") {
+  return [...properties].sort((a, b) => compareProperties(a, b, sort));
+}
+
+function compareProperties(a: Property, b: Property, sort: PropertySort) {
+  if (sort === "source-newest") {
+    return compareDateDesc(a.source_published_at, b.source_published_at)
+      || compareNewest(a, b, { includeSourcePublishedAt: false });
+  }
+
+  if (sort === "price-asc") {
+    return compareNumberAsc(a.price_yen, b.price_yen) || compareNewest(a, b);
+  }
+
+  if (sort === "price-desc") {
+    return compareNumberDesc(a.price_yen, b.price_yen) || compareNewest(a, b);
+  }
+
+  return compareNewest(a, b);
+}
+
+function compareNewest(a: Property, b: Property, options: { includeSourcePublishedAt?: boolean } = {}) {
+  const includeSourcePublishedAt = options.includeSourcePublishedAt ?? true;
+  return compareDateDesc(a.first_detected_at, b.first_detected_at)
+    || (includeSourcePublishedAt ? compareDateDesc(a.source_published_at, b.source_published_at) : 0)
+    || compareDateDesc(a.updated_at, b.updated_at)
+    || compareDateDesc(a.created_at, b.created_at);
+}
+
+function compareDateDesc(a?: string | null, b?: string | null) {
+  return toTime(b) - toTime(a);
+}
+
+function compareNumberAsc(a: number, b: number) {
+  return a - b;
+}
+
+function compareNumberDesc(a: number, b: number) {
+  return b - a;
+}
+
+function toTime(value?: string | null) {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
 }
 
 function sanitizePublicListProperties(properties: Property[]) {
@@ -211,6 +286,7 @@ function sanitizePublicProperty(property: Property, { keepSourceUrl }: { keepSou
     publication_permission: property.publication_permission,
     status: property.status,
     published_at: property.published_at,
+    created_at: property.created_at ?? null,
     updated_at: property.updated_at,
     property_sources: null,
     property_images: []

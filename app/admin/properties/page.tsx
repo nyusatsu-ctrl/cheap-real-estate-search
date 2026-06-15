@@ -39,6 +39,7 @@ export default async function AdminPropertiesPage({ searchParams }: { searchPara
           city={filters.city}
           priceRange={filters.priceRange}
           propertyType={filters.propertyType}
+          sort={filters.sort}
           keyword={filters.keyword}
         />
         <p className="mt-3 text-sm font-semibold text-slate-700">{properties.length}件</p>

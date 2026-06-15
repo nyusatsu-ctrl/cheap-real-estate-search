@@ -62,10 +62,13 @@ export type Property = {
   publication_permission: PublicationPermission;
   status: PropertyStatus;
   published_at: string | null;
+  created_at?: string | null;
   updated_at: string;
   property_sources?: Pick<PropertySource, "name" | "website_url"> | null;
   property_images?: PropertyImage[];
 };
+
+export type PropertySort = "newest" | "source-newest" | "price-asc" | "price-desc";
 
 export type PropertyFilters = {
   region?: string;
@@ -75,6 +78,7 @@ export type PropertyFilters = {
   maxPrice?: number;
   propertyType?: PropertyCategory;
   priceRange?: string;
+  sort?: PropertySort;
   keyword?: string;
 };
 

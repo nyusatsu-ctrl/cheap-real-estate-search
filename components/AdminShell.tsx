@@ -13,7 +13,7 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-500">格安不動産サーチ 管理画面</p>
-          <h1 className="text-2xl font-black text-slate-950">物件管理システム</h1>
+          <h1 className="text-2xl font-black text-slate-950">格安不動産サーチ</h1>
           <p className="mt-1 text-xs text-slate-500">{email}</p>
         </div>
         <div className="flex items-center gap-2">

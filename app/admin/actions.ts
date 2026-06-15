@@ -36,7 +36,7 @@ export async function signInAction(formData: FormData) {
     });
   }
 
-  redirect("/admin/diagnoses");
+  redirect("/admin/properties");
 }
 
 export async function signOutAction() {

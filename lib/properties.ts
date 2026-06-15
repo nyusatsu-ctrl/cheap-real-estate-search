@@ -19,7 +19,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
 
   let query = supabase
     .from("properties")
-    .select("*, property_sources(name, website_url), property_images(*)")
+    .select("*")
     .eq("status", "published")
     .order("published_at", { ascending: false });
 
@@ -31,7 +31,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
     return getFallbackPublishedProperties(filters);
   }
 
-  return filterProperties((data ?? []) as Property[], filters);
+  return sanitizePublicListProperties(filterProperties((data ?? []) as Property[], filters));
 }
 
 export async function getPublishedPropertyLocations() {
@@ -84,7 +84,7 @@ export async function getPublishedProperty(id: string) {
 
   const { data, error } = await supabase
     .from("properties")
-    .select("*, property_sources(name, website_url), property_images(*)")
+    .select("*, property_images(*)")
     .eq("id", id)
     .eq("status", "published")
     .single();
@@ -142,7 +142,7 @@ function filterProperties(properties: Property[], filters: PropertyFilters) {
 }
 
 function getFallbackPublishedProperties(filters: PropertyFilters) {
-  return filterProperties(sampleProperties.filter((property) => property.status === "published"), filters);
+  return sanitizePublicListProperties(filterProperties(sampleProperties.filter((property) => property.status === "published"), filters));
 }
 
 function getFallbackPropertyLocations(publishedOnly: boolean) {
@@ -167,6 +167,15 @@ function matchesKeyword(property: Property, keyword: string) {
   ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(keyword));
+}
+
+function sanitizePublicListProperties(properties: Property[]) {
+  return properties.map((property) => ({
+    ...property,
+    source_url: "",
+    property_sources: null,
+    property_images: []
+  }));
 }
 
 function uniqueLocations(properties: Pick<Property, "prefecture" | "city">[]) {

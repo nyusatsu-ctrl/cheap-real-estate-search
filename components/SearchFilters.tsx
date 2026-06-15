@@ -122,7 +122,7 @@ export function SearchFilters({ action = "/properties", locations, region, prefe
             <input
               name="keyword"
               defaultValue={keyword ?? ""}
-              placeholder="空き家、山林、市区町村、元サイト名など"
+              placeholder="空き家、山林、市区町村など"
               className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
             />
           </label>

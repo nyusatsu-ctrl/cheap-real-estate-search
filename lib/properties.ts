@@ -163,9 +163,7 @@ function matchesKeyword(property: Property, keyword: string) {
     property.prefecture,
     property.city,
     property.address_display,
-    property.property_sources?.name,
-    property.source_url,
-    property.remarks
+    getPropertyCategory(property)
   ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(keyword));

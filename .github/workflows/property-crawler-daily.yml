@@ -34,13 +34,13 @@ jobs:
         run: npm ci
 
       - name: Crawl zero-estate candidates
-        run: npm run crawl:properties -- --source=zero-estate --limit=30 --commit
+        run: npm run crawl:properties -- --source=zero-estate --limit=30 --commit --auto-publish-safe
 
       - name: Crawl akisol-zero candidates
-        run: npm run crawl:properties -- --source=akisol-zero --limit=30 --commit
+        run: npm run crawl:properties -- --source=akisol-zero --limit=30 --commit --auto-publish-safe
 
       - name: Crawl zenkoku-zero-fudosan candidates
-        run: npm run crawl:properties -- --source=zenkoku-zero-fudosan --limit=30 --commit
+        run: npm run crawl:properties -- --source=zenkoku-zero-fudosan --limit=30 --commit --auto-publish-safe
 
       - name: Crawl kumamoto-akiya candidates
-        run: npm run crawl:properties -- --source=kumamoto-akiya --limit=30 --commit
+        run: npm run crawl:properties -- --source=kumamoto-akiya --limit=30 --commit --auto-publish-safe

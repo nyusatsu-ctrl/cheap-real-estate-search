@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CalendarDays, Home, MapPin, Ruler } from "lucide-react";
+import { CalendarDays, MapPin, Ruler } from "lucide-react";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatArea, formatDate, formatPrice } from "@/lib/format";
 import type { Property } from "@/lib/types";
@@ -87,10 +87,6 @@ export function PropertyCard({ property }: { property: Property }) {
               元サイト掲載日 {formatDate(property.source_published_at ?? property.listed_at ?? null)}
             </p>
           ) : null}
-          <p className="flex items-center gap-2">
-            <Home className="h-4 w-4 text-slate-400" />
-            情報元 {property.property_sources?.name ?? "未設定"}
-          </p>
         </div>
       </Link>
     </article>

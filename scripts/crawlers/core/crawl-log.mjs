@@ -11,6 +11,10 @@ export function createRunResult(source) {
     failed: 0,
     inserted: 0,
     updated: 0,
+    autoPublished: 0,
+    keptPending: 0,
+    duplicatesUpdated: 0,
+    rejectedByRule: 0,
     robots: null
   };
 }
@@ -66,6 +70,9 @@ export function printSourceResult(result, options = {}) {
     console.log(`ERROR ${error.errorType}: ${error.message}${error.url ? ` (${error.url})` : ""}`);
   }
   console.log(`Found: ${result.found} / Candidates: ${result.candidates.length} / Skipped: ${result.skipped} / Failed: ${result.failed}`);
+  console.log(
+    `Saved: inserted=${result.inserted} updated=${result.updated} autoPublished=${result.autoPublished} keptPending=${result.keptPending} duplicatesUpdated=${result.duplicatesUpdated} rejectedByRule=${result.rejectedByRule}`
+  );
   if (options.verbose) {
     printVerboseCandidateTable(result);
   } else {

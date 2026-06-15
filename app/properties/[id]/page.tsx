@@ -50,8 +50,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             ["アプリ検知日", formatDate(property.first_detected_at ?? null)],
             ["元サイト掲載日", formatDate(property.source_published_at ?? property.listed_at ?? null)],
             ["最終確認日", formatDate(property.last_checked_at ?? null)],
-            ["情報元", property.property_sources?.name ?? "未設定"],
-            ["掲載許諾", property.publication_permission],
             ["公開状態", "公開中"]
           ].map(([label, value]) => (
             <div key={label} className="grid grid-cols-[8rem_1fr] border-b border-slate-200 last:border-b-0 sm:border-r">
@@ -62,9 +60,14 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         </dl>
 
         <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-bold text-slate-700">元ページURL</p>
-          <a href={property.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex break-all text-sm font-semibold text-brand-700 hover:underline">
-            {property.source_url}
+          <p className="text-sm font-bold text-slate-700">掲載元ページ</p>
+          <a
+            href={property.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center gap-2 rounded bg-brand-700 px-4 py-3 text-sm font-bold text-white focus-ring"
+          >
+            掲載元で確認
             <ExternalLink className="ml-1 h-4 w-4 shrink-0" />
           </a>
         </div>

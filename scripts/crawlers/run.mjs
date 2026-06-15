@@ -107,6 +107,7 @@ const args = parseArgs(process.argv.slice(2));
 const jsonOutput = args.json === true;
 const verbose = args.verbose === true;
 const commit = args.commit === true && !jsonOutput;
+const autoPublishSafe = commit && args["auto-publish-safe"] === true;
 const limit = toPositiveInteger(args.limit, DEFAULT_LIMIT);
 const sourceFilter = typeof args.source === "string" ? args.source : "all";
 
@@ -128,10 +129,25 @@ async function main() {
     console.log(`Sources: ${sources.map((source) => source.id).join(", ")}`);
     console.log(`Limit per source: ${limit}`);
     if (!commit) console.log("DB保存: なし (--commit がないため)");
-    if (commit) console.log("DB保存: draft / pending として保存します。published にはしません。");
+    if (commit && autoPublishSafe) {
+      console.log("DB保存: 安全条件を満たす新規物件だけ自動公開し、それ以外は draft / pending に残します。");
+    } else if (commit) {
+      console.log("DB保存: draft / pending として保存します。published にはしません。");
+    }
   }
 
-  const totals = { found: 0, candidates: 0, inserted: 0, updated: 0, skipped: 0, failed: 0 };
+  const totals = {
+    found: 0,
+    candidates: 0,
+    inserted: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    autoPublished: 0,
+    keptPending: 0,
+    duplicatesUpdated: 0,
+    rejectedByRule: 0
+  };
   const results = [];
 
   for (const source of sources) {
@@ -143,6 +159,10 @@ async function main() {
     totals.updated += result.updated ?? 0;
     totals.skipped += result.skipped;
     totals.failed += result.failed;
+    totals.autoPublished += result.autoPublished ?? 0;
+    totals.keptPending += result.keptPending ?? 0;
+    totals.duplicatesUpdated += result.duplicatesUpdated ?? 0;
+    totals.rejectedByRule += result.rejectedByRule ?? 0;
     if (!jsonOutput) {
       printSourceResult(result, { verbose });
       console.log("");
@@ -155,7 +175,7 @@ async function main() {
     console.log(JSON.stringify(diagnostics, null, 2));
   } else {
     console.log(
-      `Completed. sources=${sources.length} found=${totals.found} candidates=${totals.candidates} inserted=${totals.inserted} updated=${totals.updated} skipped=${totals.skipped} failed=${totals.failed}`
+      `Completed. sources=${sources.length} found=${totals.found} candidates=${totals.candidates} inserted=${totals.inserted} updated=${totals.updated} skipped=${totals.skipped} failed=${totals.failed} autoPublished=${totals.autoPublished} keptPending=${totals.keptPending} duplicatesUpdated=${totals.duplicatesUpdated} rejectedByRule=${totals.rejectedByRule}`
     );
   }
 }
@@ -199,11 +219,17 @@ async function runSource(source) {
         skipped: result.skipped,
         failed: result.failed,
         errors: result.errors,
-        startedAt: result.startedAt
+        startedAt: result.startedAt,
+        autoPublishSafe,
+        robotsStatus: result.robots?.status ?? null
       });
       result.inserted = saved.inserted;
       result.updated = saved.updated;
       result.failed += saved.failed ?? 0;
+      result.autoPublished = saved.autoPublished ?? 0;
+      result.keptPending = saved.keptPending ?? 0;
+      result.duplicatesUpdated = saved.duplicatesUpdated ?? 0;
+      result.rejectedByRule = saved.rejectedByRule ?? 0;
     } catch (error) {
       result.failed += 1;
       result.errors.push(formatCrawlerError(error, { sourceKey: source.id, url: source.listUrl }));

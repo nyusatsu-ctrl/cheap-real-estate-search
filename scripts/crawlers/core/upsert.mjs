@@ -2,9 +2,31 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
+const AUTO_PUBLISH_EXCLUDED_TITLE_WORDS = [
+  "成約済",
+  "売却済",
+  "受付終了",
+  "募集終了",
+  "掲載終了",
+  "取引終了",
+  "終了しました",
+  "商談中",
+  "商談成立",
+  "交渉中",
+  "交渉終了"
+];
+
+const UNCONFIRMED_LOCATION_VALUES = new Set([
+  "",
+  "不明",
+  "未確認",
+  "都道府県未確認",
+  "市区町村未確認"
+]);
+
 export async function upsertCandidates({ source, candidates, commit }) {
   if (!commit) {
-    return { inserted: 0, updated: 0, skipped: candidates.length };
+    return createSaveCounts({ skipped: candidates.length });
   }
 
   return persistCrawlResult({ source, candidates, commit });
@@ -18,33 +40,47 @@ export async function persistCrawlResult({
   skipped = 0,
   failed = 0,
   errors = [],
-  startedAt = new Date().toISOString()
+  startedAt = new Date().toISOString(),
+  autoPublishSafe = false,
+  robotsStatus = null
 }) {
   if (!commit) {
-    return { inserted: 0, updated: 0, skipped: candidates.length, failed: 0 };
+    return createSaveCounts({ skipped: candidates.length });
   }
 
   loadEnvFile(".env.local");
   const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const propertySourceId = await ensurePropertySource(supabase, source);
-  const crawlerSourceId = await ensureCrawlerSourceIfAvailable(supabase, source);
+  const runtimeSource = { ...source, robotsStatus: robotsStatus ?? source.robotsStatus };
+  const propertySourceId = await ensurePropertySource(supabase, runtimeSource);
+  const crawlerSourceId = await ensureCrawlerSourceIfAvailable(supabase, runtimeSource);
   const runId = await createCrawlRun(supabase, {
-    source,
+    source: runtimeSource,
     crawlerSourceId,
     startedAt,
     found,
-    candidates: candidates.length
+    candidates: candidates.length,
+    autoPublishSafe
   });
   let inserted = 0;
   let updated = 0;
   let saveFailed = 0;
+  let autoPublished = 0;
+  let keptPending = 0;
+  let duplicatesUpdated = 0;
+  let rejectedByRule = 0;
 
   for (const candidate of candidates) {
     try {
-      const existing = await findExistingProperty(supabase, candidate);
+      const existing = await findExistingProperty(supabase, candidate, { crawlerSourceId });
       const now = new Date().toISOString();
       const changedFields = existing ? getChangedFields(existing, candidate) : [];
       const contentChanged = Boolean(existing?.content_hash && existing.content_hash !== candidate.content_hash);
+      const autoPublishDecision = evaluateAutoPublishCandidate(candidate, {
+        source: runtimeSource,
+        robotsStatus,
+        autoPublishSafe,
+        isDuplicateUpdate: Boolean(existing?.id)
+      });
       const payload = buildPropertyPayload({
         candidate,
         propertySourceId,
@@ -52,7 +88,8 @@ export async function persistCrawlResult({
         existing,
         now,
         changedFields,
-        contentChanged
+        contentChanged,
+        autoPublishDecision
       });
       let propertyId = existing?.id ?? null;
 
@@ -66,6 +103,7 @@ export async function persistCrawlResult({
         if (error) throw new Error(error.message);
         propertyId = data.id;
         updated += 1;
+        duplicatesUpdated += 1;
       } else {
         const { data, error } = await supabase
           .from("properties")
@@ -75,6 +113,12 @@ export async function persistCrawlResult({
         if (error) throw new Error(error.message);
         propertyId = data.id;
         inserted += 1;
+        if (autoPublishDecision.canAutoPublish) {
+          autoPublished += 1;
+        } else {
+          keptPending += 1;
+          if (autoPublishSafe) rejectedByRule += 1;
+        }
       }
 
       await insertSnapshot(supabase, {
@@ -83,12 +127,14 @@ export async function persistCrawlResult({
         runId,
         crawlerSourceId,
         operation: existing?.id ? "update" : "insert",
-        changedFields
+        changedFields,
+        autoPublishDecision,
+        duplicateUpdated: Boolean(existing?.id)
       });
     } catch (error) {
       saveFailed += 1;
       await insertCrawlError(supabase, {
-        source,
+        source: runtimeSource,
         crawlerSourceId,
         runId,
         url: candidate.source_url,
@@ -100,7 +146,7 @@ export async function persistCrawlResult({
 
   for (const error of errors) {
     await insertCrawlError(supabase, {
-      source,
+      source: runtimeSource,
       crawlerSourceId,
       runId,
       url: error.url,
@@ -119,10 +165,24 @@ export async function persistCrawlResult({
     updated,
     skipped,
     failed: totalFailed,
-    status: statusForRun({ inserted, updated, skipped, failed: totalFailed, errors })
+    status: statusForRun({ inserted, updated, skipped, failed: totalFailed, errors }),
+    autoPublishSafe,
+    autoPublished,
+    keptPending,
+    duplicatesUpdated,
+    rejectedByRule
   });
 
-  return { inserted, updated, skipped, failed: saveFailed };
+  return createSaveCounts({
+    inserted,
+    updated,
+    skipped,
+    failed: saveFailed,
+    autoPublished,
+    keptPending,
+    duplicatesUpdated,
+    rejectedByRule
+  });
 }
 
 async function ensurePropertySource(supabase, source) {
@@ -177,10 +237,11 @@ async function ensureCrawlerSourceIfAvailable(supabase, source) {
   return data.id;
 }
 
-async function findExistingProperty(supabase, candidate) {
+async function findExistingProperty(supabase, candidate, { crawlerSourceId = null } = {}) {
   const selectColumns = [
     "id",
     "title",
+    "title_normalized",
     "price_yen",
     "prefecture",
     "city",
@@ -194,33 +255,203 @@ async function findExistingProperty(supabase, candidate) {
     "status",
     "publication_permission",
     "published_at",
+    "crawler_source_id",
+    "source_external_id",
+    "duplicate_key",
     "first_detected_at",
     "last_changed_at",
     "content_hash",
     "previous_snapshot_hash"
   ].join(",");
 
-  const byUrl = await supabase
-    .from("properties")
-    .select(selectColumns)
-    .eq("source_url", candidate.source_url)
-    .limit(1)
-    .maybeSingle();
-  if (byUrl.error) throw new Error(byUrl.error.message);
-  if (byUrl.data) return byUrl.data;
+  const byUrl = await selectFirstProperty(
+    supabase.from("properties").select(selectColumns).eq("source_url", candidate.source_url)
+  );
+  if (byUrl) return byUrl;
 
-  const byDuplicate = await supabase
-    .from("properties")
-    .select(selectColumns)
-    .eq("duplicate_key", candidate.duplicate_key)
-    .limit(1)
-    .maybeSingle();
-  if (byDuplicate.error) return null;
-  return byDuplicate.data ?? null;
+  if (candidate.source_external_id) {
+    if (crawlerSourceId) {
+      const byExternalAndCrawler = await selectFirstProperty(
+        supabase
+          .from("properties")
+          .select(selectColumns)
+          .eq("source_external_id", candidate.source_external_id)
+          .eq("crawler_source_id", crawlerSourceId)
+      );
+      if (byExternalAndCrawler) return byExternalAndCrawler;
+    }
+
+    const byExternal = await selectFirstProperty(
+      supabase.from("properties").select(selectColumns).eq("source_external_id", candidate.source_external_id)
+    );
+    if (byExternal) return byExternal;
+  }
+
+  if (candidate.duplicate_key) {
+    const byDuplicate = await selectFirstProperty(
+      supabase.from("properties").select(selectColumns).eq("duplicate_key", candidate.duplicate_key)
+    );
+    if (byDuplicate) return byDuplicate;
+  }
+
+  return findNearDuplicateProperty(supabase, candidate, selectColumns);
 }
 
-function buildPropertyPayload({ candidate, propertySourceId, crawlerSourceId, existing, now, changedFields, contentChanged }) {
+async function selectFirstProperty(query) {
+  const { data, error } = await query.limit(1);
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] ?? null : data ?? null;
+}
+
+async function findNearDuplicateProperty(supabase, candidate, selectColumns) {
+  if (!candidate.prefecture || !candidate.city || candidate.price_yen === null || candidate.price_yen === undefined) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("properties")
+    .select(selectColumns)
+    .eq("prefecture", candidate.prefecture)
+    .eq("city", candidate.city)
+    .eq("price_yen", candidate.price_yen)
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+
+  const possibleMatches = Array.isArray(data) ? data : [];
+  return (
+    possibleMatches.find((property) => isLocationDuplicate(property, candidate)) ??
+    possibleMatches.find((property) => isTitleDuplicate(property, candidate)) ??
+    null
+  );
+}
+
+function isLocationDuplicate(existing, candidate) {
+  return addressesLookSame(existing, candidate) && areasLookClose(existing, candidate);
+}
+
+function isTitleDuplicate(existing, candidate) {
+  return titlesLookSimilar(existing.title_normalized ?? existing.title, candidate.title_normalized ?? candidate.title) && areasLookClose(existing, candidate);
+}
+
+function addressesLookSame(existing, candidate) {
+  const current = normalizeAddressForDuplicate(existing.address_display, existing.prefecture, existing.city);
+  const next = normalizeAddressForDuplicate(candidate.address_display, candidate.prefecture, candidate.city);
+  if (!current || !next) return false;
+  return current === next || current.includes(next) || next.includes(current);
+}
+
+function areasLookClose(existing, candidate) {
+  return areaValueClose(existing.land_area_m2, candidate.land_area_m2) && areaValueClose(existing.building_area_m2, candidate.building_area_m2);
+}
+
+function areaValueClose(current, next) {
+  if (current === null || current === undefined || current === "" || next === null || next === undefined || next === "") return true;
+  const currentNumber = Number(current);
+  const nextNumber = Number(next);
+  if (!Number.isFinite(currentNumber) || !Number.isFinite(nextNumber)) return true;
+  return Math.abs(currentNumber - nextNumber) <= 1;
+}
+
+function normalizeAddressForDuplicate(value, prefecture, city) {
+  const normalized = normalizeDuplicateText(value)
+    .replace(normalizeDuplicateText(prefecture), "")
+    .replace(normalizeDuplicateText(city), "");
+  return normalized.length >= 3 ? normalized : "";
+}
+
+function titlesLookSimilar(current, next) {
+  const currentTitle = normalizeDuplicateText(current);
+  const nextTitle = normalizeDuplicateText(next);
+  if (!currentTitle || !nextTitle) return false;
+  if (currentTitle === nextTitle) return true;
+  if (currentTitle.length >= 10 && nextTitle.length >= 10 && (currentTitle.includes(nextTitle) || nextTitle.includes(currentTitle))) {
+    return true;
+  }
+  return diceCoefficient(currentTitle, nextTitle) >= 0.72;
+}
+
+function diceCoefficient(current, next) {
+  const currentBigrams = buildBigrams(current);
+  const nextBigrams = buildBigrams(next);
+  if (currentBigrams.length === 0 || nextBigrams.length === 0) return 0;
+
+  const counts = new Map();
+  for (const bigram of currentBigrams) counts.set(bigram, (counts.get(bigram) ?? 0) + 1);
+
+  let overlap = 0;
+  for (const bigram of nextBigrams) {
+    const count = counts.get(bigram) ?? 0;
+    if (count <= 0) continue;
+    overlap += 1;
+    counts.set(bigram, count - 1);
+  }
+
+  return (2 * overlap) / (currentBigrams.length + nextBigrams.length);
+}
+
+function buildBigrams(value) {
+  const chars = [...value];
+  if (chars.length < 2) return chars;
+  return chars.slice(0, -1).map((char, index) => `${char}${chars[index + 1]}`);
+}
+
+function normalizeDuplicateText(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[【】［］\[\]（）()「」『』"'’‘“”`´〜~・,\s、。./／\\|｜:：;；\-−ー―_＿]/g, "")
+    .trim();
+}
+
+function evaluateAutoPublishCandidate(candidate, { source, robotsStatus, autoPublishSafe, isDuplicateUpdate }) {
+  const reasons = [];
+
+  if (!autoPublishSafe) reasons.push("auto_publish_safe_disabled");
+  if (isDuplicateUpdate) reasons.push("duplicate_or_existing");
+  if (source.crawlPolicy === "manual_only" || source.crawlPolicy === "disallow") reasons.push(`crawl_policy_${source.crawlPolicy}`);
+  if (robotsStatus === "disallowed") reasons.push("robots_disallowed");
+  if (!Number.isFinite(candidate.price_yen) || candidate.price_yen < 0 || candidate.price_yen > 3000000) reasons.push("price_out_of_range");
+  if (isUnconfirmedLocation(candidate.prefecture)) reasons.push("prefecture_missing");
+  if (isUnconfirmedLocation(candidate.city)) reasons.push("city_missing");
+  if (!isValidHttpUrl(candidate.source_url)) reasons.push("source_url_invalid");
+  if (!candidate.property_type || candidate.property_type === "unknown") reasons.push("property_type_unknown");
+  if (!candidate.property_category || candidate.property_category === "unknown") reasons.push("property_category_unknown");
+  if (!candidate.duplicate_key) reasons.push("duplicate_key_missing");
+  if (!candidate.content_hash) reasons.push("content_hash_missing");
+  if ((candidate.parse_warnings ?? []).length > 0) reasons.push("parse_warning");
+  if (AUTO_PUBLISH_EXCLUDED_TITLE_WORDS.some((word) => String(candidate.title ?? "").includes(word))) reasons.push("excluded_title_word");
+
+  return {
+    canAutoPublish: reasons.length === 0,
+    reasons
+  };
+}
+
+function isUnconfirmedLocation(value) {
+  return UNCONFIRMED_LOCATION_VALUES.has(String(value ?? "").trim());
+}
+
+function isValidHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function buildPropertyPayload({
+  candidate,
+  propertySourceId,
+  crawlerSourceId,
+  existing,
+  now,
+  changedFields,
+  contentChanged,
+  autoPublishDecision
+}) {
   const isExisting = Boolean(existing?.id);
+  const shouldAutoPublishNew = !isExisting && autoPublishDecision?.canAutoPublish;
   return {
     title: candidate.title,
     property_type: candidate.property_type,
@@ -249,9 +480,9 @@ function buildPropertyPayload({ candidate, propertySourceId, crawlerSourceId, ex
     price_band: candidate.price_band,
     risk_tags: candidate.risk_tags,
     remarks: candidate.remarks,
-    publication_permission: isExisting ? existing.publication_permission ?? "pending" : "pending",
-    status: isExisting ? existing.status ?? "draft" : "draft",
-    published_at: isExisting ? existing.published_at ?? null : null,
+    publication_permission: isExisting ? existing.publication_permission ?? "pending" : shouldAutoPublishNew ? "permitted" : "pending",
+    status: isExisting ? existing.status ?? "draft" : shouldAutoPublishNew ? "published" : "draft",
+    published_at: isExisting ? existing.published_at ?? null : shouldAutoPublishNew ? now : null,
     crawler_source_id: crawlerSourceId,
     source_external_id: candidate.source_external_id,
     source_listing_url: candidate.source_listing_url,
@@ -261,11 +492,11 @@ function buildPropertyPayload({ candidate, propertySourceId, crawlerSourceId, ex
     duplicate_key: candidate.duplicate_key,
     content_hash: candidate.content_hash,
     changed_fields: changedFields,
-    crawl_status: isExisting ? "checked" : "candidate"
+    crawl_status: isExisting || shouldAutoPublishNew ? "checked" : "candidate"
   };
 }
 
-async function createCrawlRun(supabase, { source, crawlerSourceId, startedAt, found, candidates }) {
+async function createCrawlRun(supabase, { source, crawlerSourceId, startedAt, found, candidates, autoPublishSafe }) {
   const { data, error } = await supabase
     .from("property_crawl_runs")
     .insert({
@@ -275,7 +506,10 @@ async function createCrawlRun(supabase, { source, crawlerSourceId, startedAt, fo
       status: "running",
       started_at: startedAt,
       found_count: found,
-      candidate_count: candidates
+      candidate_count: candidates,
+      metadata: {
+        autoPublishSafe
+      }
     })
     .select("id")
     .single();
@@ -283,7 +517,21 @@ async function createCrawlRun(supabase, { source, crawlerSourceId, startedAt, fo
   return data.id;
 }
 
-async function finishCrawlRun(supabase, { runId, found, candidates, inserted, updated, skipped, failed, status }) {
+async function finishCrawlRun(supabase, {
+  runId,
+  found,
+  candidates,
+  inserted,
+  updated,
+  skipped,
+  failed,
+  status,
+  autoPublishSafe,
+  autoPublished,
+  keptPending,
+  duplicatesUpdated,
+  rejectedByRule
+}) {
   const { error } = await supabase
     .from("property_crawl_runs")
     .update({
@@ -294,13 +542,29 @@ async function finishCrawlRun(supabase, { runId, found, candidates, inserted, up
       inserted_count: inserted,
       updated_count: updated,
       skipped_count: skipped,
-      failed_count: failed
+      failed_count: failed,
+      metadata: {
+        autoPublishSafe,
+        autoPublished,
+        keptPending,
+        duplicatesUpdated,
+        rejectedByRule
+      }
     })
     .eq("id", runId);
   if (error) throw new Error(error.message);
 }
 
-async function insertSnapshot(supabase, { candidate, propertyId, runId, crawlerSourceId, operation, changedFields }) {
+async function insertSnapshot(supabase, {
+  candidate,
+  propertyId,
+  runId,
+  crawlerSourceId,
+  operation,
+  changedFields,
+  autoPublishDecision,
+  duplicateUpdated
+}) {
   const { error } = await supabase.from("property_snapshots").insert({
     property_id: propertyId,
     crawl_run_id: runId,
@@ -325,6 +589,8 @@ async function insertSnapshot(supabase, { candidate, propertyId, runId, crawlerS
     summary: {
       operation,
       changedFields,
+      autoPublishDecision,
+      duplicateUpdated,
       priceBand: candidate.price_band,
       riskTags: candidate.risk_tags,
       transactionType: candidate.transaction_type
@@ -381,6 +647,20 @@ function normalizeComparable(value) {
     return Number(value).toFixed(2);
   }
   return String(value).replace(/\s+/g, " ").trim();
+}
+
+function createSaveCounts(overrides = {}) {
+  return {
+    inserted: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    autoPublished: 0,
+    keptPending: 0,
+    duplicatesUpdated: 0,
+    rejectedByRule: 0,
+    ...overrides
+  };
 }
 
 function loadEnvFile(fileName) {

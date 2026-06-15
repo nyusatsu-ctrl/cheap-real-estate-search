@@ -2,6 +2,11 @@ import { PREFECTURES, PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS } fr
 import type { PropertyCategory, PropertyFilters, PropertyLocationOption } from "@/lib/types";
 
 type SearchParamValue = string | string[] | undefined;
+type PriceRangeOption = {
+  value: string;
+  minPrice?: number;
+  maxPrice?: number;
+};
 
 export type PropertySearchParams = {
   region?: SearchParamValue;
@@ -14,9 +19,11 @@ export type PropertySearchParams = {
   maxPrice?: SearchParamValue;
 };
 
-export function normalizePropertyFilters(params: PropertySearchParams): PropertyFilters {
-  const priceRange = firstString(params.priceRange);
-  const priceBounds = getPriceRangeBounds(priceRange);
+export function normalizePropertyFilters(params: PropertySearchParams, options: { priceRangeOptions?: readonly PriceRangeOption[] } = {}): PropertyFilters {
+  const priceRangeOptions = options.priceRangeOptions ?? PROPERTY_PRICE_RANGE_OPTIONS;
+  const requestedPriceRange = firstString(params.priceRange);
+  const priceBounds = getPriceRangeBounds(requestedPriceRange, priceRangeOptions);
+  const priceRange = priceBounds.option ? requestedPriceRange : undefined;
   const minPrice = priceBounds.minPrice ?? parseOptionalNumber(firstString(params.minPrice));
   const maxPrice = priceBounds.maxPrice ?? parseOptionalNumber(firstString(params.maxPrice));
 
@@ -38,9 +45,10 @@ export function getRegionPrefectures(region?: string): string[] {
   return prefectures ? [...prefectures] : PREFECTURES;
 }
 
-export function getPriceRangeBounds(priceRange?: string) {
-  const option = PROPERTY_PRICE_RANGE_OPTIONS.find((candidate) => candidate.value === priceRange);
+export function getPriceRangeBounds(priceRange?: string, options: readonly PriceRangeOption[] = PROPERTY_PRICE_RANGE_OPTIONS) {
+  const option = options.find((candidate) => candidate.value === priceRange);
   return {
+    option,
     minPrice: option?.minPrice,
     maxPrice: option?.maxPrice
   };

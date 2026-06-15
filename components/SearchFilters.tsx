@@ -6,6 +6,11 @@ import { PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_TYPE_LA
 import { getCityOptions, getRegionPrefectures } from "@/lib/property-filters";
 import type { PropertyLocationOption } from "@/lib/types";
 
+type PriceRangeOption = {
+  value: string;
+  label: string;
+};
+
 type Props = {
   action?: string;
   locations: PropertyLocationOption[];
@@ -13,11 +18,22 @@ type Props = {
   prefecture?: string;
   city?: string;
   priceRange?: string;
+  priceRangeOptions?: readonly PriceRangeOption[];
   propertyType?: string;
   keyword?: string;
 };
 
-export function SearchFilters({ action = "/properties", locations, region, prefecture, city, priceRange, propertyType, keyword }: Props) {
+export function SearchFilters({
+  action = "/properties",
+  locations,
+  region,
+  prefecture,
+  city,
+  priceRange,
+  priceRangeOptions = PROPERTY_PRICE_RANGE_OPTIONS,
+  propertyType,
+  keyword
+}: Props) {
   const [selectedRegion, setSelectedRegion] = useState(region ?? "");
   const [selectedPrefecture, setSelectedPrefecture] = useState(prefecture ?? "");
   const [selectedCity, setSelectedCity] = useState(city ?? "");
@@ -109,7 +125,7 @@ export function SearchFilters({ action = "/properties", locations, region, prefe
               className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
             >
               <option value="">指定なし</option>
-              {PROPERTY_PRICE_RANGE_OPTIONS.map((option) => (
+              {priceRangeOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

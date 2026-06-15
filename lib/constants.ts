@@ -151,6 +151,8 @@ export const PROPERTY_PRICE_RANGE_OPTIONS = [
   { value: "500-plus", label: "500万円以上", minPrice: 5000000, maxPrice: undefined }
 ] as const;
 
+export const PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS = PROPERTY_PRICE_RANGE_OPTIONS.filter((option) => option.value !== "500-plus");
+
 export const TENDER_TYPE_LABELS: Record<TenderType, string> = {
   goods: "物品",
   service: "役務",

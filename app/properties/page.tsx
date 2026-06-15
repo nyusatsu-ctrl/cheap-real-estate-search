@@ -1,11 +1,12 @@
 import { PropertyCard } from "@/components/PropertyCard";
 import { SearchFilters } from "@/components/SearchFilters";
+import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
 import { normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
 import { getPublishedProperties, getPublishedPropertyLocations } from "@/lib/properties";
 
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const resolvedSearchParams = await searchParams;
-  const filters = normalizePropertyFilters(resolvedSearchParams);
+  const filters = normalizePropertyFilters(resolvedSearchParams, { priceRangeOptions: PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS });
   const [properties, locations] = await Promise.all([getPublishedProperties(filters), getPublishedPropertyLocations()]);
 
   return (
@@ -20,6 +21,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         prefecture={filters.prefecture}
         city={filters.city}
         priceRange={filters.priceRange}
+        priceRangeOptions={PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS}
         propertyType={filters.propertyType}
         keyword={filters.keyword}
       />

@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "建設業売上アップ診断 管理者ログイン",
-  description: "建設業売上アップ診断の診断者情報とリード対応状況を管理するためのログイン画面です。"
+  title: "格安不動産サーチ 管理者ログイン",
+  description: "格安不動産サーチの物件情報と問い合わせ対応状況を管理するためのログイン画面です。"
 };
 
 export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
@@ -13,7 +13,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-bold text-brand-700">建設業売上アップ診断</p>
+        <p className="text-sm font-bold text-brand-700">格安不動産サーチ</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
         <p className="mt-2 text-sm text-slate-600">診断者情報とリード対応状況を管理するアカウントでログインしてください。</p>
         {!hasSupabaseEnv() ? (

@@ -173,7 +173,10 @@ async function getRawCrawlerCandidates(): Promise<CrawlerCandidate[]> {
     .order("updated_at", { ascending: false })
     .limit(3000);
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error(`[crawler-candidates] Failed to load crawler candidates: ${error.message}`);
+    return [];
+  }
 
   return ((data ?? []) as unknown as CrawlerCandidate[]).filter(isCrawlerCandidate);
 }

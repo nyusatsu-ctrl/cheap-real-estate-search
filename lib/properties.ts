@@ -14,7 +14,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    return filterProperties(sampleProperties.filter((property) => property.status === "published"), filters);
+    return getFallbackPublishedProperties(filters);
   }
 
   let query = supabase
@@ -26,7 +26,10 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
   query = applyServerFilters(query, filters);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    logPropertyQueryError("published properties", error);
+    return getFallbackPublishedProperties(filters);
+  }
 
   return filterProperties((data ?? []) as Property[], filters);
 }
@@ -50,7 +53,10 @@ async function getPropertyLocations({ publishedOnly }: { publishedOnly: boolean 
   if (publishedOnly) query = query.eq("status", "published");
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    logPropertyQueryError("property locations", error);
+    return getFallbackPropertyLocations(publishedOnly);
+  }
 
   return uniqueLocations((data ?? []) as Pick<Property, "prefecture" | "city">[]);
 }
@@ -99,7 +105,10 @@ export async function getAdminProperties(filters: PropertyFilters = {}) {
   query = applyServerFilters(query, filters);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    logPropertyQueryError("admin properties", error);
+    return filterProperties(sampleProperties, filters);
+  }
   return filterProperties((data ?? []) as Property[], filters);
 }
 
@@ -130,6 +139,18 @@ function filterProperties(properties: Property[], filters: PropertyFilters) {
     if (keyword && !matchesKeyword(property, keyword)) return false;
     return true;
   });
+}
+
+function getFallbackPublishedProperties(filters: PropertyFilters) {
+  return filterProperties(sampleProperties.filter((property) => property.status === "published"), filters);
+}
+
+function getFallbackPropertyLocations(publishedOnly: boolean) {
+  return uniqueLocations(publishedOnly ? sampleProperties.filter((property) => property.status === "published") : sampleProperties);
+}
+
+function logPropertyQueryError(scope: string, error: { message?: string }) {
+  console.error(`[properties] Failed to load ${scope}: ${error.message ?? "unknown error"}`);
 }
 
 function getPropertyCategory(property: Property) {

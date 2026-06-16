@@ -10,6 +10,10 @@
     font-family: inherit;
   }
 
+  .ecoloop-prescreening [hidden] {
+    display: none !important;
+  }
+
   .ecoloop-prescreening-entry {
     display: flex;
     align-items: center;
@@ -23,8 +27,7 @@
   }
 
   .ecoloop-prescreening-entry h2,
-  .ecoloop-prescreening-dialog h2,
-  .ecoloop-prescreening-application-note h2 {
+  .ecoloop-prescreening-dialog h2 {
     margin: 0;
     font-size: 24px;
     line-height: 1.35;
@@ -33,8 +36,7 @@
 
   .ecoloop-prescreening-entry p,
   .ecoloop-prescreening-lead,
-  .ecoloop-prescreening-result p,
-  .ecoloop-prescreening-application-note p {
+  .ecoloop-prescreening-result p {
     margin: 8px 0 0;
     font-size: 16px;
     line-height: 1.8;
@@ -199,27 +201,6 @@
     background: #fef2f2;
   }
 
-  .ecoloop-prescreening-application-note {
-    margin: 24px auto;
-    max-width: 960px;
-    border: 1px solid #facc15;
-    border-radius: 12px;
-    background: #fffbeb;
-    padding: 20px;
-    color: #422006;
-    font-family: inherit;
-  }
-
-  .ecoloop-prescreening-application-note h2 {
-    font-size: 20px;
-    color: #713f12;
-  }
-
-  .ecoloop-prescreening-application-note p {
-    font-size: 15px;
-    line-height: 1.85;
-  }
-
   #ecoloop-prescreening-application-form,
   [data-ecoloop-prescreening-application-form] {
     display: none;
@@ -264,6 +245,7 @@
       <p class="ecoloop-prescreening-eyebrow">仮審査前のかんたん確認</p>
       <h2>まずは予備審査をする</h2>
       <p>数問の確認で、仮審査に進めるか確認できます</p>
+      <p style="margin:12px 0 0;border:1px solid #fed7aa;border-radius:8px;background:#fff7ed;padding:10px 12px;font-size:14px;line-height:1.7;color:#9a3412;">現在、バイク自社ローンの申込対象地域は、九州全域、鳥取県・島根県・岡山県、四国全域のみとなっております。対象地域外にお住まいの方は、仮審査フォームへ進めません。</p>
     </div>
     <button type="button" class="ecoloop-prescreening-primary-button" data-ecoloop-prescreening-open>
       まずは予備審査をする
@@ -341,33 +323,9 @@
           </label>
 
           <fieldset class="ecoloop-prescreening-fieldset">
-            <legend>現在、クレジット・ローンの支払い遅れがありますか？ <em>必須</em></legend>
-            <label><input type="radio" name="creditLoanDelay" value="yes" required> はい</label>
-            <label><input type="radio" name="creditLoanDelay" value="no" required> いいえ</label>
-          </fieldset>
-
-          <fieldset class="ecoloop-prescreening-fieldset">
             <legend>現在、支払いをしていない未払い・滞納中のものがありますか？ <em>必須</em></legend>
             <label><input type="radio" name="unpaidDelinquency" value="yes" required> はい</label>
             <label><input type="radio" name="unpaidDelinquency" value="no" required> いいえ</label>
-          </fieldset>
-
-          <fieldset class="ecoloop-prescreening-fieldset">
-            <legend>過去に自己破産をしたことがありますか？ <em>必須</em></legend>
-            <label><input type="radio" name="bankruptcy" value="yes" required> はい</label>
-            <label><input type="radio" name="bankruptcy" value="no" required> いいえ</label>
-          </fieldset>
-
-          <label class="ecoloop-prescreening-field" id="ecoloop-prescreening-discharge-date-field" hidden>
-            <span>免責が降りた日を西暦で入力してください <em>必須</em></span>
-            <input type="date" name="dischargeDate">
-          </label>
-
-          <fieldset class="ecoloop-prescreening-fieldset">
-            <legend>債務整理後、現在も支払い中ですか？ <em>必須</em></legend>
-            <label><input type="radio" name="debtArrangementPaying" value="yes" required> はい</label>
-            <label><input type="radio" name="debtArrangementPaying" value="no" required> いいえ</label>
-            <label><input type="radio" name="debtArrangementPaying" value="none" required> 債務整理をしていない</label>
           </fieldset>
 
           <p class="ecoloop-prescreening-error" id="ecoloop-prescreening-validation-message" aria-live="polite"></p>
@@ -383,30 +341,16 @@
   </div>
 </div>
 
-<div class="ecoloop-prescreening-application-note" data-ecoloop-prescreening-application-note hidden>
-  <h2>【仮審査お申し込み前の注意事項】</h2>
-  <p>仮審査フォームを送信後、1週間以内に当社よりお電話にて詳しい内容を確認させていただきます。</p>
-  <p>お電話で色々とお話をお伺いしたうえで審査を進めますので、社会常識がない方、言葉遣いや態度が悪い方、当社とのやり取りが困難と判断される方は、お申し込みをお断りする場合があります。</p>
-  <p>当社からは「<strong>096-201-7191</strong>」の番号よりお電話いたします。お電話に出られなかった場合は、必ず折り返しのお電話をお願いいたします。</p>
-  <p>また、お支払い回数はお客様の状況により異なりますが、<strong>最長でも60回払い</strong>までとなります。</p>
+<div id="ecoloop-prescreening-application-form" hidden aria-hidden="true" style="display:none;">
+  [contact-form-7 id="498" title="自社ローン仮審査"]
 </div>
-
-<!--
-  既存の仮審査フォーム全体を下記のID付きdivで囲んでください。
-  <div id="ecoloop-prescreening-application-form">
-    既存の仮審査フォーム
-  </div>
--->
 
 <script>
   (function () {
     "use strict";
 
-    // URL設定箇所: 同一ページ内で表示切替するため、通常は空文字のまま使います。
-    // 別ページへ移動させる場合だけ、ここにURLを設定してください。
     var PRE_SCREENING_PASS_REDIRECT_URL = "";
 
-    // 仮審査フォーム全体を囲む要素です。既存フォーム本体の送信処理には触れません。
     var PRE_SCREENING_FORM_SELECTOR = "#ecoloop-prescreening-application-form, [data-ecoloop-prescreening-application-form]";
 
     var PRE_SCREENING_PASS_STORAGE_KEY = "ecoloopPreScreeningPassed";
@@ -425,9 +369,6 @@
     var formView = document.getElementById("ecoloop-prescreening-form-view");
     var resultView = document.getElementById("ecoloop-prescreening-result-view");
     var validationMessage = document.getElementById("ecoloop-prescreening-validation-message");
-    var dischargeDateField = document.getElementById("ecoloop-prescreening-discharge-date-field");
-    var dischargeDateInput = form ? form.elements.dischargeDate : null;
-
     function openModal() {
       modal.classList.add("ecoloop-prescreening-is-open");
       modal.setAttribute("aria-hidden", "false");
@@ -451,30 +392,15 @@
       return eligiblePrefectures.indexOf(prefecture) !== -1;
     }
 
-    function isWithinFiveYears(dateValue) {
-      if (!dateValue) return true;
-      var dischargeDate = new Date(dateValue + "T00:00:00");
-      if (Number.isNaN(dischargeDate.getTime())) return true;
-      var today = new Date();
-      var threshold = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
-      return dischargeDate >= threshold;
-    }
-
     function evaluatePreScreening(data) {
       var reasons = [];
       var eligibleArea = isEligibleArea(data.prefecture);
 
-      if (data.creditLoanDelay === "yes") {
-        reasons.push("CURRENT_CREDIT_LOAN_DELAY");
+      if (!eligibleArea) {
+        reasons.push("OUTSIDE_SERVICE_AREA");
       }
       if (data.unpaidDelinquency === "yes") {
         reasons.push("CURRENT_UNPAID_DELINQUENCY");
-      }
-      if (!eligibleArea && data.bankruptcy === "yes" && isWithinFiveYears(data.dischargeDate)) {
-        reasons.push("OUTSIDE_AREA_BANKRUPTCY_WITHIN_5_YEARS");
-      }
-      if (!eligibleArea && data.debtArrangementPaying === "yes") {
-        reasons.push("OUTSIDE_AREA_DEBT_ARRANGEMENT_PAYING");
       }
 
       return {
@@ -492,11 +418,6 @@
       setValidationMessage("");
       if (!form.reportValidity()) {
         setValidationMessage("未入力の項目があります。すべて回答してください。");
-        return false;
-      }
-      if (getRadioValue("bankruptcy") === "yes" && !form.elements.dischargeDate.value) {
-        if (dischargeDateInput) dischargeDateInput.focus();
-        setValidationMessage("免責が降りた日を入力してください。");
         return false;
       }
       return true;
@@ -551,23 +472,22 @@
       return document.querySelector(PRE_SCREENING_FORM_SELECTOR);
     }
 
-    function hideApplicationForm() {
+    function setApplicationFormVisible(isVisible) {
       var formElement = getApplicationFormElement();
-      var note = document.querySelector("[data-ecoloop-prescreening-application-note]");
-      if (formElement) {
-        formElement.classList.remove("ecoloop-prescreening-application-form-visible");
-        formElement.setAttribute("aria-hidden", "true");
-      }
-      if (note) note.hidden = true;
+      if (!formElement) return null;
+      formElement.hidden = !isVisible;
+      formElement.style.display = isVisible ? "block" : "none";
+      formElement.setAttribute("aria-hidden", isVisible ? "false" : "true");
+      formElement.classList.toggle("ecoloop-prescreening-application-form-visible", isVisible);
+      return formElement;
+    }
+
+    function hideApplicationForm() {
+      return setApplicationFormVisible(false);
     }
 
     function showApplicationForm() {
-      var formElement = getApplicationFormElement();
-      if (!formElement) return null;
-      formElement.classList.add("ecoloop-prescreening-application-form-visible");
-      formElement.removeAttribute("aria-hidden");
-      showApplicationNote(formElement);
-      return formElement;
+      return setApplicationFormVisible(true);
     }
 
     function goToApplicationForm() {
@@ -590,10 +510,6 @@
     }
 
     function renderResult(result) {
-      formView.hidden = true;
-      resultView.hidden = false;
-      resultView.className = "ecoloop-prescreening-result " + (result.ok ? "ecoloop-prescreening-result-ok" : "ecoloop-prescreening-result-ng");
-
       if (form.elements.prescreening_result_code) {
         form.elements.prescreening_result_code.value = result.ok ? "OK" : "NG";
       }
@@ -602,21 +518,21 @@
       }
 
       if (result.ok) {
-        resultView.innerHTML =
-          '<h2>予備審査を通過しました</h2>' +
-          '<p>仮審査に進むことができます。下のボタンから仮審査フォームへお進みください。</p>' +
-          '<div class="ecoloop-prescreening-actions" style="margin-top:16px;">' +
-          '<button type="button" class="ecoloop-prescreening-primary-button" data-ecoloop-prescreening-continue>仮審査に進む</button>' +
-          '</div>';
-        resultView.querySelector("[data-ecoloop-prescreening-continue]").addEventListener("click", goToApplicationForm);
+        goToApplicationForm();
         return;
       }
 
+      formView.hidden = true;
+      resultView.hidden = false;
+      resultView.className = "ecoloop-prescreening-result ecoloop-prescreening-result-ng";
       clearPassState();
       hideApplicationForm();
+      var resultMessage = result.reasons.indexOf("OUTSIDE_SERVICE_AREA") !== -1
+        ? "現在お住まいの地域は、当社バイク自社ローンの申込対象地域外のため、仮審査フォームへ進めません。申込対象地域は、九州全域、鳥取県・島根県・岡山県、四国全域です。"
+        : "ご入力内容を確認した結果、現在の条件では仮審査へのお申し込みが難しい状況です。支払い状況が改善された後に、再度ご相談ください。";
       resultView.innerHTML =
         '<h2>現在の内容では仮審査に進めません</h2>' +
-        '<p>ご入力内容を確認した結果、現在の条件では仮審査へのお申し込みが難しい状況です。支払い状況が改善された後に、再度ご相談ください。</p>' +
+        '<p>' + resultMessage + '</p>' +
         '<div class="ecoloop-prescreening-actions" style="margin-top:16px;">' +
         '<button type="button" class="ecoloop-prescreening-primary-button" data-ecoloop-prescreening-close-result>閉じる</button>' +
         '</div>';
@@ -630,17 +546,9 @@
       resultView.className = "ecoloop-prescreening-result";
     }
 
-    function showApplicationNote(beforeElement) {
-      var note = document.querySelector("[data-ecoloop-prescreening-application-note]");
-      if (!note) return;
-      note.hidden = false;
-      if (beforeElement && beforeElement.parentNode && note.parentNode !== beforeElement.parentNode) {
-        beforeElement.parentNode.insertBefore(note, beforeElement);
-      }
-    }
-
     function applyApplicationNoteIfPassed() {
-      if (hasPassState()) {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get(PRE_SCREENING_RESULT_PARAM) === "1") {
         showApplicationForm();
         return;
       }
@@ -673,25 +581,12 @@
       }
     });
 
-    form.addEventListener("change", function (event) {
-      if (event.target.name === "bankruptcy") {
-        var showDate = getRadioValue("bankruptcy") === "yes";
-        dischargeDateField.hidden = !showDate;
-        dischargeDateInput.required = showDate;
-        if (!showDate) dischargeDateInput.value = "";
-      }
-    });
-
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       if (!validateForm()) return;
       var data = {
         prefecture: form.elements.prefecture.value,
-        creditLoanDelay: getRadioValue("creditLoanDelay"),
-        unpaidDelinquency: getRadioValue("unpaidDelinquency"),
-        bankruptcy: getRadioValue("bankruptcy"),
-        dischargeDate: form.elements.dischargeDate.value,
-        debtArrangementPaying: getRadioValue("debtArrangementPaying")
+        unpaidDelinquency: getRadioValue("unpaidDelinquency")
       };
       renderResult(evaluatePreScreening(data));
     });

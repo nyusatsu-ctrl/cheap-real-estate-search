@@ -1,0 +1,105 @@
+<div id="ecoloop-prescreening-root" class="ecoloop-prescreening-wrap" style="box-sizing:border-box;max-width:960px;margin:28px auto;font-family:inherit;color:#111827;">
+  <div class="ecoloop-prescreening-entry" style="box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid #fde68a;border-radius:12px;background:#fffbeb;padding:22px;color:#1f2937;">
+    <div style="box-sizing:border-box;">
+      <p class="ecoloop-prescreening-eyebrow" style="box-sizing:border-box;margin:0 0 6px;font-size:13px;font-weight:700;line-height:1.5;color:#b45309;">仮審査前のかんたん確認</p>
+      <h2 style="box-sizing:border-box;margin:0;font-size:24px;line-height:1.35;color:#111827;font-weight:700;">まずは予備審査をする</h2>
+      <p style="box-sizing:border-box;margin:8px 0 0;font-size:16px;line-height:1.8;color:#1f2937;">数問の確認で、仮審査に進めるか確認できます</p>
+      <p style="box-sizing:border-box;margin:12px 0 0;border:1px solid #fed7aa;border-radius:8px;background:#fff7ed;padding:10px 12px;font-size:14px;line-height:1.7;color:#9a3412;">現在、バイク自社ローンの申込対象地域は、九州全域、鳥取県・島根県・岡山県、四国全域のみとなっております。対象地域外にお住まいの方は、仮審査フォームへ進めません。</p>
+    </div>
+    <button type="button" data-ecoloop-prescreening-open onclick="return window.ecoloopPrescreeningOpen(event)" style="box-sizing:border-box;appearance:none;border:0;border-radius:8px;background:#dc2626;color:#ffffff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 20px;font-size:16px;font-weight:700;line-height:1.2;text-decoration:none;white-space:nowrap;">
+      まずは予備審査をする
+    </button>
+  </div>
+
+  <div id="ecoloop-prescreening-modal" aria-hidden="true" style="box-sizing:border-box;display:none;position:fixed;inset:0;z-index:99999;">
+    <div data-ecoloop-prescreening-close onclick="return window.ecoloopPrescreeningClose(event)" style="box-sizing:border-box;position:absolute;inset:0;background:rgba(15,23,42,0.62);"></div>
+    <div role="dialog" aria-modal="true" aria-labelledby="ecoloop-prescreening-title" style="box-sizing:border-box;position:relative;margin:36px auto;max-height:calc(100vh - 72px);max-width:720px;overflow-y:auto;border-radius:12px;background:#ffffff;padding:28px;color:#111827;box-shadow:0 24px 70px rgba(15,23,42,0.3);">
+      <button type="button" aria-label="閉じる" data-ecoloop-prescreening-close onclick="return window.ecoloopPrescreeningClose(event)" style="box-sizing:border-box;position:absolute;top:12px;right:12px;width:40px;height:40px;border:1px solid #e5e7eb;border-radius:999px;background:#ffffff;cursor:pointer;font-size:28px;line-height:1;color:#374151;">×</button>
+
+      <div id="ecoloop-prescreening-form-view" style="box-sizing:border-box;">
+        <p style="box-sizing:border-box;margin:0 0 6px;font-size:13px;font-weight:700;line-height:1.5;color:#b45309;">予備審査</p>
+        <h2 id="ecoloop-prescreening-title" style="box-sizing:border-box;margin:0;font-size:24px;line-height:1.35;color:#111827;font-weight:700;">仮審査に進めるか確認します</h2>
+        <p style="box-sizing:border-box;margin:8px 0 0;font-size:16px;line-height:1.8;color:#1f2937;">以下の項目に回答してください。判定結果により、仮審査フォームへご案内します。</p>
+
+        <form id="ecoloop-prescreening-form" novalidate onsubmit="return window.ecoloopPrescreeningSubmit(event)" style="box-sizing:border-box;display:grid;gap:18px;margin-top:20px;">
+          <input type="hidden" name="prescreening_result_code" value="">
+          <input type="hidden" name="prescreening_reason_codes" value="">
+
+          <label style="box-sizing:border-box;display:grid;gap:8px;margin:0;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">
+            <span style="box-sizing:border-box;font-size:15px;font-weight:700;line-height:1.6;color:#111827;">お住まいの都道府県 <em style="font-style:normal;color:#dc2626;">必須</em></span>
+            <select name="prefecture" required style="box-sizing:border-box;width:100%;min-height:44px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:16px;background:#ffffff;color:#111827;">
+              <option value="">選択してください</option>
+              <option>北海道</option>
+              <option>青森県</option>
+              <option>岩手県</option>
+              <option>宮城県</option>
+              <option>秋田県</option>
+              <option>山形県</option>
+              <option>福島県</option>
+              <option>茨城県</option>
+              <option>栃木県</option>
+              <option>群馬県</option>
+              <option>埼玉県</option>
+              <option>千葉県</option>
+              <option>東京都</option>
+              <option>神奈川県</option>
+              <option>新潟県</option>
+              <option>富山県</option>
+              <option>石川県</option>
+              <option>福井県</option>
+              <option>山梨県</option>
+              <option>長野県</option>
+              <option>岐阜県</option>
+              <option>静岡県</option>
+              <option>愛知県</option>
+              <option>三重県</option>
+              <option>滋賀県</option>
+              <option>京都府</option>
+              <option>大阪府</option>
+              <option>兵庫県</option>
+              <option>奈良県</option>
+              <option>和歌山県</option>
+              <option>鳥取県</option>
+              <option>島根県</option>
+              <option>岡山県</option>
+              <option>広島県</option>
+              <option>山口県</option>
+              <option>徳島県</option>
+              <option>香川県</option>
+              <option>愛媛県</option>
+              <option>高知県</option>
+              <option>福岡県</option>
+              <option>佐賀県</option>
+              <option>長崎県</option>
+              <option>熊本県</option>
+              <option>大分県</option>
+              <option>宮崎県</option>
+              <option>鹿児島県</option>
+              <option>沖縄県</option>
+            </select>
+          </label>
+
+          <fieldset style="box-sizing:border-box;display:grid;gap:8px;margin:0;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">
+            <legend style="box-sizing:border-box;font-size:15px;font-weight:700;line-height:1.6;color:#111827;">現在、支払いをしていない未払い・滞納中のものがありますか？ <em style="font-style:normal;color:#dc2626;">必須</em></legend>
+            <label style="box-sizing:border-box;display:flex;align-items:center;gap:8px;font-size:16px;line-height:1.5;color:#111827;"><input type="radio" name="unpaidDelinquency" value="yes" required style="width:18px;height:18px;"> はい</label>
+            <label style="box-sizing:border-box;display:flex;align-items:center;gap:8px;font-size:16px;line-height:1.5;color:#111827;"><input type="radio" name="unpaidDelinquency" value="no" required style="width:18px;height:18px;"> いいえ</label>
+          </fieldset>
+
+          <p id="ecoloop-prescreening-validation-message" aria-live="polite" style="box-sizing:border-box;min-height:24px;margin:0;color:#b91c1c;font-size:14px;font-weight:700;"></p>
+
+          <div style="box-sizing:border-box;display:flex;justify-content:flex-end;">
+            <button type="submit" style="box-sizing:border-box;appearance:none;border:0;border-radius:8px;background:#dc2626;color:#ffffff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 20px;font-size:16px;font-weight:700;line-height:1.2;text-decoration:none;white-space:nowrap;">結果を確認する</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="ecoloop-prescreening-result-view" hidden aria-hidden="true" style="box-sizing:border-box;display:none;border-radius:10px;padding:20px;"></div>
+    </div>
+  </div>
+
+  <div id="ecoloop-prescreening-application-form" hidden aria-hidden="true" style="box-sizing:border-box;display:none;margin-top:24px;">
+    [contact-form-7 id="498" title="自社ローン仮審査"]
+  </div>
+</div>
+
+<script src="/wp-content/uploads/ecoloop-prescreening.js?v=20260616a"></script>

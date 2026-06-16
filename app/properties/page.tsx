@@ -1,6 +1,7 @@
 import { PropertyCard } from "@/components/PropertyCard";
 import { SearchFilters } from "@/components/SearchFilters";
 import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
+import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
 import { normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
 import { getPublishedProperties, getPublishedPropertyLocations } from "@/lib/properties";
 
@@ -14,6 +15,9 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
       <div className="mb-5">
         <h1 className="text-2xl font-black text-slate-950">物件一覧</h1>
         <p className="mt-1 text-sm text-slate-600">公開中の物件のみ表示しています。</p>
+        <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          {PROPERTY_INFORMATION_NOTICE}
+        </p>
       </div>
       <SearchFilters
         locations={locations}

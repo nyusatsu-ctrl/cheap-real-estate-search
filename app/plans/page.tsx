@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell, Check, FileSearch, ShieldCheck, Star } from "lucide-react";
 import { MONTHLY_PRICE_YEN, TRIAL_DAYS } from "@/lib/billing/stripe";
+import { BUSINESS_INFO } from "@/lib/legal";
 
 const features = [
   "全国の格安不動産一覧の閲覧",
@@ -96,6 +97,34 @@ export default function PlansPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-8">
+        <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-slate-950">課金・解約について</h2>
+          <dl className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded border border-slate-200 p-4">
+              <dt className="text-sm font-bold text-slate-500">無料期間</dt>
+              <dd className="mt-2 text-sm leading-6 text-slate-700">登録から{TRIAL_DAYS}日間無料で利用できます。</dd>
+            </div>
+            <div className="rounded border border-slate-200 p-4">
+              <dt className="text-sm font-bold text-slate-500">無料期間終了後の課金条件</dt>
+              <dd className="mt-2 text-sm leading-6 text-slate-700">
+                無料登録だけでは自動課金されません。継続利用する場合のみ、利用者自身で月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円の有料プランへ申し込みます。
+              </dd>
+            </div>
+            <div className="rounded border border-slate-200 p-4">
+              <dt className="text-sm font-bold text-slate-500">支払方法</dt>
+              <dd className="mt-2 text-sm leading-6 text-slate-700">{BUSINESS_INFO.paymentMethod}です。</dd>
+            </div>
+            <div className="rounded border border-slate-200 p-4">
+              <dt className="text-sm font-bold text-slate-500">解約方法と停止タイミング</dt>
+              <dd className="mt-2 text-sm leading-6 text-slate-700">
+                有料プランは会員画面またはお問い合わせから解約できます。解約手続き完了後、次回更新分から課金を停止し、現在の契約期間終了後に有料機能の利用が停止します。
+              </dd>
+            </div>
+          </dl>
+        </article>
       </section>
     </div>
   );

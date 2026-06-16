@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Calculator, ExternalLink, MapPin } from "lucide-react";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatArea, formatDate, formatPrice } from "@/lib/format";
+import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
 import { getPublishedProperty } from "@/lib/properties";
 import { ViewedPropertyTracker } from "@/components/ViewedPropertyTracker";
 
@@ -36,6 +37,9 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         </div>
         <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{property.title}</h1>
         <p className="mt-4 text-4xl font-black text-brand-700">{formatPrice(property.price_yen)}</p>
+        <p className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          {PROPERTY_INFORMATION_NOTICE}
+        </p>
         <p className="mt-3 flex items-center gap-2 text-slate-700">
           <MapPin className="h-4 w-4 text-slate-400" />
           {property.address_display}

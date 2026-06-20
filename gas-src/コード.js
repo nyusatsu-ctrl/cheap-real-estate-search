@@ -109,6 +109,22 @@ var COLUMNS = [
   '勤務時間'
 ];
 
+var BIKE_LOAN_SERVICE_AREA_PREFECTURES = [
+  '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+  '鳥取県', '島根県', '岡山県',
+  '徳島県', '香川県', '愛媛県', '高知県'
+];
+
+var ALL_PREFECTURES_FOR_IMPORT = [
+  '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+  '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+  '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+  '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+  '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+  '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+  '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'
+];
+
 // ============================================================
 // メイン処理：メールを読み取ってスプレッドシートに書き込む
 // ============================================================
@@ -254,6 +270,7 @@ function importLoanApplications() {
       sheet.getRange(2, 1, 1, COLUMNS.length).setValues([row]);
       setApplicationTypeIfColumnExists_(sheet, 2, applicationType);
       setExtraApplicationColumns_(sheet, 2, parsed);
+      applyOutOfServiceAreaStatusIfNeeded_(sheet, 2, parsed, applicationType);
       var autoMarketCustomerId = '';
       try {
         var autoMarketHeaderMap = getHeaderMap_(sheet);
@@ -1164,6 +1181,47 @@ function setExtraApplicationColumns_(sheet, rowNumber, parsed) {
     var columnNumber = ensureColumnByHeader_(sheet, columnName);
     sheet.getRange(rowNumber, columnNumber).setValue(value);
   }
+}
+
+function applyOutOfServiceAreaStatusIfNeeded_(sheet, rowNumber, parsed, applicationType) {
+  if (applicationType !== '仮審査申込' || !isBikeLoanApplication_(parsed)) {
+    return;
+  }
+
+  var prefecture = extractPrefectureFromApplication_(parsed);
+  if (!prefecture || isBikeLoanServiceAreaPrefecture_(prefecture)) {
+    return;
+  }
+
+  var statusColumn = ensureColumnByHeader_(sheet, '対応状況');
+  sheet.getRange(rowNumber, statusColumn).setValue('対応不可');
+
+  var memoColumn = ensureColumnByHeader_(sheet, '対応メモ');
+  var range = sheet.getRange(rowNumber, memoColumn);
+  var currentMemo = trimFullWidth(String(range.getDisplayValue() || ''));
+  var outOfAreaMemo = '対象地域外のため対応不可: ' + prefecture + ' / 申込可能地域は九州全域、鳥取県・島根県・岡山県、四国全域です。';
+  if (currentMemo.indexOf(outOfAreaMemo) === -1) {
+    range.setValue(currentMemo ? currentMemo + '\n' + outOfAreaMemo : outOfAreaMemo);
+  }
+}
+
+function isBikeLoanApplication_(parsed) {
+  var requestType = trimFullWidth(String(parsed['ご希望'] || ''));
+  return requestType.indexOf('バイク') !== -1;
+}
+
+function isBikeLoanServiceAreaPrefecture_(prefecture) {
+  return BIKE_LOAN_SERVICE_AREA_PREFECTURES.indexOf(prefecture) !== -1;
+}
+
+function extractPrefectureFromApplication_(parsed) {
+  var address = trimFullWidth(String(parsed['住所'] || ''));
+  for (var i = 0; i < ALL_PREFECTURES_FOR_IMPORT.length; i++) {
+    if (address.indexOf(ALL_PREFECTURES_FOR_IMPORT[i]) !== -1) {
+      return ALL_PREFECTURES_FOR_IMPORT[i];
+    }
+  }
+  return '';
 }
 
 // ============================================================

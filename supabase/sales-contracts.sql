@@ -254,36 +254,81 @@ grant all on public.sales_documents to service_role;
 grant all on public.sales_contact_histories to service_role;
 grant all on public.sales_audit_logs to service_role;
 
-do $$
-declare
-  table_name text;
-  policy_name text;
-begin
-  foreach table_name in array array[
-    'sales_customers',
-    'sales_contracts',
-    'sales_vehicles',
-    'sales_loans',
-    'sales_leases',
-    'sales_guarantors',
-    'sales_documents',
-    'sales_contact_histories',
-    'sales_audit_logs'
-  ]
-  loop
-    policy_name := 'admins manage ' || table_name;
-    if not exists (
-      select 1
-      from pg_policies
-      where schemaname = 'public'
-        and tablename = table_name
-        and policyname = policy_name
-    ) then
-      execute format(
-        'create policy %I on public.%I for all to authenticated using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = ''admin'')) with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = ''admin''))',
-        policy_name,
-        table_name
-      );
-    end if;
-  end loop;
-end $$;
+create or replace function public.sales_is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+set row_security = off
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+drop policy if exists "admins manage sales_customers" on public.sales_customers;
+create policy "admins manage sales_customers"
+on public.sales_customers for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_contracts" on public.sales_contracts;
+create policy "admins manage sales_contracts"
+on public.sales_contracts for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_vehicles" on public.sales_vehicles;
+create policy "admins manage sales_vehicles"
+on public.sales_vehicles for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_loans" on public.sales_loans;
+create policy "admins manage sales_loans"
+on public.sales_loans for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_leases" on public.sales_leases;
+create policy "admins manage sales_leases"
+on public.sales_leases for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_guarantors" on public.sales_guarantors;
+create policy "admins manage sales_guarantors"
+on public.sales_guarantors for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_documents" on public.sales_documents;
+create policy "admins manage sales_documents"
+on public.sales_documents for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_contact_histories" on public.sales_contact_histories;
+create policy "admins manage sales_contact_histories"
+on public.sales_contact_histories for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_audit_logs" on public.sales_audit_logs;
+create policy "admins manage sales_audit_logs"
+on public.sales_audit_logs for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());

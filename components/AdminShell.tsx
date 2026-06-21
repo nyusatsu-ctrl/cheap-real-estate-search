@@ -8,13 +8,19 @@ const adminMenuItems = [
   { href: "/admin/sales-contracts", label: "契約台帳" }
 ];
 
-export function AdminShell({ children, email }: { children: React.ReactNode; email: string }) {
+type AdminShellProps = {
+  children: React.ReactNode;
+  email: string;
+  systemName?: string;
+};
+
+export function AdminShell({ children, email, systemName = "格安不動産サーチ" }: AdminShellProps) {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-500">格安不動産サーチ 管理画面</p>
-          <h1 className="text-2xl font-black text-slate-950">格安不動産サーチ</h1>
+          <p className="text-sm font-semibold text-slate-500">{systemName} 管理画面</p>
+          <h1 className="text-2xl font-black text-slate-950">{systemName}</h1>
           <p className="mt-1 text-xs text-slate-500">{email}</p>
         </div>
         <div className="flex items-center gap-2">

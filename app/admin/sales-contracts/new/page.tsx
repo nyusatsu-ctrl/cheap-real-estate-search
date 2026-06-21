@@ -1,10 +1,16 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import { SalesContractForm } from "@/components/sales-contracts/SalesContractForm";
 import { createSalesContractAction } from "@/app/admin/sales-contracts/actions";
 import { requireAdmin } from "@/lib/admin";
 
 type NewSalesContractSearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const metadata: Metadata = {
+  title: "新規契約登録 | 契約管理システム",
+  description: "販売後の顧客、契約、車両、信販、書類、対応履歴を登録します。"
+};
 
 export default async function NewSalesContractPage({ searchParams }: { searchParams: NewSalesContractSearchParams }) {
   const admin = await requireAdmin();
@@ -19,7 +25,7 @@ export default async function NewSalesContractPage({ searchParams }: { searchPar
   const hasSourceParams = Object.values(sourceDefaults).some(Boolean);
 
   return (
-    <AdminShell email={admin.email}>
+    <AdminShell email={admin.email} systemName="契約管理システム">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/admin/sales-contracts" className="text-sm font-bold text-brand-700">契約台帳へ戻る</Link>

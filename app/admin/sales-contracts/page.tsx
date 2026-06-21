@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import { SalesContractTable } from "@/components/sales-contracts/SalesContractTable";
 import { requireAdmin } from "@/lib/admin";
@@ -12,6 +13,11 @@ import type { SalesContractFilters } from "@/lib/sales-contracts/types";
 
 type SalesContractsSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+export const metadata: Metadata = {
+  title: "契約台帳 | 契約管理システム",
+  description: "販売後の顧客、契約、車両、ローン、リース、書類、対応履歴を管理します。"
+};
+
 export default async function SalesContractsPage({ searchParams }: { searchParams: SalesContractsSearchParams }) {
   const admin = await requireAdmin();
   const params = await searchParams;
@@ -20,7 +26,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
   const setupMissing = firstParam(params.setup) === "missing";
 
   return (
-    <AdminShell email={admin.email}>
+    <AdminShell email={admin.email} systemName="契約管理システム">
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-950">契約台帳</h1>

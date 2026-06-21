@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { ContactHistoryForm } from "@/components/sales-contracts/ContactHistoryForm";
@@ -16,6 +17,11 @@ import { getSalesContractDetail } from "@/lib/sales-contracts/data";
 type SalesContractDetailParams = Promise<{ id: string }>;
 type SalesContractDetailSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+export const metadata: Metadata = {
+  title: "契約詳細 | 契約管理システム",
+  description: "契約台帳の契約詳細、車両、ローン、リース、書類、対応履歴を管理します。"
+};
+
 export default async function SalesContractDetailPage({
   params,
   searchParams
@@ -31,7 +37,7 @@ export default async function SalesContractDetailPage({
 
   if (result.tableMissing) {
     return (
-      <AdminShell email={admin.email}>
+      <AdminShell email={admin.email} systemName="契約管理システム">
         <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
           契約管理テーブルが未作成です。supabase/sales-contracts.sql をSupabase SQL Editorで適用してください。
         </div>
@@ -42,7 +48,7 @@ export default async function SalesContractDetailPage({
   if (!result.data) notFound();
 
   return (
-    <AdminShell email={admin.email}>
+    <AdminShell email={admin.email} systemName="契約管理システム">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/admin/sales-contracts" className="text-sm font-bold text-brand-700">契約台帳へ戻る</Link>

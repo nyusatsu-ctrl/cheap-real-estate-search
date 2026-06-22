@@ -29,10 +29,12 @@ import type {
 
 export function SalesContractDetail({
   detail,
-  hideAction
+  hideAction,
+  showCreatedActions = false
 }: {
   detail: SalesContractDetailType;
   hideAction?: (formData: FormData) => void | Promise<void>;
+  showCreatedActions?: boolean;
 }) {
   const item = detail;
   const documentLabels = new Map<string, string>(DOCUMENT_TYPE_OPTIONS.map((option) => [option.value, option.label]));
@@ -44,6 +46,8 @@ export function SalesContractDetail({
 
   return (
     <div className="space-y-5">
+      {showCreatedActions ? <ContractCreatedActions item={item} isLoanReviewSource={isLoanReviewSource} /> : null}
+
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -258,6 +262,52 @@ export function SalesContractDetail({
         </section>
       ) : null}
     </div>
+  );
+}
+
+function ContractCreatedActions({
+  item,
+  isLoanReviewSource
+}: {
+  item: SalesContractDetailType;
+  isLoanReviewSource: boolean;
+}) {
+  return (
+    <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-black text-emerald-700">登録完了</p>
+          <h2 className="mt-1 text-2xl font-black text-emerald-950">契約を登録しました</h2>
+          <p className="mt-2 text-sm font-semibold text-emerald-900">
+            次に必要な確認や登録作業へ進めます。
+          </p>
+        </div>
+        <Badge className={getStatusClass(item.contract.status)}>
+          {CONTRACT_STATUS_LABELS[item.contract.status]}
+        </Badge>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="/admin/sales-contracts" className="rounded border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 focus-ring">
+          契約台帳へ戻る
+        </Link>
+        <Link href="/admin/sales-contracts/new" className="rounded border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 focus-ring">
+          新規契約を続けて登録
+        </Link>
+        <Link href={LOAN_REVIEW_APP_URL} target="_blank" rel="noopener noreferrer" className="rounded border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 focus-ring">
+          自社ローン審査管理を開く
+        </Link>
+        {item.contract.contract_type === "lease" ? (
+          <Link href="#lease-maturity" className="rounded bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm focus-ring">
+            リース満期管理を作成
+          </Link>
+        ) : null}
+        {isLoanReviewSource ? (
+          <Link href={buildLoanReviewReturnUrl(item)} target="_blank" rel="noopener noreferrer" className="rounded bg-emerald-900 px-4 py-2 text-sm font-bold text-white shadow-sm focus-ring">
+            自社ローン審査管理へ戻る
+          </Link>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

@@ -39,6 +39,7 @@ export default async function SalesContractDetailPage({
   const { id } = await params;
   const query = await searchParams;
   const error = firstParam(query.error);
+  const created = firstParam(query.created) === "1";
   const result = await getSalesContractDetail(id);
 
   if (result.tableMissing) {
@@ -65,7 +66,7 @@ export default async function SalesContractDetailPage({
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</div>
       ) : null}
       <div className="space-y-6">
-        <SalesContractDetail detail={result.data} hideAction={hideTestSalesContractAction} />
+        <SalesContractDetail detail={result.data} hideAction={hideTestSalesContractAction} showCreatedActions={created} />
         {result.data.contract.contract_type === "lease" ? (
           <LeaseMaturityCard detail={result.data} action={upsertLeaseMaturityAction} historyAction={addLeaseMaturityHistoryAction} />
         ) : null}

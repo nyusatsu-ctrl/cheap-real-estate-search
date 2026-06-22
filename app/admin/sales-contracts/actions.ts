@@ -122,7 +122,7 @@ export async function createSalesContractAction(formData: FormData) {
   await insertAuditLog(supabase, admin.id, "sales_contracts", contractId, "create", null, contractResult.data, "契約を作成");
 
   revalidatePath("/admin/sales-contracts");
-  redirect(`/admin/sales-contracts/${contractId}`);
+  redirect(`/admin/sales-contracts/${contractId}?created=1`);
 }
 
 export async function updateSalesContractAction(formData: FormData) {

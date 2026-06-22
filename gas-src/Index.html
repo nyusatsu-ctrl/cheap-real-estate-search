@@ -162,6 +162,108 @@
         padding: 8px 10px;
       }
 
+      .quick-filter-bar {
+        display: flex;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        padding: 10px 18px;
+        border-bottom: 1px solid var(--line);
+        background: #ffffff;
+      }
+
+      .quick-filter-heading {
+        flex: 0 0 auto;
+        color: #344054;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 28px;
+      }
+
+      .quick-filter-buttons {
+        display: flex;
+        flex: 1 1 520px;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .quick-filter-button {
+        min-height: 28px;
+        padding: 5px 9px;
+        border-color: #cbd5e1;
+        background: #f8fafc;
+        color: #344054;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .quick-filter-button:hover {
+        background: #eef4ff;
+        border-color: #bfdbfe;
+      }
+
+      .quick-filter-button.active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      .quick-filter-button.tone-green {
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+        color: #166534;
+      }
+
+      .quick-filter-button.tone-green.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+
+      .quick-filter-button.tone-red {
+        border-color: #fecaca;
+        background: #fef2f2;
+        color: var(--red);
+      }
+
+      .quick-filter-button.tone-red.active {
+        background: #dc2626;
+        border-color: #dc2626;
+        color: #fff;
+      }
+
+      .quick-filter-button.tone-amber {
+        border-color: #fde68a;
+        background: #fffbeb;
+        color: var(--amber);
+      }
+
+      .quick-filter-button.tone-amber.active {
+        background: var(--amber);
+        border-color: var(--amber);
+        color: #fff;
+      }
+
+      .quick-filter-button.tone-blue {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        color: var(--blue-dark);
+      }
+
+      .quick-filter-button.tone-blue.active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      .quick-filter-count {
+        margin-left: 4px;
+        font-size: 11px;
+        opacity: 0.8;
+      }
+
       .notice {
         display: none;
         margin: 12px 18px 0;
@@ -198,7 +300,7 @@
       .table-scroll {
         overflow-y: auto;
         overflow-x: auto;
-        max-height: calc(100vh - 158px);
+        max-height: calc(100vh - 206px);
       }
 
       table {
@@ -943,6 +1045,7 @@
 
       body.market-admin-mode > header,
       body.market-admin-mode > .toolbar,
+      body.market-admin-mode > .quick-filter-bar,
       body.market-admin-mode > .notice,
       body.market-admin-mode > main {
         display: none;
@@ -1329,6 +1432,11 @@
       <button id="fixPhonesButton" type="button">電話番号0補正</button>
     </section>
 
+    <section class="quick-filter-bar" aria-label="ステータス別クイック絞り込み">
+      <div class="quick-filter-heading">クイック絞り込み</div>
+      <div id="quickFilterButtons" class="quick-filter-buttons"></div>
+    </section>
+
     <div id="setupNotice" class="notice">
       <span>管理列がまだありません。最初に「管理列を作成」を押してください。</span>
       <button id="setupNoticeButton" type="button">作成</button>
@@ -1431,9 +1539,25 @@
         callResultOptions: [],
         marketFilterOptions: [],
         marketLogs: [],
+        quickFilter: '',
         saving: false
       };
       const SALES_CONTRACT_REGISTRATION_URL = 'https://cheap-real-estate-search.vercel.app/admin/sales-contracts/new';
+      const QUICK_FILTERS = [
+        { value: '', label: 'すべて', tone: 'blue' },
+        { value: 'new', label: '新規受付', tone: 'blue' },
+        { value: 'calling', label: '架電中', tone: 'amber' },
+        { value: 'reviewing', label: '審査中', tone: 'amber' },
+        { value: 'premiumReviewing', label: 'プレミア審査中', tone: 'amber' },
+        { value: 'astReviewing', label: 'アスト審査中', tone: 'amber' },
+        { value: 'premiumApproved', label: 'プレミア可決', tone: 'green' },
+        { value: 'astApproved', label: 'アスト可決', tone: 'green' },
+        { value: 'denied', label: '否決', tone: 'red' },
+        { value: 'unavailable', label: '対応不可', tone: 'red' },
+        { value: 'unrequested', label: '未依頼', tone: 'blue' },
+        { value: 'marketMissing', label: '相場未取得', tone: 'amber' },
+        { value: 'modelCheck', label: '車種名確認', tone: 'amber' }
+      ];
       const PREMIUM_PRINT_CONFIG = {
         page: { dpi: 300, widthPx: 3508, heightPx: 2480, offsetX: 0, offsetY: 0 },
         whiteouts: [
@@ -1484,6 +1608,7 @@
         requestFilter: document.getElementById('requestFilter'),
         marketFilter: document.getElementById('marketFilter'),
         marketSort: document.getElementById('marketSort'),
+        quickFilterButtons: document.getElementById('quickFilterButtons'),
         setupButton: document.getElementById('setupButton'),
         fixPhonesButton: document.getElementById('fixPhonesButton'),
         setupNotice: document.getElementById('setupNotice'),
@@ -1514,6 +1639,7 @@
         safeAddEventListener(els.requestFilter, 'change', applyFilters);
         safeAddEventListener(els.marketFilter, 'change', applyFilters);
         safeAddEventListener(els.marketSort, 'change', applyFilters);
+        safeAddEventListener(els.quickFilterButtons, 'click', handleQuickFilterClick);
         safeAddEventListener(els.setupButton, 'click', setupColumns);
         safeAddEventListener(els.fixPhonesButton, 'click', fixPhoneNumbers);
         safeAddEventListener(els.setupNoticeButton, 'click', setupColumns);
@@ -1531,6 +1657,14 @@
         if (element) {
           element.addEventListener(eventName, handler);
         }
+      }
+
+      function handleQuickFilterClick(event) {
+        const target = event.target;
+        const button = target && typeof target.closest === 'function' ? target.closest('[data-quick-filter]') : null;
+        if (!button) return;
+        state.quickFilter = button.dataset.quickFilter || '';
+        applyFilters();
       }
 
       function loadDashboard() {
@@ -2564,35 +2698,94 @@
       }
 
       function applyFilters() {
-        const keyword = normalizeText(els.search.value);
-        const applicationType = els.applicationTypeFilter.value;
-        const status = els.statusFilter.value;
-        const requestType = els.requestFilter.value;
-        const marketStatus = els.marketFilter.value;
-        const sortType = els.marketSort.value;
+        const filters = currentListFilters();
+        const baseFiltered = state.customers.filter((customer) => matchesStandardFilters(customer, filters));
+        state.filtered = baseFiltered.filter((customer) => matchesQuickFilter(customer, state.quickFilter));
 
-        state.filtered = state.customers.filter((customer) => {
-          const searchable = normalizeText([
-            customer.name,
-            customer.kana,
-            customer.phone,
-            customer.email,
-            customer.workplace,
-            customer.desiredCar,
-            customer.desiredYear,
-            customer.market && customer.market.status
-          ].join(' '));
-
-          return (!keyword || searchable.includes(keyword))
-            && (!applicationType || customer.applicationType === applicationType)
-            && (!status || customer.status === status)
-            && (!requestType || customer.requestType === requestType)
-            && (!marketStatus || (customer.market && customer.market.status === marketStatus));
-        });
-
-        sortFilteredCustomers(sortType);
+        sortFilteredCustomers(filters.sortType);
+        renderQuickFilters(baseFiltered);
 
         renderTable();
+      }
+
+      function currentListFilters() {
+        return {
+          keyword: normalizeText(els.search.value),
+          applicationType: els.applicationTypeFilter.value,
+          status: els.statusFilter.value,
+          requestType: els.requestFilter.value,
+          marketStatus: els.marketFilter.value,
+          sortType: els.marketSort.value
+        };
+      }
+
+      function matchesStandardFilters(customer, filters) {
+        const searchable = normalizeText([
+          customer.name,
+          customer.kana,
+          customer.phone,
+          customer.email,
+          customer.workplace,
+          customer.desiredCar,
+          customer.desiredYear,
+          customer.market && customer.market.status
+        ].join(' '));
+
+        return (!filters.keyword || searchable.includes(filters.keyword))
+          && (!filters.applicationType || customer.applicationType === filters.applicationType)
+          && (!filters.status || customer.status === filters.status)
+          && (!filters.requestType || customer.requestType === filters.requestType)
+          && (!filters.marketStatus || (customer.market && customer.market.status === filters.marketStatus));
+      }
+
+      function renderQuickFilters(baseFiltered) {
+        if (!els.quickFilterButtons) return;
+        const counts = {};
+        QUICK_FILTERS.forEach((filter) => {
+          counts[filter.value] = filter.value
+            ? baseFiltered.filter((customer) => matchesQuickFilter(customer, filter.value)).length
+            : baseFiltered.length;
+        });
+        els.quickFilterButtons.innerHTML = QUICK_FILTERS.map((filter) => {
+          const active = state.quickFilter === filter.value;
+          return `
+            <button type="button" class="quick-filter-button tone-${filter.tone}${active ? ' active' : ''}" data-quick-filter="${escapeHtml(filter.value)}" aria-pressed="${active ? 'true' : 'false'}">
+              ${escapeHtml(filter.label)}<span class="quick-filter-count">${escapeHtml(counts[filter.value] || 0)}</span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      function matchesQuickFilter(customer, filterValue) {
+        if (!filterValue) return true;
+        switch (filterValue) {
+          case 'new':
+            return String(customer && customer.status ? customer.status : '') === '新規受付';
+          case 'calling':
+            return isCallingCustomer(customer);
+          case 'reviewing':
+            return reviewIncludes(customer && customer.review1, '審査中') || reviewIncludes(customer && customer.review2, '審査中');
+          case 'premiumReviewing':
+            return reviewIncludes(customer && customer.review1, '審査中');
+          case 'astReviewing':
+            return reviewIncludes(customer && customer.review2, '審査中');
+          case 'premiumApproved':
+            return isPremiumApproved(customer);
+          case 'astApproved':
+            return isAstApproved(customer);
+          case 'denied':
+            return isAnyDenied(customer);
+          case 'unavailable':
+            return String(customer && customer.status ? customer.status : '') === '対応不可';
+          case 'unrequested':
+            return isReviewUnrequested(customer && customer.review1) && isReviewUnrequested(customer && customer.review2);
+          case 'marketMissing':
+            return marketStatusValue(customer) === '相場未取得';
+          case 'modelCheck':
+            return isModelNameCheckNeeded(customer);
+          default:
+            return true;
+        }
       }
 
       function sortFilteredCustomers(sortType) {
@@ -3367,6 +3560,54 @@
 
       function isResponseUnavailable(customer) {
         return customer && (customer.status === '対応不可' || customer.status === '相談のみで終了');
+      }
+
+      function isCallingCustomer(customer) {
+        if (!customer) return false;
+        const status = String(customer.status || '');
+        if (status.indexOf('架電中') !== -1) return true;
+        return safeNumber(customer.callCount) >= 1 && !isWorkflowClosed(customer);
+      }
+
+      function isWorkflowClosed(customer) {
+        const status = String(customer && customer.status ? customer.status : '');
+        return status.indexOf('完了') !== -1
+          || status.indexOf('終了') !== -1
+          || status.indexOf('対応不可') !== -1
+          || status.indexOf('否決') !== -1
+          || status.indexOf('キャンセル') !== -1;
+      }
+
+      function reviewIncludes(value, keyword) {
+        return String(value || '').indexOf(keyword) !== -1;
+      }
+
+      function isReviewUnrequested(value) {
+        const text = String(value || '').trim();
+        return !text || text === '-' || text === '未依頼';
+      }
+
+      function isAnyDenied(customer) {
+        if (!customer) return false;
+        const status = String(customer.status || '');
+        return status.indexOf('否決') !== -1
+          || reviewIncludes(customer.review1, '否決')
+          || reviewIncludes(customer.review2, '否決');
+      }
+
+      function marketStatusValue(customer) {
+        return customer && customer.market && customer.market.status ? customer.market.status : '相場未取得';
+      }
+
+      function isModelNameCheckNeeded(customer) {
+        const market = customer && customer.market ? customer.market : {};
+        const text = [
+          market.status,
+          marketStatusText(market),
+          market.errorMessage,
+          market.noDataReason
+        ].join(' ');
+        return text.indexOf('車種名確認') !== -1;
       }
 
       function isGuarantorReview(customer) {

@@ -21,6 +21,8 @@ import type {
   SalesLeaseMaturityFilters,
   SalesLeaseMaturityHistory,
   SalesLeaseMaturityListItem,
+  SalesLeaseMaturityListResult,
+  SalesLeaseMaturitySummary,
   SalesLoan,
   SalesVehicle
 } from "@/lib/sales-contracts/types";
@@ -31,6 +33,19 @@ type SupabaseErrorLike = {
 };
 
 const TABLE_MISSING_MESSAGE = "契約管理テーブルが未作成です。supabase/sales-contracts.sql を適用してください。";
+const EMPTY_LEASE_MATURITY_SUMMARY: SalesLeaseMaturitySummary = {
+  total: 0,
+  overdue: 0,
+  thisMonth: 0,
+  nextMonth: 0,
+  within30Days: 0,
+  waitingResponse: 0,
+  contactOverdue: 0
+};
+const EMPTY_LEASE_MATURITY_LIST_RESULT: SalesLeaseMaturityListResult = {
+  items: [],
+  summary: EMPTY_LEASE_MATURITY_SUMMARY
+};
 
 export async function getSalesContractList(filters: SalesContractFilters = {}): Promise<SalesDataResult<SalesContractListItem[]>> {
   const supabase = await createSupabaseServerClient();
@@ -178,10 +193,10 @@ export async function getSalesContractDetail(id: string): Promise<SalesDataResul
   };
 }
 
-export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilters = {}): Promise<SalesDataResult<SalesLeaseMaturityListItem[]>> {
+export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilters = {}): Promise<SalesDataResult<SalesLeaseMaturityListResult>> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return { data: [], tableMissing: true, errorMessage: TABLE_MISSING_MESSAGE };
+    return { data: EMPTY_LEASE_MATURITY_LIST_RESULT, tableMissing: true, errorMessage: TABLE_MISSING_MESSAGE };
   }
 
   let maturitiesQuery = supabase
@@ -195,10 +210,10 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
   if (filters.customerChoice) maturitiesQuery = maturitiesQuery.eq("customer_choice", filters.customerChoice);
 
   const maturitiesResult = await maturitiesQuery;
-  if (maturitiesResult.error) return handleDataError<SalesLeaseMaturityListItem[]>(maturitiesResult.error, []);
+  if (maturitiesResult.error) return handleDataError<SalesLeaseMaturityListResult>(maturitiesResult.error, EMPTY_LEASE_MATURITY_LIST_RESULT);
 
   const maturities = (maturitiesResult.data ?? []) as SalesLeaseMaturity[];
-  if (maturities.length === 0) return { data: [], tableMissing: false };
+  if (maturities.length === 0) return { data: EMPTY_LEASE_MATURITY_LIST_RESULT, tableMissing: false };
 
   const leaseIds = unique(maturities.map((maturity) => maturity.lease_id));
   const contractIds = unique(maturities.map((maturity) => maturity.contract_id));
@@ -210,7 +225,7 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
   ]);
 
   const firstError = [contractsResult.error, leasesResult.error, vehiclesResult.error].find(Boolean);
-  if (firstError) return handleDataError<SalesLeaseMaturityListItem[]>(firstError, []);
+  if (firstError) return handleDataError<SalesLeaseMaturityListResult>(firstError, EMPTY_LEASE_MATURITY_LIST_RESULT);
 
   const contracts = ((contractsResult.data ?? []) as SalesContract[]).filter((contract) => contract.contract_type === "lease");
   const contractsById = mapById(contracts);
@@ -219,7 +234,7 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
   const customersResult = customerIds.length
     ? await supabase.from("sales_customers").select("*").in("id", customerIds).is("deleted_at", null)
     : { data: [], error: null };
-  if (customersResult.error) return handleDataError<SalesLeaseMaturityListItem[]>(customersResult.error, []);
+  if (customersResult.error) return handleDataError<SalesLeaseMaturityListResult>(customersResult.error, EMPTY_LEASE_MATURITY_LIST_RESULT);
 
   const customersById = mapById((customersResult.data ?? []) as SalesCustomer[]);
   const vehiclesByContractId = mapFirstByContractId((vehiclesResult.data ?? []) as SalesVehicle[]);
@@ -237,8 +252,12 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
     }];
   });
 
+  const baseItems = applyLeaseMaturityFilters(items, filters);
   return {
-    data: applyLeaseMaturityFilters(items, filters).sort(compareLeaseMaturityItems),
+    data: {
+      items: applyLeaseMaturityQuickFilter(baseItems, filters).sort(compareLeaseMaturityItems),
+      summary: summarizeLeaseMaturities(baseItems)
+    },
     tableMissing: false
   };
 }
@@ -436,7 +455,52 @@ function applyLeaseMaturityFilters(items: SalesLeaseMaturityListItem[], filters:
   });
 }
 
+function applyLeaseMaturityQuickFilter(items: SalesLeaseMaturityListItem[], filters: SalesLeaseMaturityFilters) {
+  if (!filters.quickFilter) return items;
+  return items.filter((item) => {
+    const flags = getLeaseMaturityFlags(item);
+    switch (filters.quickFilter) {
+      case "overdue":
+        return flags.isMaturityOverdue;
+      case "this_month":
+        return flags.isThisMonth;
+      case "next_month":
+        return flags.isNextMonth;
+      case "within_30_days":
+        return flags.isWithin30Days;
+      case "waiting_response":
+        return (item.maturity?.maturity_status ?? "not_started") === "waiting_response";
+      case "contact_overdue":
+        return flags.isContactOverdue;
+      default:
+        return true;
+    }
+  });
+}
+
+function summarizeLeaseMaturities(items: SalesLeaseMaturityListItem[]): SalesLeaseMaturitySummary {
+  return items.reduce<SalesLeaseMaturitySummary>((summary, item) => {
+    const flags = getLeaseMaturityFlags(item);
+    summary.total += 1;
+    if (flags.isMaturityOverdue) summary.overdue += 1;
+    if (flags.isThisMonth) summary.thisMonth += 1;
+    if (flags.isNextMonth) summary.nextMonth += 1;
+    if (flags.isWithin30Days) summary.within30Days += 1;
+    if ((item.maturity?.maturity_status ?? "not_started") === "waiting_response") summary.waitingResponse += 1;
+    if (flags.isContactOverdue) summary.contactOverdue += 1;
+    return summary;
+  }, { ...EMPTY_LEASE_MATURITY_SUMMARY });
+}
+
 function compareLeaseMaturityItems(a: SalesLeaseMaturityListItem, b: SalesLeaseMaturityListItem) {
+  const aCompleted = (a.maturity?.maturity_status ?? "not_started") === "completed";
+  const bCompleted = (b.maturity?.maturity_status ?? "not_started") === "completed";
+  if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+
+  const aContactTime = dateSortValue(a.maturity?.next_contact_date ?? "");
+  const bContactTime = dateSortValue(b.maturity?.next_contact_date ?? "");
+  if (aContactTime !== bContactTime) return aContactTime - bContactTime;
+
   const aTime = dateSortValue(getEffectiveMaturityDate(a));
   const bTime = dateSortValue(getEffectiveMaturityDate(b));
   if (aTime !== bTime) return aTime - bTime;
@@ -451,6 +515,24 @@ export function getEffectiveResidualValueAmount(item: Pick<SalesLeaseMaturityLis
   return item.maturity?.residual_value_amount ?? item.lease.residual_value_amount ?? null;
 }
 
+export function getLeaseMaturityFlags(item: Pick<SalesLeaseMaturityListItem, "lease" | "maturity">, todayYmd = getTodayYmd()) {
+  const maturityDate = toYmd(getEffectiveMaturityDate(item));
+  const nextContactDate = toYmd(item.maturity?.next_contact_date ?? "");
+  const isCompleted = (item.maturity?.maturity_status ?? "not_started") === "completed";
+  const thisMonth = todayYmd.slice(0, 7);
+  const nextMonth = getNextMonth(todayYmd);
+  const thirtyDaysLater = addDaysYmd(todayYmd, 30);
+
+  return {
+    isCompleted,
+    isMaturityOverdue: Boolean(maturityDate) && maturityDate < todayYmd && !isCompleted,
+    isThisMonth: Boolean(maturityDate) && maturityDate.startsWith(thisMonth),
+    isNextMonth: Boolean(maturityDate) && maturityDate.startsWith(nextMonth),
+    isWithin30Days: Boolean(maturityDate) && maturityDate >= todayYmd && maturityDate <= thirtyDaysLater && !isCompleted,
+    isContactOverdue: Boolean(nextContactDate) && nextContactDate < todayYmd && !isCompleted
+  };
+}
+
 function dateSortValue(value: string) {
   if (!value) return Number.POSITIVE_INFINITY;
   const time = new Date(value).getTime();
@@ -461,6 +543,11 @@ function dateTimeSortValue(value: string | null | undefined) {
   if (!value) return 0;
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+function getNextMonth(todayYmd: string) {
+  const [year, month] = todayYmd.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
 }
 
 function normalize(value: unknown) {

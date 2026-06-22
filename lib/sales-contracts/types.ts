@@ -30,6 +30,13 @@ export type SalesLeaseMaturityStatus =
   | "return_planned"
   | "completed";
 export type SalesLeaseMaturityChoice = "undecided" | "purchase" | "renewal" | "return";
+export type SalesLeaseMaturityQuickFilter =
+  | "overdue"
+  | "this_month"
+  | "next_month"
+  | "within_30_days"
+  | "waiting_response"
+  | "contact_overdue";
 
 export type SalesCustomer = {
   id: string;
@@ -279,11 +286,27 @@ export type SalesLeaseMaturityListItem = {
   maturity: SalesLeaseMaturity | null;
 };
 
+export type SalesLeaseMaturitySummary = {
+  total: number;
+  overdue: number;
+  thisMonth: number;
+  nextMonth: number;
+  within30Days: number;
+  waitingResponse: number;
+  contactOverdue: number;
+};
+
+export type SalesLeaseMaturityListResult = {
+  items: SalesLeaseMaturityListItem[];
+  summary: SalesLeaseMaturitySummary;
+};
+
 export type SalesLeaseMaturityFilters = {
   maturityMonth?: string;
   leaseCompany?: SalesLeaseCompany;
   maturityStatus?: SalesLeaseMaturityStatus;
   customerChoice?: SalesLeaseMaturityChoice;
+  quickFilter?: SalesLeaseMaturityQuickFilter;
 };
 
 export type SalesDataResult<T> = {

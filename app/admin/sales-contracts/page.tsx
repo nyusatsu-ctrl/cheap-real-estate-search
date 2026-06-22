@@ -43,6 +43,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
   const filters = getFilters(params);
   const result = await getSalesContractList(filters);
   const setupMissing = firstParam(params.setup) === "missing";
+  const hasActiveFilters = Boolean(filters.keyword || filters.vehicleType || filters.contractType || filters.status || filters.financeCompany || filters.nextAction);
 
   return (
     <AdminShell email={admin.email} systemName="契約管理システム">
@@ -124,7 +125,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
         </div>
       </form>
 
-      <SalesContractTable items={result.data} />
+      <SalesContractTable items={result.data} emptyState={hasActiveFilters ? "filtered" : "onboarding"} />
     </AdminShell>
   );
 }

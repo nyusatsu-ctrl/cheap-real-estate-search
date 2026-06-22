@@ -19,14 +19,13 @@ import {
   LEASE_COMPANY_LABELS,
   VEHICLE_TYPE_LABELS
 } from "@/lib/sales-contracts/rules";
+import { LOAN_REVIEW_APP_URL } from "@/lib/sales-contracts/source";
 import type {
   SalesContactHistory,
   SalesContractDetail as SalesContractDetailType,
   SalesContractStatus,
   SalesContractType
 } from "@/lib/sales-contracts/types";
-
-const LOAN_REVIEW_APP_URL = "https://script.google.com/macros/s/AKfycbxqQtu-w9tcr_uXEs2dl0ykUfH18b58xXiyiDk72unfhhIBcrujkGQULzFCUP5hU_Sv/exec";
 
 export function SalesContractDetail({
   detail,

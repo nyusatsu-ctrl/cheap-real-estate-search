@@ -17,9 +17,18 @@ import {
   CONTRACT_TYPE_LABELS,
   VEHICLE_TYPE_LABELS
 } from "@/lib/sales-contracts/rules";
+import { LOAN_REVIEW_APP_URL } from "@/lib/sales-contracts/source";
 import type { SalesContractListItem } from "@/lib/sales-contracts/types";
 
-export function SalesContractTable({ items }: { items: SalesContractListItem[] }) {
+type SalesContractTableEmptyState = "default" | "onboarding" | "filtered";
+
+export function SalesContractTable({
+  items,
+  emptyState = "default"
+}: {
+  items: SalesContractListItem[];
+  emptyState?: SalesContractTableEmptyState;
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -97,14 +106,65 @@ export function SalesContractTable({ items }: { items: SalesContractListItem[] }
             })}
             {items.length === 0 ? (
               <tr>
-                <td colSpan={19} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">
-                  契約データはまだありません。
+                <td colSpan={19} className="px-3 py-8">
+                  <EmptySalesContractsState variant={emptyState} />
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function EmptySalesContractsState({ variant }: { variant: SalesContractTableEmptyState }) {
+  if (variant === "filtered") {
+    return (
+      <div className="py-5 text-center text-sm font-semibold text-slate-500">
+        条件に一致する契約データはありません。
+      </div>
+    );
+  }
+
+  if (variant !== "onboarding") {
+    return (
+      <div className="py-5 text-center text-sm font-semibold text-slate-500">
+        契約データはまだありません。
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-left">
+      <h2 className="text-xl font-black text-slate-950">契約データはまだありません</h2>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+        新規契約登録、または自社ローン審査管理アプリから契約予定のお客様を送信して、契約台帳に登録してください。
+      </p>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link href="/admin/sales-contracts/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+          新規契約を登録
+        </Link>
+        <a
+          href={LOAN_REVIEW_APP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 focus-ring"
+        >
+          自社ローン審査管理を開く
+        </a>
+      </div>
+      <p className="mt-4 text-sm font-semibold leading-6 text-emerald-900">
+        GAS審査管理から送信した場合は、顧客情報・電話番号・希望車種などが自動入力されます。契約条件を確認してから保存してください。
+      </p>
+      <ol className="mt-4 grid gap-2 text-sm font-bold text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
+        {["審査管理で顧客を選択", "契約管理へ登録を押す", "契約条件を確認", "契約を登録"].map((step, index) => (
+          <li key={step} className="rounded border border-emerald-100 bg-white px-3 py-2">
+            <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-700 text-xs text-white">{index + 1}</span>
+            {step}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

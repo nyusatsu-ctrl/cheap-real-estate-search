@@ -32,7 +32,7 @@ export default async function NewSalesContractPage({ searchParams }: { searchPar
     vehicle_type: normalizeVehicleType(firstParam(params.vehicle_type)),
     contract_type: normalizeContractType(firstParam(params.contract_type)),
     finance_company: normalizeFinanceCompany(firstParam(params.finance_company)),
-    payment_estimate: firstParam(params.payment_estimate),
+    payment_estimate: normalizePaymentEstimate(firstParam(params.payment_estimate)),
     application_amount: firstParam(params.application_amount),
     payment_count: firstParam(params.payment_count),
     initial_payment_amount: firstParam(params.initial_payment_amount),
@@ -153,4 +153,11 @@ function normalizeFinanceCompany(value: string): SalesFinanceCompany | undefined
   if (value === "aplus" || value === "アプラス") return "aplus";
   if (value === "ast" || value === "アスト") return "ast";
   return undefined;
+}
+
+function normalizePaymentEstimate(value: string) {
+  const text = value.trim();
+  if (!text) return "";
+  if (!/[0-9０-９]/.test(text)) return "";
+  return /[^\d０-９\s,，.．円￥¥万万円月々毎税込税抜込以内以下以上程度約~〜/／\-－]/.test(text) ? "" : text;
 }

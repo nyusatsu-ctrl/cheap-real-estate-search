@@ -8,8 +8,24 @@ export const metadata: Metadata = {
   description: "契約台帳、顧客、車両、ローン、リース、満期管理を管理するためのログイン画面です。"
 };
 
-export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
+type AdminLoginSearchParams = {
+  error?: string;
+  message?: string;
+  next?: string;
+  redirectTo?: string;
+  continue?: string;
+};
+
+function safeLoginRedirectPath(value: string | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/admin/login")) {
+    return "/admin/sales-contracts";
+  }
+  return value;
+}
+
+export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<AdminLoginSearchParams> }) {
   const resolvedSearchParams = await searchParams;
+  const redirectTo = safeLoginRedirectPath(resolvedSearchParams.next ?? resolvedSearchParams.redirectTo ?? resolvedSearchParams.continue);
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -32,6 +48,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
           </p>
         ) : null}
         <form action={signInAction} className="mt-5 grid gap-4">
+          <input type="hidden" name="redirect_to" value={redirectTo} />
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             メールアドレス
             <input id="email" name="email" type="email" autoComplete="username" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />

@@ -19,14 +19,26 @@ function nullableNumber(formData: FormData, key: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function safeAdminRedirectPath(value: FormDataEntryValue | null) {
+  const path = String(value ?? "").trim();
+  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/admin/login")) {
+    return "/admin/sales-contracts";
+  }
+  return path;
+}
+
 export async function signInAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const email = requiredString(formData, "email");
   const password = requiredString(formData, "password");
+  const redirectTo = safeAdminRedirectPath(formData.get("redirect_to"));
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/admin/login?error=${encodeURIComponent(error.message)}`);
+  if (error) {
+    const params = new URLSearchParams({ error: error.message, next: redirectTo });
+    redirect(`/admin/login?${params.toString()}`);
+  }
 
   if (process.env.ADMIN_AUTH_DEBUG === "1" || process.env.NODE_ENV === "development") {
     console.info("[admin-auth] sign_in", {
@@ -36,7 +48,7 @@ export async function signInAction(formData: FormData) {
     });
   }
 
-  redirect("/admin/properties");
+  redirect(redirectTo);
 }
 
 export async function signOutAction() {

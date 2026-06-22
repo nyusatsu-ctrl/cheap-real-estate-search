@@ -17,6 +17,8 @@ import {
   DOCUMENT_VISIBILITY_LABELS,
   FINANCE_COMPANY_LABELS,
   LEASE_COMPANY_LABELS,
+  LEASE_MATURITY_CHOICE_LABELS,
+  LEASE_MATURITY_STATUS_LABELS,
   VEHICLE_TYPE_LABELS
 } from "@/lib/sales-contracts/rules";
 import { LOAN_REVIEW_APP_URL } from "@/lib/sales-contracts/source";
@@ -74,6 +76,8 @@ export function SalesContractDetail({
         </dl>
         <NextActionPanel history={nextAction} />
       </section>
+
+      {item.contract.contract_type === "lease" ? <LeaseMaturityNavigationCard item={item} /> : null}
 
       {isLoanReviewSource ? <LoanReviewSourceCard item={item} /> : null}
 
@@ -287,6 +291,116 @@ function ContractCreatedActions({
       </div>
     </section>
   );
+}
+
+function LeaseMaturityNavigationCard({ item }: { item: SalesContractDetailType }) {
+  const maturity = item.leaseMaturity;
+  const maturityDate = maturity?.maturity_date ?? item.lease?.lease_end_date;
+  const residualValueAmount = maturity?.residual_value_amount ?? item.lease?.residual_value_amount;
+  const nextContactStatus = getNextContactStatus(maturity?.next_contact_date ?? null, maturity?.maturity_status ?? null);
+
+  return (
+    <section className={`rounded-lg border p-5 shadow-sm ${maturity ? nextContactStatus.panelClass : "border-amber-200 bg-amber-50"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-black text-slate-600">リース契約</p>
+          <h3 className="mt-1 text-xl font-black text-slate-950">リース満期管理</h3>
+          <p className="mt-2 text-sm font-semibold text-slate-700">
+            満期予定日: {formatSalesDate(maturityDate)} / 残価: {formatYen(residualValueAmount)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {maturity ? (
+            <>
+              <Badge className={getLeaseMaturityStatusClass(maturity.maturity_status)}>{LEASE_MATURITY_STATUS_LABELS[maturity.maturity_status]}</Badge>
+              <Badge className={getLeaseMaturityChoiceClass(maturity.customer_choice)}>{LEASE_MATURITY_CHOICE_LABELS[maturity.customer_choice]}</Badge>
+              <Badge className={nextContactStatus.badgeClass}>{nextContactStatus.label}</Badge>
+            </>
+          ) : (
+            <Badge className="bg-amber-100 text-amber-900">未作成</Badge>
+          )}
+        </div>
+      </div>
+      {maturity ? (
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+          <SummaryItem label="満期ステータス" value={LEASE_MATURITY_STATUS_LABELS[maturity.maturity_status]} />
+          <SummaryItem label="お客様の選択" value={LEASE_MATURITY_CHOICE_LABELS[maturity.customer_choice]} />
+          <SummaryItem label="次回連絡予定日" value={formatSalesDate(maturity.next_contact_date)} />
+        </dl>
+      ) : (
+        <p className="mt-3 text-sm font-semibold text-amber-900">
+          満期管理を作成すると、満期ステータス、お客様の選択、次回連絡予定日を一覧で追えるようになります。
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="#lease-maturity" className={`rounded px-4 py-2 text-sm font-bold shadow-sm focus-ring ${maturity ? "bg-brand-700 text-white" : "bg-amber-700 text-white"}`}>
+          {maturity ? "リース満期管理を編集" : "リース満期管理を作成"}
+        </Link>
+        {maturity ? (
+          <Link href="/admin/sales-lease-maturities" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+            リース満期一覧で見る
+          </Link>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function getNextContactStatus(value: string | null, maturityStatus: string | null) {
+  if (maturityStatus === "completed") {
+    return {
+      label: "完了済み",
+      panelClass: "border-slate-200 bg-white",
+      badgeClass: "bg-slate-100 text-slate-700"
+    };
+  }
+  if (!value) {
+    return {
+      label: "次回連絡未設定",
+      panelClass: "border-slate-200 bg-white",
+      badgeClass: "bg-slate-100 text-slate-700"
+    };
+  }
+  const target = value.slice(0, 10);
+  const today = getTodayYmd();
+  if (target < today) {
+    return {
+      label: "連絡期限切れ",
+      panelClass: "border-rose-200 bg-rose-50",
+      badgeClass: "bg-rose-700 text-white"
+    };
+  }
+  if (target <= today) {
+    return {
+      label: "今日まで",
+      panelClass: "border-amber-200 bg-amber-50",
+      badgeClass: "bg-amber-700 text-white"
+    };
+  }
+  if (target <= addDaysYmd(today, 7)) {
+    return {
+      label: "7日以内",
+      panelClass: "border-blue-200 bg-blue-50",
+      badgeClass: "bg-blue-700 text-white"
+    };
+  }
+  return {
+    label: "予定あり",
+    panelClass: "border-slate-200 bg-white",
+    badgeClass: "bg-slate-900 text-white"
+  };
+}
+
+function getLeaseMaturityStatusClass(value: string) {
+  if (value === "completed") return "bg-slate-100 text-slate-700";
+  if (value === "waiting_response") return "bg-amber-100 text-amber-900";
+  if (value === "purchase_planned" || value === "renewal_planned" || value === "return_planned") return "bg-sky-100 text-sky-900";
+  return "bg-emerald-50 text-emerald-800";
+}
+
+function getLeaseMaturityChoiceClass(value: string) {
+  if (value === "undecided") return "bg-slate-100 text-slate-700";
+  return "bg-emerald-100 text-emerald-900";
 }
 
 function DocumentLinksSection({ item }: { item: SalesContractDetailType }) {

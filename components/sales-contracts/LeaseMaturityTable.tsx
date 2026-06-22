@@ -73,7 +73,7 @@ export function LeaseMaturityTable({ items }: { items: SalesLeaseMaturityListIte
                     {flags.isContactOverdue ? <div className="mt-1"><Badge tone="danger">連絡期限切れ</Badge></div> : null}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
-                    <Link href={`/admin/sales-contracts/${item.contract.id}`} className="font-bold text-brand-700">
+                    <Link href={`/admin/sales-contracts/${item.contract.id}#lease-maturity`} className="font-bold text-brand-700">
                       表示
                     </Link>
                   </td>

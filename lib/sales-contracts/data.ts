@@ -16,6 +16,10 @@ import type {
   SalesDocument,
   SalesGuarantor,
   SalesLease,
+  SalesLeaseMaturity,
+  SalesLeaseMaturityFilters,
+  SalesLeaseMaturityHistory,
+  SalesLeaseMaturityListItem,
   SalesLoan,
   SalesVehicle
 } from "@/lib/sales-contracts/types";
@@ -103,7 +107,8 @@ export async function getSalesContractDetail(id: string): Promise<SalesDataResul
     leasesResult,
     guarantorsResult,
     documentsResult,
-    contactHistoriesResult
+    contactHistoriesResult,
+    leaseMaturitiesResult
   ] = await Promise.all([
     supabase.from("sales_customers").select("*").eq("id", contract.customer_id).is("deleted_at", null).maybeSingle(),
     supabase.from("sales_vehicles").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("updated_at", { ascending: false }),
@@ -111,7 +116,8 @@ export async function getSalesContractDetail(id: string): Promise<SalesDataResul
     supabase.from("sales_leases").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("updated_at", { ascending: false }),
     supabase.from("sales_guarantors").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("created_at", { ascending: true }),
     supabase.from("sales_documents").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("created_at", { ascending: true }),
-    supabase.from("sales_contact_histories").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("handled_at", { ascending: false })
+    supabase.from("sales_contact_histories").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("handled_at", { ascending: false }),
+    supabase.from("sales_lease_maturities").select("*").eq("contract_id", contract.id).is("deleted_at", null).order("updated_at", { ascending: false })
   ]);
 
   const firstError = [
@@ -121,9 +127,21 @@ export async function getSalesContractDetail(id: string): Promise<SalesDataResul
     leasesResult.error,
     guarantorsResult.error,
     documentsResult.error,
-    contactHistoriesResult.error
+    contactHistoriesResult.error,
+    leaseMaturitiesResult.error
   ].find(Boolean);
   if (firstError) return handleDataError<SalesContractDetail | null>(firstError, null);
+
+  const leaseMaturity = ((leaseMaturitiesResult.data ?? []) as SalesLeaseMaturity[])[0] ?? null;
+  const maturityHistoriesResult = leaseMaturity
+    ? await supabase
+      .from("sales_lease_maturity_histories")
+      .select("*")
+      .eq("maturity_id", leaseMaturity.id)
+      .is("deleted_at", null)
+      .order("handled_at", { ascending: false })
+    : { data: [], error: null };
+  if (maturityHistoriesResult.error) return handleDataError<SalesContractDetail | null>(maturityHistoriesResult.error, null);
 
   return {
     data: {
@@ -134,8 +152,73 @@ export async function getSalesContractDetail(id: string): Promise<SalesDataResul
       lease: ((leasesResult.data ?? []) as SalesLease[])[0] ?? null,
       guarantors: (guarantorsResult.data ?? []) as SalesGuarantor[],
       documents: (documentsResult.data ?? []) as SalesDocument[],
-      contactHistories: (contactHistoriesResult.data ?? []) as SalesContractDetail["contactHistories"]
+      contactHistories: (contactHistoriesResult.data ?? []) as SalesContractDetail["contactHistories"],
+      leaseMaturity,
+      leaseMaturityHistories: (maturityHistoriesResult.data ?? []) as SalesLeaseMaturityHistory[]
     },
+    tableMissing: false
+  };
+}
+
+export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilters = {}): Promise<SalesDataResult<SalesLeaseMaturityListItem[]>> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return { data: [], tableMissing: true, errorMessage: TABLE_MISSING_MESSAGE };
+  }
+
+  let leasesQuery = supabase
+    .from("sales_leases")
+    .select("*")
+    .is("deleted_at", null)
+    .order("lease_end_date", { ascending: true, nullsFirst: false })
+    .limit(1000);
+
+  if (filters.leaseCompany) leasesQuery = leasesQuery.eq("lease_company", filters.leaseCompany);
+
+  const leasesResult = await leasesQuery;
+  if (leasesResult.error) return handleDataError<SalesLeaseMaturityListItem[]>(leasesResult.error, []);
+
+  const leases = (leasesResult.data ?? []) as SalesLease[];
+  if (leases.length === 0) return { data: [], tableMissing: false };
+
+  const leaseIds = leases.map((lease) => lease.id);
+  const contractIds = unique(leases.map((lease) => lease.contract_id));
+
+  const [contractsResult, vehiclesResult, maturitiesResult] = await Promise.all([
+    supabase.from("sales_contracts").select("*").in("id", contractIds).is("deleted_at", null),
+    supabase.from("sales_vehicles").select("*").in("contract_id", contractIds).is("deleted_at", null),
+    supabase.from("sales_lease_maturities").select("*").in("lease_id", leaseIds).is("deleted_at", null)
+  ]);
+
+  const firstError = [contractsResult.error, vehiclesResult.error, maturitiesResult.error].find(Boolean);
+  if (firstError) return handleDataError<SalesLeaseMaturityListItem[]>(firstError, []);
+
+  const contracts = ((contractsResult.data ?? []) as SalesContract[]).filter((contract) => contract.contract_type === "lease");
+  const contractsById = mapById(contracts);
+  const customerIds = unique(contracts.map((contract) => contract.customer_id));
+  const customersResult = customerIds.length
+    ? await supabase.from("sales_customers").select("*").in("id", customerIds).is("deleted_at", null)
+    : { data: [], error: null };
+  if (customersResult.error) return handleDataError<SalesLeaseMaturityListItem[]>(customersResult.error, []);
+
+  const customersById = mapById((customersResult.data ?? []) as SalesCustomer[]);
+  const vehiclesByContractId = mapFirstByContractId((vehiclesResult.data ?? []) as SalesVehicle[]);
+  const maturitiesByLeaseId = mapFirstByLeaseId((maturitiesResult.data ?? []) as SalesLeaseMaturity[]);
+
+  const items = leases.flatMap((lease) => {
+    const contract = contractsById.get(lease.contract_id);
+    if (!contract) return [];
+    return [{
+      contract,
+      customer: customersById.get(contract.customer_id) ?? null,
+      vehicle: vehiclesByContractId.get(contract.id) ?? null,
+      lease,
+      maturity: maturitiesByLeaseId.get(lease.id) ?? null
+    }];
+  });
+
+  return {
+    data: applyLeaseMaturityFilters(items, filters).sort(compareLeaseMaturityItems),
     tableMissing: false
   };
 }
@@ -262,6 +345,36 @@ function applyFilters(items: SalesContractListItem[], filters: SalesContractFilt
   });
 }
 
+function applyLeaseMaturityFilters(items: SalesLeaseMaturityListItem[], filters: SalesLeaseMaturityFilters) {
+  return items.filter((item) => {
+    if (filters.maturityStatus && (item.maturity?.maturity_status ?? "not_started") !== filters.maturityStatus) return false;
+    if (filters.customerChoice && (item.maturity?.customer_choice ?? "undecided") !== filters.customerChoice) return false;
+    if (filters.maturityMonth && !getEffectiveMaturityDate(item).startsWith(filters.maturityMonth)) return false;
+    return true;
+  });
+}
+
+function compareLeaseMaturityItems(a: SalesLeaseMaturityListItem, b: SalesLeaseMaturityListItem) {
+  const aTime = dateSortValue(getEffectiveMaturityDate(a));
+  const bTime = dateSortValue(getEffectiveMaturityDate(b));
+  if (aTime !== bTime) return aTime - bTime;
+  return String(a.customer?.name ?? "").localeCompare(String(b.customer?.name ?? ""), "ja");
+}
+
+export function getEffectiveMaturityDate(item: Pick<SalesLeaseMaturityListItem, "lease" | "maturity">) {
+  return item.maturity?.maturity_date ?? item.lease.lease_end_date ?? "";
+}
+
+export function getEffectiveResidualValueAmount(item: Pick<SalesLeaseMaturityListItem, "lease" | "maturity">) {
+  return item.maturity?.residual_value_amount ?? item.lease.residual_value_amount ?? null;
+}
+
+function dateSortValue(value: string) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
+
 function normalize(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -278,6 +391,14 @@ function mapFirstByContractId<T extends { contract_id: string }>(items: T[]) {
   const map = new Map<string, T>();
   for (const item of items) {
     if (!map.has(item.contract_id)) map.set(item.contract_id, item);
+  }
+  return map;
+}
+
+function mapFirstByLeaseId<T extends { lease_id: string }>(items: T[]) {
+  const map = new Map<string, T>();
+  for (const item of items) {
+    if (!map.has(item.lease_id)) map.set(item.lease_id, item);
   }
   return map;
 }

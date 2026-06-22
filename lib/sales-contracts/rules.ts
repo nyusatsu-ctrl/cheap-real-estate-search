@@ -6,6 +6,8 @@ import type {
   SalesContractType,
   SalesDocumentVisibility,
   SalesFinanceCompany,
+  SalesLeaseMaturityChoice,
+  SalesLeaseMaturityStatus,
   SalesLeaseCompany,
   SalesVehicleType
 } from "@/lib/sales-contracts/types";
@@ -78,6 +80,23 @@ export const DOCUMENT_VISIBILITY_LABELS: Record<SalesDocumentVisibility, string>
   public: "共有可"
 };
 
+export const LEASE_MATURITY_STATUS_LABELS: Record<SalesLeaseMaturityStatus, string> = {
+  not_started: "未対応",
+  notified: "案内済み",
+  waiting_response: "回答待ち",
+  purchase_planned: "買取予定",
+  renewal_planned: "再リース予定",
+  return_planned: "返却予定",
+  completed: "完了"
+};
+
+export const LEASE_MATURITY_CHOICE_LABELS: Record<SalesLeaseMaturityChoice, string> = {
+  undecided: "未定",
+  purchase: "買取",
+  renewal: "再リース",
+  return: "返却"
+};
+
 export const DOCUMENT_TYPE_OPTIONS = [
   { value: "order_contract", label: "注文書・売買契約書" },
   { value: "finance_contract", label: "信販契約書" },
@@ -100,6 +119,8 @@ export const CONTRACT_STATUS_OPTIONS = Object.entries(CONTRACT_STATUS_LABELS).ma
 export const CONTACT_STATUS_OPTIONS = Object.entries(CONTACT_STATUS_LABELS).map(([value, label]) => ({ value: value as SalesContactStatus, label }));
 export const CONTACT_METHOD_OPTIONS = Object.entries(CONTACT_METHOD_LABELS).map(([value, label]) => ({ value: value as SalesContactMethod, label }));
 export const DOCUMENT_VISIBILITY_OPTIONS = Object.entries(DOCUMENT_VISIBILITY_LABELS).map(([value, label]) => ({ value: value as SalesDocumentVisibility, label }));
+export const LEASE_MATURITY_STATUS_OPTIONS = Object.entries(LEASE_MATURITY_STATUS_LABELS).map(([value, label]) => ({ value: value as SalesLeaseMaturityStatus, label }));
+export const LEASE_MATURITY_CHOICE_OPTIONS = Object.entries(LEASE_MATURITY_CHOICE_LABELS).map(([value, label]) => ({ value: value as SalesLeaseMaturityChoice, label }));
 
 export function getAllowedContractTypes(vehicleType: SalesVehicleType) {
   return CONTRACT_TYPE_OPTIONS.filter((option) => vehicleType !== "bike" || option.value !== "lease");

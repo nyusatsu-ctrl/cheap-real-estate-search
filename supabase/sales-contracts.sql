@@ -194,6 +194,65 @@ create table if not exists public.sales_audit_logs (
   deleted_at timestamptz
 );
 
+create table if not exists public.sales_lease_maturities (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.sales_contracts(id) on delete restrict,
+  lease_id uuid not null references public.sales_leases(id) on delete restrict,
+  maturity_date date,
+  maturity_status text not null default 'not_started' check (maturity_status in (
+    'not_started',
+    'notified',
+    'waiting_response',
+    'purchase_planned',
+    'renewal_planned',
+    'return_planned',
+    'completed'
+  )),
+  customer_choice text not null default 'undecided' check (customer_choice in (
+    'undecided',
+    'purchase',
+    'renewal',
+    'return'
+  )),
+  residual_value_amount bigint check (residual_value_amount is null or residual_value_amount >= 0),
+  maturity_mileage integer check (maturity_mileage is null or maturity_mileage >= 0),
+  contracted_mileage_limit integer check (contracted_mileage_limit is null or contracted_mileage_limit >= 0),
+  mileage_over_limit boolean not null default false,
+  vehicle_condition_memo text,
+  additional_settlement_amount bigint check (additional_settlement_amount is null or additional_settlement_amount >= 0),
+  additional_settlement_reason text,
+  final_settlement_amount bigint check (final_settlement_amount is null or final_settlement_amount >= 0),
+  purchase_payment_due_date date,
+  purchase_paid_date date,
+  renewal_contract_id uuid references public.sales_contracts(id) on delete restrict,
+  return_scheduled_date date,
+  return_completed_date date,
+  maturity_notice_sent_date date,
+  next_contact_date date,
+  memo text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+create table if not exists public.sales_lease_maturity_histories (
+  id uuid primary key default gen_random_uuid(),
+  maturity_id uuid not null references public.sales_lease_maturities(id) on delete restrict,
+  contract_id uuid not null references public.sales_contracts(id) on delete restrict,
+  customer_id uuid references public.sales_customers(id) on delete restrict,
+  handled_at timestamptz,
+  handled_by text,
+  method text not null default 'phone' check (method in ('phone', 'line', 'email', 'sms', 'visit', 'other')),
+  content text not null,
+  next_action_date date,
+  status text not null default 'normal' check (status in ('normal', 'caution', 'payment_delay', 'repair_consultation', 'complaint', 'completed')),
+  attachment_url text,
+  memo text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
 alter table public.sales_loans
   add column if not exists initial_payment_amount bigint check (initial_payment_amount is null or initial_payment_amount >= 0),
   add column if not exists final_payment_amount bigint check (final_payment_amount is null or final_payment_amount >= 0);
@@ -235,6 +294,20 @@ create index if not exists sales_contact_histories_customer_id_idx on public.sal
 create index if not exists sales_contact_histories_handled_at_idx on public.sales_contact_histories(handled_at desc);
 create index if not exists sales_audit_logs_target_idx on public.sales_audit_logs(target_table, target_id);
 create index if not exists sales_audit_logs_actor_idx on public.sales_audit_logs(actor_profile_id);
+create unique index if not exists sales_lease_maturities_active_lease_id_uidx on public.sales_lease_maturities(lease_id) where deleted_at is null;
+create index if not exists sales_lease_maturities_contract_id_idx on public.sales_lease_maturities(contract_id);
+create index if not exists sales_lease_maturities_lease_id_idx on public.sales_lease_maturities(lease_id);
+create index if not exists sales_lease_maturities_maturity_date_idx on public.sales_lease_maturities(maturity_date);
+create index if not exists sales_lease_maturities_maturity_status_idx on public.sales_lease_maturities(maturity_status);
+create index if not exists sales_lease_maturities_customer_choice_idx on public.sales_lease_maturities(customer_choice);
+create index if not exists sales_lease_maturities_next_contact_date_idx on public.sales_lease_maturities(next_contact_date);
+create index if not exists sales_lease_maturities_deleted_at_idx on public.sales_lease_maturities(deleted_at);
+create index if not exists sales_lease_maturity_histories_maturity_id_idx on public.sales_lease_maturity_histories(maturity_id);
+create index if not exists sales_lease_maturity_histories_contract_id_idx on public.sales_lease_maturity_histories(contract_id);
+create index if not exists sales_lease_maturity_histories_customer_id_idx on public.sales_lease_maturity_histories(customer_id);
+create index if not exists sales_lease_maturity_histories_handled_at_idx on public.sales_lease_maturity_histories(handled_at desc);
+create index if not exists sales_lease_maturity_histories_next_action_date_idx on public.sales_lease_maturity_histories(next_action_date);
+create index if not exists sales_lease_maturity_histories_deleted_at_idx on public.sales_lease_maturity_histories(deleted_at);
 
 alter table public.sales_customers enable row level security;
 alter table public.sales_contracts enable row level security;
@@ -245,6 +318,8 @@ alter table public.sales_guarantors enable row level security;
 alter table public.sales_documents enable row level security;
 alter table public.sales_contact_histories enable row level security;
 alter table public.sales_audit_logs enable row level security;
+alter table public.sales_lease_maturities enable row level security;
+alter table public.sales_lease_maturity_histories enable row level security;
 
 grant select, insert, update on public.sales_customers to authenticated;
 grant select, insert, update on public.sales_contracts to authenticated;
@@ -255,6 +330,8 @@ grant select, insert, update on public.sales_guarantors to authenticated;
 grant select, insert, update on public.sales_documents to authenticated;
 grant select, insert, update on public.sales_contact_histories to authenticated;
 grant select, insert on public.sales_audit_logs to authenticated;
+grant select, insert, update on public.sales_lease_maturities to authenticated;
+grant select, insert, update on public.sales_lease_maturity_histories to authenticated;
 
 grant all on public.sales_customers to service_role;
 grant all on public.sales_contracts to service_role;
@@ -265,6 +342,8 @@ grant all on public.sales_guarantors to service_role;
 grant all on public.sales_documents to service_role;
 grant all on public.sales_contact_histories to service_role;
 grant all on public.sales_audit_logs to service_role;
+grant all on public.sales_lease_maturities to service_role;
+grant all on public.sales_lease_maturity_histories to service_role;
 
 create or replace function public.sales_is_admin()
 returns boolean
@@ -341,6 +420,20 @@ with check (public.sales_is_admin());
 drop policy if exists "admins manage sales_audit_logs" on public.sales_audit_logs;
 create policy "admins manage sales_audit_logs"
 on public.sales_audit_logs for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_lease_maturities" on public.sales_lease_maturities;
+create policy "admins manage sales_lease_maturities"
+on public.sales_lease_maturities for all
+to authenticated
+using (public.sales_is_admin())
+with check (public.sales_is_admin());
+
+drop policy if exists "admins manage sales_lease_maturity_histories" on public.sales_lease_maturity_histories;
+create policy "admins manage sales_lease_maturity_histories"
+on public.sales_lease_maturity_histories for all
 to authenticated
 using (public.sales_is_admin())
 with check (public.sales_is_admin());

@@ -4,8 +4,13 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { ContactHistoryForm } from "@/components/sales-contracts/ContactHistoryForm";
 import { DocumentsSection } from "@/components/sales-contracts/DocumentsSection";
+import { LeaseMaturityCard } from "@/components/sales-contracts/LeaseMaturityCard";
 import { SalesContractDetail } from "@/components/sales-contracts/SalesContractDetail";
 import { SalesContractForm } from "@/components/sales-contracts/SalesContractForm";
+import {
+  addLeaseMaturityHistoryAction,
+  upsertLeaseMaturityAction
+} from "@/app/admin/sales-lease-maturities/actions";
 import {
   addContactHistoryAction,
   addDocumentAction,
@@ -60,6 +65,9 @@ export default async function SalesContractDetailPage({
       ) : null}
       <div className="space-y-6">
         <SalesContractDetail detail={result.data} />
+        {result.data.contract.contract_type === "lease" ? (
+          <LeaseMaturityCard detail={result.data} action={upsertLeaseMaturityAction} historyAction={addLeaseMaturityHistoryAction} />
+        ) : null}
         <section>
           <h2 className="mb-3 text-xl font-black text-slate-950">編集</h2>
           <SalesContractForm mode="edit" action={updateSalesContractAction} detail={result.data} />

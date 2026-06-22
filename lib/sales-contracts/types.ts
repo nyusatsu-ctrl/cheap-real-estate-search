@@ -18,6 +18,15 @@ export type SalesContractStatus =
 export type SalesContactMethod = "phone" | "line" | "email" | "sms" | "visit" | "other";
 export type SalesContactStatus = "normal" | "caution" | "payment_delay" | "repair_consultation" | "complaint" | "completed";
 export type SalesDocumentVisibility = "admin" | "staff" | "public";
+export type SalesLeaseMaturityStatus =
+  | "not_started"
+  | "notified"
+  | "waiting_response"
+  | "purchase_planned"
+  | "renewal_planned"
+  | "return_planned"
+  | "completed";
+export type SalesLeaseMaturityChoice = "undecided" | "purchase" | "renewal" | "return";
 
 export type SalesCustomer = {
   id: string;
@@ -186,6 +195,52 @@ export type SalesContactHistory = {
   deleted_at: string | null;
 };
 
+export type SalesLeaseMaturity = {
+  id: string;
+  contract_id: string;
+  lease_id: string;
+  maturity_date: string | null;
+  maturity_status: SalesLeaseMaturityStatus;
+  customer_choice: SalesLeaseMaturityChoice;
+  residual_value_amount: number | null;
+  maturity_mileage: number | null;
+  contracted_mileage_limit: number | null;
+  mileage_over_limit: boolean;
+  vehicle_condition_memo: string | null;
+  additional_settlement_amount: number | null;
+  additional_settlement_reason: string | null;
+  final_settlement_amount: number | null;
+  purchase_payment_due_date: string | null;
+  purchase_paid_date: string | null;
+  renewal_contract_id: string | null;
+  return_scheduled_date: string | null;
+  return_completed_date: string | null;
+  maturity_notice_sent_date: string | null;
+  next_contact_date: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+export type SalesLeaseMaturityHistory = {
+  id: string;
+  maturity_id: string;
+  contract_id: string;
+  customer_id: string | null;
+  handled_at: string | null;
+  handled_by: string | null;
+  method: SalesContactMethod;
+  content: string;
+  next_action_date: string | null;
+  status: SalesContactStatus;
+  attachment_url: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
 export type SalesContractListItem = {
   contract: SalesContract;
   customer: SalesCustomer | null;
@@ -198,6 +253,8 @@ export type SalesContractDetail = SalesContractListItem & {
   guarantors: SalesGuarantor[];
   documents: SalesDocument[];
   contactHistories: SalesContactHistory[];
+  leaseMaturity: SalesLeaseMaturity | null;
+  leaseMaturityHistories: SalesLeaseMaturityHistory[];
 };
 
 export type SalesContractFilters = {
@@ -205,6 +262,21 @@ export type SalesContractFilters = {
   contractType?: SalesContractType;
   status?: SalesContractStatus;
   financeCompany?: SalesFinanceCompany;
+};
+
+export type SalesLeaseMaturityListItem = {
+  contract: SalesContract;
+  customer: SalesCustomer | null;
+  vehicle: SalesVehicle | null;
+  lease: SalesLease;
+  maturity: SalesLeaseMaturity | null;
+};
+
+export type SalesLeaseMaturityFilters = {
+  maturityMonth?: string;
+  leaseCompany?: SalesLeaseCompany;
+  maturityStatus?: SalesLeaseMaturityStatus;
+  customerChoice?: SalesLeaseMaturityChoice;
 };
 
 export type SalesDataResult<T> = {

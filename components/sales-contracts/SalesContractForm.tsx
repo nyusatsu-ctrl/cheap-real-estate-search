@@ -85,6 +85,8 @@ export function SalesContractForm({
 
   const sourceLinkMemo = buildSourceLinkMemo(sourceDefaults);
   const sourceSnapshotJson = buildSourceSnapshotJson(sourceDefaults);
+  const sourceSystemValue = contract?.source_system ?? sourceDefaults?.source_system ?? "";
+  const isLoanReviewImport = mode === "create" && sourceSystemValue === "gas_loan_review";
   const sourceReceivedAtValue = dateTimeLocalValue(contract?.source_received_at ?? sourceDefaults?.source_received_at);
   const sourceVehicleModel = vehicle?.model ?? sourceDefaults?.desired_vehicle ?? "";
   const sourceMonthlyPayment = firstPresentValue(
@@ -94,8 +96,9 @@ export function SalesContractForm({
   );
   const initialVehicleType = contract?.vehicle_type ?? sourceDefaults?.vehicle_type ?? "car";
   const initialContractType = contract?.contract_type ?? sourceDefaults?.contract_type ?? "cash";
-  const initialFinanceCompany = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
-  const initialLeaseCompany = contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "";
+  const initialContractStatus = contract?.status ?? (isLoanReviewImport ? "waiting_delivery" : "contracted");
+  const initialFinanceCompany: SalesFinanceCompany | "" = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
+  const initialLeaseCompany: SalesLeaseCompany | "" = contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "";
   const initialInstallmentCount =
     loan?.installment_count ??
     (initialContractType === "loan" && initialFinanceCompany ? parseOptionalInteger(sourceDefaults?.payment_count) : null);
@@ -107,7 +110,7 @@ export function SalesContractForm({
   const [leaseCompany, setLeaseCompany] = useState<SalesLeaseCompany | "">(initialLeaseCompany);
   const [installmentCount, setInstallmentCount] = useState<number | null>(initialInstallmentCount);
   const [clearFinancialDefaults, setClearFinancialDefaults] = useState(false);
-  const [missingRequiredFields, setMissingRequiredFields] = useState<SalesContractMissingRequiredField[]>(() => mode === "create" ? getSalesContractMissingRequiredFields({
+  const initialRequiredInput = {
     customerName: customer?.name ?? sourceDefaults?.customer_name,
     phone: customer?.phone ?? sourceDefaults?.phone,
     vehicleType: initialVehicleType,
@@ -124,7 +127,16 @@ export function SalesContractForm({
     monthlyLeaseFee: lease?.monthly_lease_fee,
     leaseStartDate: lease?.lease_start_date,
     leaseEndDate: lease?.lease_end_date
+  };
+  const [missingRequiredFields, setMissingRequiredFields] = useState<SalesContractMissingRequiredField[]>(() => mode === "create" ? getSalesContractMissingRequiredFields(initialRequiredInput, {
+    mode: isLoanReviewImport ? "candidate" : "contract"
   }) : []);
+  const [unconfirmedFields, setUnconfirmedFields] = useState<SalesContractMissingRequiredField[]>(() => isLoanReviewImport
+    ? getUnconfirmedFields(
+      getSalesContractMissingRequiredFields(initialRequiredInput),
+      getSalesContractMissingRequiredFields(initialRequiredInput, { mode: "candidate" })
+    )
+    : []);
 
   const allowedContractTypes = getAllowedContractTypes(vehicleType);
   const allowedFinanceCompanies = getAllowedFinanceCompanies(vehicleType);
@@ -135,9 +147,11 @@ export function SalesContractForm({
     contractType,
     financeCompany: contractType === "loan" ? financeCompany : "",
     leaseCompany: contractType === "lease" ? leaseCompany : "",
-    installmentCount
+    installmentCount,
+    allowIncompleteTerms: isLoanReviewImport
   });
   const missingRequiredFieldKeys = useMemo(() => new Set(missingRequiredFields.map((field) => field.key)), [missingRequiredFields]);
+  const unconfirmedFieldKeys = useMemo(() => new Set(unconfirmedFields.map((field) => field.key)), [unconfirmedFields]);
   const blockingMessages = useMemo(() => {
     const requiredMessages = missingRequiredFields.map((field) => field.message);
     const selectionMessages = validation.errors.filter((message) => !isCoveredByRequiredFieldMessage(message, missingRequiredFieldKeys));
@@ -149,6 +163,7 @@ export function SalesContractForm({
   const financialTextValue = (value: string | null | undefined) => clearFinancialDefaults ? "" : value;
   const financialCheckboxValue = (value: boolean | null | undefined) => clearFinancialDefaults ? false : value ?? false;
   const isMissing = (key: string) => mode === "create" && missingRequiredFieldKeys.has(key);
+  const isUnconfirmed = (key: string) => isLoanReviewImport && unconfirmedFieldKeys.has(key) && !missingRequiredFieldKeys.has(key);
 
   const refreshMissingRequiredFields = useCallback((overrides: Partial<RequiredFieldOverrides> = {}) => {
     if (mode !== "create") {
@@ -164,7 +179,7 @@ export function SalesContractForm({
     const currentLeaseCompany = overrides.leaseCompany ?? ((read("lease_company") as SalesLeaseCompany | "") || leaseCompany);
     const currentInstallmentCount = "installmentCount" in overrides ? overrides.installmentCount : read("installment_count") || installmentCount;
 
-    setMissingRequiredFields(getSalesContractMissingRequiredFields({
+    const requiredInput = {
       customerName: read("customer_name"),
       phone: read("phone"),
       vehicleType: currentVehicleType,
@@ -181,8 +196,14 @@ export function SalesContractForm({
       monthlyLeaseFee: read("monthly_lease_fee"),
       leaseStartDate: read("lease_start_date"),
       leaseEndDate: read("lease_end_date")
-    }));
-  }, [contractType, financeCompany, installmentCount, leaseCompany, mode, vehicleType]);
+    };
+    const blockingFields = getSalesContractMissingRequiredFields(requiredInput, {
+      mode: isLoanReviewImport ? "candidate" : "contract"
+    });
+
+    setMissingRequiredFields(blockingFields);
+    setUnconfirmedFields(isLoanReviewImport ? getUnconfirmedFields(getSalesContractMissingRequiredFields(requiredInput), blockingFields) : []);
+  }, [contractType, financeCompany, installmentCount, isLoanReviewImport, leaseCompany, mode, vehicleType]);
 
   function handleVehicleTypeChange(nextValue: SalesVehicleType) {
     setVehicleType(nextValue);
@@ -282,13 +303,14 @@ export function SalesContractForm({
         </>
       ) : null}
 
-      <input type="hidden" name="source_system" value={contract?.source_system ?? sourceDefaults?.source_system ?? ""} />
+      <input type="hidden" name="source_system" value={sourceSystemValue} />
       <input type="hidden" name="source_row_key" value={contract?.source_row_key ?? sourceDefaults?.source_row_key ?? ""} />
       <input type="hidden" name="source_row_number" value={contract?.source_row_number?.toString() ?? sourceDefaults?.source_row_number ?? ""} />
       <input type="hidden" name="source_received_at" value={sourceReceivedAtValue} />
       <input type="hidden" name="source_snapshot_json" value={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson} />
 
       <MissingRequiredFieldsNotice messages={blockingMessages} />
+      <UnconfirmedContractFieldsNotice fields={unconfirmedFields} />
 
       <Section title="顧客情報">
         <div className="grid gap-3 md:grid-cols-3">
@@ -317,7 +339,15 @@ export function SalesContractForm({
           <SelectField label="契約方法" name="contract_type" value={contractType} onChange={(value) => handleContractTypeChange(value as SalesContractType)}>
             {allowedContractTypes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </SelectField>
-          <TextField label="契約金額" name="sale_price" type="number" defaultValue={numberValue(contract?.sale_price)} required={contractType === "cash"} missing={isMissing("sale_price") || isMissing("principal")} />
+          <TextField
+            label="契約金額"
+            name="sale_price"
+            type="number"
+            defaultValue={numberValue(contract?.sale_price)}
+            required={contractType === "cash" && !isLoanReviewImport}
+            missing={isMissing("sale_price") || isMissing("principal") || isUnconfirmed("sale_price") || isUnconfirmed("principal")}
+            helperText={isUnconfirmed("sale_price") || isUnconfirmed("principal") ? "正式契約までに契約金額またはローン元金を入力してください。" : undefined}
+          />
           <TextField label="諸費用" name="fees" type="number" defaultValue={numberValue(contract?.fees)} />
           <TextField label="総支払額" name="total_price" type="number" defaultValue={numberValue(contract?.total_price)} />
           <TextField label="頭金" name="down_payment" type="number" defaultValue={numberValue(contract?.down_payment)} />
@@ -326,7 +356,7 @@ export function SalesContractForm({
           <TextField label="担当者" name="staff_name" defaultValue={contract?.staff_name} />
           <label className="grid gap-1 text-sm font-bold text-slate-700">
             契約ステータス
-            <select name="status" defaultValue={contract?.status ?? "contracted"} className={inputClass}>
+            <select name="status" defaultValue={initialContractStatus} className={inputClass}>
               {CONTRACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
@@ -337,7 +367,14 @@ export function SalesContractForm({
       <Section title="車両情報">
         <div className="grid gap-3 md:grid-cols-4">
           <TextField label="メーカー" name="maker" defaultValue={vehicle?.maker} />
-          <TextField label="車種" name="model" defaultValue={sourceVehicleModel} required={mode === "create"} missing={isMissing("model")} />
+          <TextField
+            label="車種"
+            name="model"
+            defaultValue={sourceVehicleModel}
+            required={mode === "create" && !isLoanReviewImport}
+            missing={isMissing("model") || isUnconfirmed("model")}
+            helperText={isUnconfirmed("model") ? "正式契約までに車種を入力してください。" : undefined}
+          />
           <TextField label="グレード" name="grade" defaultValue={vehicle?.grade} />
           <TextField label="年式" name="model_year" type="number" defaultValue={numberValue(vehicle?.model_year)} />
           <TextField label="走行距離" name="mileage" type="number" defaultValue={numberValue(vehicle?.mileage)} />
@@ -364,14 +401,15 @@ export function SalesContractForm({
                 name="finance_company"
                 value={financeCompany}
                 onChange={(event) => handleFinanceCompanyChange(event.target.value as SalesFinanceCompany | "")}
-                required
-                aria-invalid={isMissing("finance_company") || undefined}
-                className={fieldClass(isMissing("finance_company"))}
+                required={!isLoanReviewImport}
+                aria-invalid={isMissing("finance_company") || isUnconfirmed("finance_company") || undefined}
+                className={fieldClass(isMissing("finance_company") || isUnconfirmed("finance_company"))}
               >
                 <option value="">選択</option>
                 {allowedFinanceCompanies.map((option) => <option key={option.value} value={option.value}>{FINANCE_COMPANY_LABELS[option.value]}</option>)}
               </select>
               {isMissing("finance_company") ? <span className="text-xs font-bold text-amber-700">信販会社を選択してください。</span> : null}
+              {isUnconfirmed("finance_company") ? <span className="text-xs font-bold text-amber-700">正式契約までに信販会社を選択してください。</span> : null}
             </label>
             <TextField label="信販申込番号" name="application_number" defaultValue={financialTextValue(loan?.application_number)} />
             <TextField label="契約番号" name="loan_contract_number" defaultValue={financialTextValue(loan?.contract_number)} />
@@ -383,26 +421,48 @@ export function SalesContractForm({
               </select>
             </label>
             <TextField label="金利" name="interest_rate" type="number" step="0.001" defaultValue={financialNumberValue(loan?.interest_rate)} />
-            <TextField label="ローン元金" name="principal" type="number" defaultValue={financialNumberValue(loan?.principal ?? sourceDefaults?.application_amount)} missing={isMissing("principal")} helperText="契約金額またはローン元金を入力してください。" />
+            <TextField
+              label="ローン元金"
+              name="principal"
+              type="number"
+              defaultValue={financialNumberValue(loan?.principal ?? sourceDefaults?.application_amount)}
+              missing={isMissing("principal") || isUnconfirmed("principal")}
+              helperText={isUnconfirmed("principal") ? "正式契約までに契約金額またはローン元金を入力してください。" : "契約金額またはローン元金を入力してください。"}
+            />
             <label className="grid gap-1 text-sm font-bold text-slate-700">
               支払回数
               <select
                 name="installment_count"
                 value={installmentCount ?? ""}
                 onChange={(event) => handleInstallmentCountChange(event.target.value)}
-                required
-                aria-invalid={isMissing("installment_count") || undefined}
-                className={fieldClass(isMissing("installment_count"))}
+                required={!isLoanReviewImport}
+                aria-invalid={isMissing("installment_count") || isUnconfirmed("installment_count") || undefined}
+                className={fieldClass(isMissing("installment_count") || isUnconfirmed("installment_count"))}
               >
                 <option value="">選択</option>
                 {installmentOptions.map((count) => <option key={count} value={count}>{count}回</option>)}
               </select>
               {isMissing("installment_count") ? <span className="text-xs font-bold text-amber-700">支払回数を選択してください。支払回数が未確定の場合は、審査結果確定後に入力してください。</span> : null}
+              {isUnconfirmed("installment_count") ? <span className="text-xs font-bold text-amber-700">正式契約までに支払回数を選択してください。</span> : null}
             </label>
             <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(loan?.initial_payment_amount ?? sourceDefaults?.initial_payment_amount)} />
-            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(sourceMonthlyPayment)} missing={isMissing("monthly_payment")} />
+            <TextField
+              label="月額"
+              name="monthly_payment"
+              type="number"
+              defaultValue={financialNumberValue(sourceMonthlyPayment)}
+              missing={isMissing("monthly_payment") || isUnconfirmed("monthly_payment")}
+              helperText={isUnconfirmed("monthly_payment") ? "正式契約までに月額を入力してください。" : undefined}
+            />
             <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(loan?.final_payment_amount)} />
-            <TextField label="支払開始日" name="first_payment_date" type="date" defaultValue={financialDateValue(loan?.first_payment_date)} missing={isMissing("first_payment_date")} />
+            <TextField
+              label="支払開始日"
+              name="first_payment_date"
+              type="date"
+              defaultValue={financialDateValue(loan?.first_payment_date)}
+              missing={isMissing("first_payment_date") || isUnconfirmed("first_payment_date")}
+              helperText={isUnconfirmed("first_payment_date") ? "正式契約までに支払開始日を入力してください。" : undefined}
+            />
             <TextField label="支払終了日" name="final_payment_date" type="date" defaultValue={financialDateValue(loan?.final_payment_date)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
               <input name="loan_bonus_payment_enabled" type="checkbox" defaultChecked={financialCheckboxValue(loan?.bonus_payment_enabled)} className={checkboxClass} />
@@ -428,23 +488,52 @@ export function SalesContractForm({
                 name="lease_company"
                 value={leaseCompany}
                 onChange={(event) => handleLeaseCompanyChange(event.target.value as SalesLeaseCompany | "")}
-                required
-                aria-invalid={isMissing("lease_company") || undefined}
-                className={fieldClass(isMissing("lease_company"))}
+                required={!isLoanReviewImport}
+                aria-invalid={isMissing("lease_company") || isUnconfirmed("lease_company") || undefined}
+                className={fieldClass(isMissing("lease_company") || isUnconfirmed("lease_company"))}
               >
                 <option value="">選択</option>
                 {allowedLeaseCompanies.map((option) => <option key={option.value} value={option.value}>{LEASE_COMPANY_LABELS[option.value]}</option>)}
               </select>
               {isMissing("lease_company") ? <span className="text-xs font-bold text-amber-700">リース会社を選択してください。</span> : null}
+              {isUnconfirmed("lease_company") ? <span className="text-xs font-bold text-amber-700">正式契約までにリース会社を選択してください。</span> : null}
             </label>
             <TextField label="提携会社" name="partner_company" defaultValue={financialTextValue(lease?.partner_company)} />
             <TextField label="契約番号" name="lease_contract_number" defaultValue={financialTextValue(lease?.contract_number)} />
-            <TextField label="支払回数・契約期間（月）" name="lease_months" type="number" defaultValue={financialNumberValue(lease?.lease_months)} missing={isMissing("lease_months")} />
+            <TextField
+              label="支払回数・契約期間（月）"
+              name="lease_months"
+              type="number"
+              defaultValue={financialNumberValue(lease?.lease_months)}
+              missing={isMissing("lease_months") || isUnconfirmed("lease_months")}
+              helperText={isUnconfirmed("lease_months") ? "正式契約までにリース期間を入力してください。" : undefined}
+            />
             <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(lease?.initial_payment_amount)} />
-            <TextField label="月額" name="monthly_lease_fee" type="number" defaultValue={financialNumberValue(lease?.monthly_lease_fee)} missing={isMissing("monthly_lease_fee")} />
+            <TextField
+              label="月額"
+              name="monthly_lease_fee"
+              type="number"
+              defaultValue={financialNumberValue(lease?.monthly_lease_fee)}
+              missing={isMissing("monthly_lease_fee") || isUnconfirmed("monthly_lease_fee")}
+              helperText={isUnconfirmed("monthly_lease_fee") ? "正式契約までに月額を入力してください。" : undefined}
+            />
             <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(lease?.final_payment_amount)} />
-            <TextField label="支払開始日" name="lease_start_date" type="date" defaultValue={financialDateValue(lease?.lease_start_date)} missing={isMissing("lease_start_date")} />
-            <TextField label="支払終了日" name="lease_end_date" type="date" defaultValue={financialDateValue(lease?.lease_end_date)} missing={isMissing("lease_end_date")} />
+            <TextField
+              label="支払開始日"
+              name="lease_start_date"
+              type="date"
+              defaultValue={financialDateValue(lease?.lease_start_date)}
+              missing={isMissing("lease_start_date") || isUnconfirmed("lease_start_date")}
+              helperText={isUnconfirmed("lease_start_date") ? "正式契約までに支払開始日を入力してください。" : undefined}
+            />
+            <TextField
+              label="支払終了日"
+              name="lease_end_date"
+              type="date"
+              defaultValue={financialDateValue(lease?.lease_end_date)}
+              missing={isMissing("lease_end_date") || isUnconfirmed("lease_end_date")}
+              helperText={isUnconfirmed("lease_end_date") ? "正式契約までに支払終了日を入力してください。" : undefined}
+            />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
               <input name="lease_bonus_payment_enabled" type="checkbox" defaultChecked={financialCheckboxValue(lease?.bonus_payment_enabled)} className={checkboxClass} />
               ボーナス払いあり
@@ -555,6 +644,11 @@ export function SalesContractForm({
                 {blockingMessages.map((message) => <li key={message}>{message}</li>)}
               </ul>
             </div>
+          ) : unconfirmedFields.length > 0 ? (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="font-black">契約候補として保存できます</p>
+              <p className="mt-1 font-semibold">正式契約前に未確定項目を確認してください。</p>
+            </div>
           ) : (
             <p className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
               入力内容を確認して登録できます。
@@ -565,7 +659,7 @@ export function SalesContractForm({
           className="rounded bg-brand-700 px-5 py-3 text-sm font-black text-white focus-ring disabled:cursor-not-allowed disabled:opacity-60 md:min-w-36"
           disabled={!canSubmit}
         >
-          {mode === "create" ? "契約を登録" : "契約を保存"}
+          {isLoanReviewImport ? "契約候補として保存" : mode === "create" ? "契約を登録" : "契約を保存"}
         </button>
       </div>
     </form>
@@ -612,6 +706,22 @@ function MissingRequiredFieldsNotice({ messages }: { messages: string[] }) {
       <p className="font-black">契約登録に必要な項目が不足しています</p>
       <ul className="mt-2 list-disc space-y-1 pl-5 font-bold">
         {messages.map((message) => <li key={message}>{message}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function UnconfirmedContractFieldsNotice({ fields }: { fields: SalesContractMissingRequiredField[] }) {
+  if (fields.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 shadow-sm">
+      <p className="font-black">契約候補として保存できます</p>
+      <p className="mt-1 font-semibold">
+        自社ローン審査管理からの連携のため、下記は未確定のまま保存できます。正式契約前に確定してください。
+      </p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 font-bold">
+        {fields.map((field) => <li key={field.key}>{field.message}</li>)}
       </ul>
     </div>
   );
@@ -744,6 +854,11 @@ function fieldClass(missing: boolean) {
 
 function uniqueMessages(messages: string[]) {
   return Array.from(new Set(messages));
+}
+
+function getUnconfirmedFields(formalFields: SalesContractMissingRequiredField[], blockingFields: SalesContractMissingRequiredField[]) {
+  const blockingKeys = new Set(blockingFields.map((field) => field.key));
+  return formalFields.filter((field) => !blockingKeys.has(field.key));
 }
 
 function isCoveredByRequiredFieldMessage(message: string, missingRequiredFieldKeys: Set<string>) {

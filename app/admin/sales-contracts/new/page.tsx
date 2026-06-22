@@ -93,7 +93,7 @@ function SourceImportSummary({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-black text-emerald-900">自社ローン審査管理から連携しました</p>
-          <p className="mt-1 text-sm text-emerald-800">内容を確認し、契約金額や支払条件を補完してから保存してください。自動登録は行いません。</p>
+          <p className="mt-1 text-sm text-emerald-800">金額や支払条件が未確定でも、顧客情報を確認して契約候補として保存できます。自動登録は行いません。</p>
         </div>
       </div>
       <dl className="mt-3 grid gap-2 text-sm md:grid-cols-4">

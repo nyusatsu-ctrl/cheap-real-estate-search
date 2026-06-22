@@ -155,6 +155,7 @@ export function validateSalesContractSelection(input: {
   financeCompany?: SalesFinanceCompany | "";
   leaseCompany?: SalesLeaseCompany | "";
   installmentCount?: number | null;
+  allowIncompleteTerms?: boolean;
 }) {
   const errors: string[] = [];
 
@@ -168,15 +169,15 @@ export function validateSalesContractSelection(input: {
 
   if (input.contractType === "loan") {
     if (!input.financeCompany) {
-      errors.push("ローン契約では信販会社を選択してください。");
+      if (!input.allowIncompleteTerms) errors.push("ローン契約では信販会社を選択してください。");
     } else if (!getAllowedFinanceCompanies(input.vehicleType).some((option) => option.value === input.financeCompany)) {
       errors.push("選択された信販会社は、この車両区分では使用できません。");
     }
 
     const allowedInstallments = getInstallmentOptions(input.vehicleType, input.financeCompany || "");
     if (!input.installmentCount) {
-      errors.push("支払回数を選択してください。支払回数が未確定の場合は、審査結果確定後に入力してください。");
-    } else if (!allowedInstallments.includes(input.installmentCount)) {
+      if (!input.allowIncompleteTerms) errors.push("支払回数を選択してください。支払回数が未確定の場合は、審査結果確定後に入力してください。");
+    } else if (input.financeCompany && !allowedInstallments.includes(input.installmentCount)) {
       errors.push("選択された支払回数は、この車両区分・信販会社では使用できません。");
     }
   }
@@ -186,7 +187,7 @@ export function validateSalesContractSelection(input: {
       errors.push("リース契約は車のみ選択できます。");
     }
     if (!input.leaseCompany) {
-      errors.push("リース契約ではリース会社を選択してください。");
+      if (!input.allowIncompleteTerms) errors.push("リース契約ではリース会社を選択してください。");
     } else if (!getAllowedLeaseCompanies(input.vehicleType).some((option) => option.value === input.leaseCompany)) {
       errors.push("選択されたリース会社は、この車両区分では使用できません。");
     }
@@ -207,7 +208,7 @@ export function getSalesContractMissingRequiredFields(input: {
   customerName?: string | number | null;
   phone?: string | number | null;
   vehicleType?: SalesVehicleType | "";
-  contractType: SalesContractType;
+  contractType?: SalesContractType | "";
   vehicleModel?: string | number | null;
   salePrice?: string | number | null;
   financeCompany?: SalesFinanceCompany | "";
@@ -220,13 +221,18 @@ export function getSalesContractMissingRequiredFields(input: {
   monthlyLeaseFee?: string | number | null;
   leaseStartDate?: string | null;
   leaseEndDate?: string | null;
-}): SalesContractMissingRequiredField[] {
+}, options: { mode?: "contract" | "candidate" } = {}): SalesContractMissingRequiredField[] {
+  const mode = options.mode ?? "contract";
   const missing: SalesContractMissingRequiredField[] = [];
   const add = (key: string, message: string) => missing.push({ key, message });
 
   if (isBlank(input.customerName)) add("customer_name", "顧客名を入力してください。");
   if (isBlank(input.phone)) add("phone", "電話番号を入力してください。");
   if (!input.vehicleType) add("vehicle_type", "車両区分を選択してください。");
+  if (!input.contractType) add("contract_type", "契約方法を選択してください。");
+
+  if (mode === "candidate") return missing;
+
   if (isBlank(input.vehicleModel)) add("model", "車種を入力してください。");
 
   if (input.contractType === "cash") {

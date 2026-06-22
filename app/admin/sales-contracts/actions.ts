@@ -392,6 +392,7 @@ async function upsertDocuments(
 }
 
 function getValidatedFormInput(formData: FormData, failurePath: string, options: { validateMinimumFields?: boolean } = {}) {
+  const sourceSystem = nullableString(formData, "source_system");
   const vehicleType = normalizeVehicleType(requiredString(formData, "vehicle_type"));
   const contractType = normalizeContractType(requiredString(formData, "contract_type"));
   const financeCompany = nullableString(formData, "finance_company") as SalesFinanceCompany | "";
@@ -408,33 +409,39 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
   const monthlyLeaseFee = numberField(formData, "monthly_lease_fee");
   const leaseStartDate = nullableString(formData, "lease_start_date");
   const leaseEndDate = nullableString(formData, "lease_end_date");
+  const isLoanReviewCandidate = Boolean(options.validateMinimumFields && sourceSystem === "gas_loan_review");
   const selection = validateSalesContractSelection({
     vehicleType,
     contractType,
     financeCompany,
     leaseCompany,
-    installmentCount
+    installmentCount,
+    allowIncompleteTerms: isLoanReviewCandidate
   });
+  const requiredFieldInput = {
+    customerName,
+    phone,
+    vehicleType,
+    contractType,
+    vehicleModel,
+    salePrice,
+    financeCompany,
+    leaseCompany,
+    installmentCount,
+    principal,
+    monthlyPayment,
+    firstPaymentDate,
+    leaseMonths,
+    monthlyLeaseFee,
+    leaseStartDate,
+    leaseEndDate
+  };
+  const formalMissingFields = getSalesContractMissingRequiredFields(requiredFieldInput);
 
   const errors = [...selection.errors];
   if (options.validateMinimumFields) {
-    errors.push(...getSalesContractMissingRequiredFields({
-      customerName,
-      phone,
-      vehicleType,
-      contractType,
-      vehicleModel,
-      salePrice,
-      financeCompany,
-      leaseCompany,
-      installmentCount,
-      principal,
-      monthlyPayment,
-      firstPaymentDate,
-      leaseMonths,
-      monthlyLeaseFee,
-      leaseStartDate,
-      leaseEndDate
+    errors.push(...getSalesContractMissingRequiredFields(requiredFieldInput, {
+      mode: isLoanReviewCandidate ? "candidate" : "contract"
     }).map((field) => field.message));
   } else {
     if (!customerName) errors.push("顧客名を入力してください。");
@@ -460,7 +467,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
       memo: nullableString(formData, "customer_memo")
     },
     contract: {
-      source_system: nullableString(formData, "source_system"),
+      source_system: sourceSystem,
       source_row_key: nullableString(formData, "source_row_key"),
       source_row_number: numberField(formData, "source_row_number"),
       source_received_at: nullableString(formData, "source_received_at"),
@@ -476,7 +483,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
       trade_in_amount: numberField(formData, "trade_in_amount"),
       financed_amount: numberField(formData, "financed_amount"),
       staff_name: nullableString(formData, "staff_name"),
-      status: normalizeContractStatus(nullableString(formData, "status")),
+      status: isLoanReviewCandidate && formalMissingFields.length > 0 ? "waiting_delivery" : normalizeContractStatus(nullableString(formData, "status")),
       memo: nullableString(formData, "contract_memo")
     },
     vehicle: {
@@ -494,8 +501,8 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
       gps_installed: checkboxField(formData, "gps_installed"),
       memo: nullableString(formData, "vehicle_memo")
     },
-    loan: contractType === "loan" ? getLoanPayload(formData, financeCompany as SalesFinanceCompany, installmentCount) : null,
-    lease: contractType === "lease" ? getLeasePayload(formData, leaseCompany as SalesLeaseCompany) : null,
+    loan: contractType === "loan" && financeCompany ? getLoanPayload(formData, financeCompany, installmentCount) : null,
+    lease: contractType === "lease" && leaseCompany ? getLeasePayload(formData, leaseCompany) : null,
     guarantor: getGuarantorPayload(formData),
     documents: getDocumentPayloads(formData),
     initialContactHistory: getContactHistoryPayload(formData)

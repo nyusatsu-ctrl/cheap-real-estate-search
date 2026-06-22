@@ -19,7 +19,8 @@ import {
   LEASE_COMPANY_LABELS,
   LEASE_MATURITY_CHOICE_LABELS,
   LEASE_MATURITY_STATUS_LABELS,
-  VEHICLE_TYPE_LABELS
+  VEHICLE_TYPE_LABELS,
+  getSalesContractMissingRequiredFields
 } from "@/lib/sales-contracts/rules";
 import { LOAN_REVIEW_APP_URL } from "@/lib/sales-contracts/source";
 import type {
@@ -45,6 +46,7 @@ export function SalesContractDetail({
   const nextAction = getNextAction(item.contactHistories);
   const hasSourceInfo = Boolean(item.contract.source_system || item.contract.source_row_key || item.contract.source_row_number || item.contract.source_received_at);
   const isLoanReviewSource = item.contract.source_system === "gas_loan_review";
+  const missingContractTerms = isLoanReviewSource ? getMissingContractTerms(item) : [];
 
   return (
     <div className="space-y-5">
@@ -78,6 +80,8 @@ export function SalesContractDetail({
       </section>
 
       {item.contract.contract_type === "lease" ? <LeaseMaturityNavigationCard item={item} /> : null}
+
+      {missingContractTerms.length > 0 ? <ContractTermsWarning fields={missingContractTerms} /> : null}
 
       {isLoanReviewSource ? <LoanReviewSourceCard item={item} /> : null}
 
@@ -254,14 +258,16 @@ function ContractCreatedActions({
   item: SalesContractDetailType;
   isLoanReviewSource: boolean;
 }) {
+  const isContractCandidate = isLoanReviewSource && getMissingContractTerms(item).length > 0;
+
   return (
     <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black text-emerald-700">登録完了</p>
-          <h2 className="mt-1 text-2xl font-black text-emerald-950">契約を登録しました</h2>
+          <h2 className="mt-1 text-2xl font-black text-emerald-950">{isContractCandidate ? "契約候補として保存しました" : "契約を登録しました"}</h2>
           <p className="mt-2 text-sm font-semibold text-emerald-900">
-            次に必要な確認や登録作業へ進めます。
+            {isContractCandidate ? "正式契約前に契約条件を確定してください。" : "次に必要な確認や登録作業へ進めます。"}
           </p>
         </div>
         <Badge className={getStatusClass(item.contract.status)}>
@@ -291,6 +297,42 @@ function ContractCreatedActions({
       </div>
     </section>
   );
+}
+
+function ContractTermsWarning({ fields }: { fields: Array<{ key: string; message: string }> }) {
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <p className="text-sm font-black text-amber-800">契約条件未確定</p>
+      <h3 className="mt-1 text-xl font-black text-amber-950">契約条件を確定してください</h3>
+      <p className="mt-2 text-sm font-semibold text-amber-900">
+        自社ローン審査管理から契約候補として保存されています。正式契約前に下記項目を確認してください。
+      </p>
+      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-bold text-amber-900">
+        {fields.map((field) => <li key={field.key}>{field.message}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function getMissingContractTerms(item: SalesContractDetailType) {
+  return getSalesContractMissingRequiredFields({
+    customerName: item.customer?.name,
+    phone: item.customer?.phone,
+    vehicleType: item.contract.vehicle_type,
+    contractType: item.contract.contract_type,
+    vehicleModel: item.vehicle?.model,
+    salePrice: item.contract.sale_price,
+    financeCompany: item.loan?.finance_company ?? "",
+    leaseCompany: item.lease?.lease_company ?? "",
+    installmentCount: item.loan?.installment_count,
+    principal: item.loan?.principal ?? item.contract.financed_amount,
+    monthlyPayment: item.loan?.monthly_payment,
+    firstPaymentDate: item.loan?.first_payment_date,
+    leaseMonths: item.lease?.lease_months,
+    monthlyLeaseFee: item.lease?.monthly_lease_fee,
+    leaseStartDate: item.lease?.lease_start_date,
+    leaseEndDate: item.lease?.lease_end_date
+  });
 }
 
 function LeaseMaturityNavigationCard({ item }: { item: SalesContractDetailType }) {

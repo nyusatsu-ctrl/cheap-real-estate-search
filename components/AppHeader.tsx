@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 export function AppHeader() {
   const pathname = usePathname();
   const isAdminLogin = pathname === "/admin/login";
-  const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities");
+  const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities") || pathname.startsWith("/admin/sales-help");
   const isContractAdmin = isAdminLogin || isSalesAdmin;
   const title = isContractAdmin ? "契約管理システム" : "格安不動産サーチ";
   const href = isSalesAdmin ? "/admin/sales-contracts" : isAdminLogin ? "/admin/login" : "/";

@@ -12,7 +12,8 @@ const defaultAdminMenuItems = [
 const salesAdminMenuItems = [
   { href: "/admin/sales-contracts", label: "契約台帳" },
   { href: "/admin/sales-contracts/new", label: "新規契約登録" },
-  { href: "/admin/sales-lease-maturities", label: "リース満期" }
+  { href: "/admin/sales-lease-maturities", label: "リース満期" },
+  { href: "/admin/sales-help", label: "使い方" }
 ];
 
 type AdminShellProps = {

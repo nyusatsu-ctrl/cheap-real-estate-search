@@ -20,9 +20,16 @@ import {
 } from "@/lib/sales-contracts/rules";
 import type { SalesContractDetail as SalesContractDetailType } from "@/lib/sales-contracts/types";
 
-export function SalesContractDetail({ detail }: { detail: SalesContractDetailType }) {
+export function SalesContractDetail({
+  detail,
+  hideAction
+}: {
+  detail: SalesContractDetailType;
+  hideAction?: (formData: FormData) => void | Promise<void>;
+}) {
   const item = detail;
   const documentLabels = new Map<string, string>(DOCUMENT_TYPE_OPTIONS.map((option) => [option.value, option.label]));
+  const canHideAsTestData = isTestSalesDetail(item);
 
   return (
     <div className="space-y-5">
@@ -214,6 +221,21 @@ export function SalesContractDetail({ detail }: { detail: SalesContractDetailTyp
           <p className="text-sm font-semibold text-slate-500">対応履歴はまだありません。</p>
         )}
       </Section>
+
+      {canHideAsTestData && hideAction ? (
+        <section className="rounded-lg border border-rose-200 bg-rose-50 p-5 shadow-sm">
+          <h3 className="text-lg font-black text-rose-950">テストデータ管理</h3>
+          <p className="mt-2 text-sm font-semibold text-rose-900">
+            顧客名または備考に「テスト」「動作確認」が含まれる契約だけ、論理削除で台帳から非表示にできます。
+          </p>
+          <form action={hideAction} className="mt-4">
+            <input type="hidden" name="contract_id" value={item.contract.id} />
+            <button className="rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+              この契約を非表示にする
+            </button>
+          </form>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -238,4 +260,13 @@ function Info({ label, value }: { label: string; value: string | number | null |
       <dd className="mt-1 font-semibold text-slate-950">{value || "-"}</dd>
     </div>
   );
+}
+
+function isTestSalesDetail(item: SalesContractDetailType) {
+  return [item.customer?.name, item.customer?.memo, item.contract.memo].some(containsTestMarker);
+}
+
+function containsTestMarker(value: unknown) {
+  const text = String(value ?? "");
+  return text.includes("テスト") || text.includes("動作確認");
 }

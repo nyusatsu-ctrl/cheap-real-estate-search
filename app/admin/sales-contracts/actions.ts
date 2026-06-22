@@ -255,6 +255,100 @@ export async function addDocumentAction(formData: FormData) {
   redirect(`/admin/sales-contracts/${contractId}`);
 }
 
+export async function hideTestSalesContractAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const supabase = createSupabaseServiceRoleClient();
+  if (!supabase) redirect(SETUP_REDIRECT);
+
+  const contractId = requiredString(formData, "contract_id");
+  const now = new Date().toISOString();
+
+  const contractResult = await supabase
+    .from("sales_contracts")
+    .select("*")
+    .eq("id", contractId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (contractResult.error) handleMutationError(contractResult.error);
+  if (!contractResult.data) redirect("/admin/sales-contracts");
+
+  const customerId = String(contractResult.data.customer_id);
+  const customerResult = await supabase
+    .from("sales_customers")
+    .select("*")
+    .eq("id", customerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (customerResult.error) handleMutationError(customerResult.error);
+
+  if (!isTestSalesRecord(contractResult.data, customerResult.data)) {
+    redirect(`/admin/sales-contracts/${contractId}?error=${encodeURIComponent("テストデータと判定できないため非表示にできません。")}`);
+  }
+
+  const relatedBefore = await Promise.all([
+    supabase.from("sales_vehicles").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_loans").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_leases").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_guarantors").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_documents").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_contact_histories").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_lease_maturities").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_lease_maturity_histories").select("id").eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_contracts").select("id").eq("customer_id", customerId).neq("id", contractId).is("deleted_at", null).limit(1)
+  ]);
+  const firstReadError = relatedBefore.map((result) => result.error).find(Boolean);
+  if (firstReadError) handleMutationError(firstReadError);
+
+  const hasOtherActiveContracts = Boolean(relatedBefore[8].data?.length);
+  const hidePayload = { deleted_at: now, updated_at: now };
+  const updates = await Promise.all([
+    supabase.from("sales_lease_maturity_histories").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_lease_maturities").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_contact_histories").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_documents").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_guarantors").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_loans").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_leases").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_vehicles").update(hidePayload).eq("contract_id", contractId).is("deleted_at", null),
+    supabase.from("sales_contracts").update(hidePayload).eq("id", contractId).is("deleted_at", null),
+    hasOtherActiveContracts
+      ? Promise.resolve({ error: null })
+      : supabase.from("sales_customers").update(hidePayload).eq("id", customerId).is("deleted_at", null)
+  ]);
+  const firstUpdateError = updates.map((result) => result.error).find(Boolean);
+  if (firstUpdateError) handleMutationError(firstUpdateError);
+
+  await insertAuditLog(
+    supabase,
+    admin.id,
+    "sales_contracts",
+    contractId,
+    "hide_test_data",
+    {
+      contract: contractResult.data,
+      customer: customerResult.data,
+      related_counts: {
+        vehicles: relatedBefore[0].data?.length ?? 0,
+        loans: relatedBefore[1].data?.length ?? 0,
+        leases: relatedBefore[2].data?.length ?? 0,
+        guarantors: relatedBefore[3].data?.length ?? 0,
+        documents: relatedBefore[4].data?.length ?? 0,
+        contact_histories: relatedBefore[5].data?.length ?? 0,
+        lease_maturities: relatedBefore[6].data?.length ?? 0,
+        lease_maturity_histories: relatedBefore[7].data?.length ?? 0
+      }
+    },
+    { deleted_at: now, customer_hidden: !hasOtherActiveContracts },
+    "テストデータを論理削除で非表示"
+  );
+
+  revalidatePath("/admin/sales-contracts");
+  revalidatePath("/admin/sales-lease-maturities");
+  revalidatePath(`/admin/sales-contracts/${contractId}`);
+  revalidatePath(`/admin/sales-customers/${customerId}`);
+  redirect("/admin/sales-contracts?hidden=test-data");
+}
+
 async function upsertPrimaryGuarantor(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
   formData: FormData,
@@ -468,6 +562,15 @@ function getContactHistoryPayload(formData: FormData) {
     attachment_url: nullableString(formData, "contact_attachment_url"),
     memo: nullableString(formData, "contact_memo")
   };
+}
+
+function isTestSalesRecord(contract: Record<string, unknown>, customer: Record<string, unknown> | null) {
+  return [customer?.name, customer?.memo, contract.memo].some(containsTestMarker);
+}
+
+function containsTestMarker(value: unknown) {
+  const text = String(value ?? "");
+  return text.includes("テスト") || text.includes("動作確認");
 }
 
 async function insertAuditLog(

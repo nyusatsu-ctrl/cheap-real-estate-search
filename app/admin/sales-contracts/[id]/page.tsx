@@ -14,6 +14,7 @@ import {
 import {
   addContactHistoryAction,
   addDocumentAction,
+  hideTestSalesContractAction,
   updateSalesContractAction
 } from "@/app/admin/sales-contracts/actions";
 import { requireAdmin } from "@/lib/admin";
@@ -64,7 +65,7 @@ export default async function SalesContractDetailPage({
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</div>
       ) : null}
       <div className="space-y-6">
-        <SalesContractDetail detail={result.data} />
+        <SalesContractDetail detail={result.data} hideAction={hideTestSalesContractAction} />
         {result.data.contract.contract_type === "lease" ? (
           <LeaseMaturityCard detail={result.data} action={upsertLeaseMaturityAction} historyAction={addLeaseMaturityHistoryAction} />
         ) : null}

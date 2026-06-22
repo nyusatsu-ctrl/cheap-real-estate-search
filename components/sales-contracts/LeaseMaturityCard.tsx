@@ -134,6 +134,7 @@ export function LeaseMaturityCard({
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-slate-700">{history.content}</p>
                   {history.next_action_date ? <p className="mt-2 text-xs font-semibold text-slate-500">次回対応: {formatSalesDate(history.next_action_date)}</p> : null}
+                  {history.memo ? <p className="mt-2 whitespace-pre-wrap text-xs font-semibold text-slate-500">備考: {history.memo}</p> : null}
                 </div>
               ))}
             </div>

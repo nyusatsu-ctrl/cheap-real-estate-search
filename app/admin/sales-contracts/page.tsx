@@ -31,6 +31,11 @@ const NEXT_ACTION_FILTER_OPTIONS = [
   { value: "overdue", label: "期限切れ" }
 ] as const;
 
+const SOURCE_FILTER_OPTIONS = [
+  { value: "manual", label: "手入力" },
+  { value: "gas_loan_review", label: "自社ローン審査管理" }
+] as const;
+
 const SORT_OPTIONS = [
   { value: "updated_desc", label: "更新日が新しい順" },
   { value: "created_desc", label: "登録日が新しい順" },
@@ -43,7 +48,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
   const filters = getFilters(params);
   const result = await getSalesContractList(filters);
   const setupMissing = firstParam(params.setup) === "missing";
-  const hasActiveFilters = Boolean(filters.keyword || filters.vehicleType || filters.contractType || filters.status || filters.financeCompany || filters.nextAction);
+  const hasActiveFilters = Boolean(filters.keyword || filters.vehicleType || filters.contractType || filters.status || filters.financeCompany || filters.source || filters.nextAction);
 
   return (
     <AdminShell email={admin.email} systemName="契約管理システム">
@@ -103,6 +108,13 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
             </select>
           </label>
           <label className="grid gap-1 text-xs font-bold text-slate-600">
+            登録元
+            <select name="source" defaultValue={filters.source ?? ""} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring">
+              <option value="">すべて</option>
+              {SOURCE_FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
             次回対応日
             <select name="next_action" defaultValue={filters.nextAction ?? ""} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring">
               <option value="">すべて</option>
@@ -135,6 +147,7 @@ function getFilters(params: Record<string, string | string[] | undefined>): Sale
   const contractType = firstParam(params.contract_type);
   const status = firstParam(params.status);
   const financeCompany = firstParam(params.finance_company);
+  const source = firstParam(params.source);
   const nextAction = firstParam(params.next_action);
   const sort = firstParam(params.sort);
   return {
@@ -143,6 +156,7 @@ function getFilters(params: Record<string, string | string[] | undefined>): Sale
     contractType: CONTRACT_TYPE_OPTIONS.some((option) => option.value === contractType) ? contractType as SalesContractFilters["contractType"] : undefined,
     status: CONTRACT_STATUS_OPTIONS.some((option) => option.value === status) ? status as SalesContractFilters["status"] : undefined,
     financeCompany: COUNTERPARTY_FILTER_OPTIONS.some((option) => option.value === financeCompany) ? financeCompany as SalesContractFilters["financeCompany"] : undefined,
+    source: SOURCE_FILTER_OPTIONS.some((option) => option.value === source) ? source as SalesContractFilters["source"] : undefined,
     nextAction: NEXT_ACTION_FILTER_OPTIONS.some((option) => option.value === nextAction) ? nextAction as SalesContractFilters["nextAction"] : undefined,
     sort: SORT_OPTIONS.some((option) => option.value === sort) ? sort as SalesContractFilters["sort"] : "updated_desc"
   };

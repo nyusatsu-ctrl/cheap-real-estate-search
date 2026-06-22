@@ -37,6 +37,7 @@ export function SalesContractTable({
             <tr>
               <th className="px-3 py-3">顧客名</th>
               <th className="px-3 py-3">電話番号</th>
+              <th className="px-3 py-3">登録元</th>
               <th className="px-3 py-3">車両区分</th>
               <th className="px-3 py-3">車種</th>
               <th className="px-3 py-3">ナンバー</th>
@@ -66,6 +67,9 @@ export function SalesContractTable({
                     <p className="mt-1 text-xs text-slate-500">{item.customer?.kana ?? ""}</p>
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-700">{item.customer?.phone ?? "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-3">
+                    <SourceBadge source={item.contract.source_system} />
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3">
                     <Badge className="bg-sky-50 text-sky-800">{VEHICLE_TYPE_LABELS[item.contract.vehicle_type]}</Badge>
                   </td>
@@ -106,7 +110,7 @@ export function SalesContractTable({
             })}
             {items.length === 0 ? (
               <tr>
-                <td colSpan={19} className="px-3 py-8">
+                <td colSpan={20} className="px-3 py-8">
                   <EmptySalesContractsState variant={emptyState} />
                 </td>
               </tr>
@@ -176,6 +180,13 @@ function Badge({ className, children }: { className: string; children: React.Rea
 function NextActionDate({ value }: { value: string | null }) {
   if (!value) return <span className="text-slate-400">-</span>;
   return <Badge className={`${getNextActionClass(value)} tabular-nums`}>{formatSalesDate(value)}</Badge>;
+}
+
+function SourceBadge({ source }: { source: string | null }) {
+  if (source === "gas_loan_review") {
+    return <Badge className="bg-emerald-50 text-emerald-800">自社ローン審査管理</Badge>;
+  }
+  return <Badge className="bg-slate-100 text-slate-700">手入力</Badge>;
 }
 
 function getContractTypeClass(value: SalesContractListItem["contract"]["contract_type"]) {

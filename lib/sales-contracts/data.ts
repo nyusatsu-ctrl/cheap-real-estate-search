@@ -388,6 +388,7 @@ function applyFilters(items: SalesContractListItem[], filters: SalesContractFilt
   const keyword = normalize(filters.keyword);
   const today = getTodayYmd();
   return items.filter((item) => {
+    if (filters.source && !matchesSource(item, filters.source)) return false;
     if (filters.financeCompany && !matchesCounterparty(item, filters.financeCompany)) return false;
     if (filters.nextAction && !matchesNextActionFilter(getNextActionDate(item), filters.nextAction, today)) return false;
 
@@ -409,6 +410,11 @@ function applyFilters(items: SalesContractListItem[], filters: SalesContractFilt
 
     return searchable.some((value) => value.includes(keyword));
   });
+}
+
+function matchesSource(item: Pick<SalesContractListItem, "contract">, source: NonNullable<SalesContractFilters["source"]>) {
+  if (source === "gas_loan_review") return item.contract.source_system === "gas_loan_review";
+  return !item.contract.source_system;
 }
 
 function matchesCounterparty(item: Pick<SalesContractListItem, "loan" | "lease">, financeCompany: NonNullable<SalesContractFilters["financeCompany"]>) {

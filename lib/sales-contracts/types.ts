@@ -5,6 +5,7 @@ export type SalesLeaseCompany = "premium" | "aplus_showa";
 export type SalesCounterpartyFilter = SalesFinanceCompany | SalesLeaseCompany;
 export type SalesNextActionFilter = "due_today" | "within_7_days" | "overdue";
 export type SalesContractSort = "updated_desc" | "created_desc" | "next_action_asc";
+export type SalesContractSourceFilter = "manual" | "gas_loan_review";
 export type SalesApprovalStatus = "unrequested" | "pending" | "approved" | "guarantor_required" | "rejected";
 export type SalesContractStatus =
   | "contracted"
@@ -274,6 +275,7 @@ export type SalesContractFilters = {
   contractType?: SalesContractType;
   status?: SalesContractStatus;
   financeCompany?: SalesCounterpartyFilter;
+  source?: SalesContractSourceFilter;
   nextAction?: SalesNextActionFilter;
   sort?: SalesContractSort;
 };

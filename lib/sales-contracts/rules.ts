@@ -43,6 +43,9 @@ export const APPROVAL_STATUS_LABELS: Record<SalesApprovalStatus, string> = {
 };
 
 export const CONTRACT_STATUS_LABELS: Record<SalesContractStatus, string> = {
+  contract_candidate: "契約候補",
+  negotiating: "商談中",
+  terms_pending: "条件確定待ち",
   contracted: "契約済",
   waiting_delivery: "納車待ち",
   delivered: "納車済",
@@ -52,6 +55,7 @@ export const CONTRACT_STATUS_LABELS: Record<SalesContractStatus, string> = {
   paid_off: "完済",
   leasing: "リース中",
   lease_ended: "リース終了",
+  completed: "完了",
   cancelled: "キャンセル",
   trouble: "トラブル対応中"
 };

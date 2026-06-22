@@ -39,6 +39,9 @@ create table if not exists public.sales_contracts (
   financed_amount bigint check (financed_amount is null or financed_amount >= 0),
   staff_name text,
   status text not null default 'contracted' check (status in (
+    'contract_candidate',
+    'negotiating',
+    'terms_pending',
     'contracted',
     'waiting_delivery',
     'delivered',
@@ -48,6 +51,7 @@ create table if not exists public.sales_contracts (
     'paid_off',
     'leasing',
     'lease_ended',
+    'completed',
     'cancelled',
     'trouble'
   )),

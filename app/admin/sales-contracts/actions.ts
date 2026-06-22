@@ -483,7 +483,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
       trade_in_amount: numberField(formData, "trade_in_amount"),
       financed_amount: numberField(formData, "financed_amount"),
       staff_name: nullableString(formData, "staff_name"),
-      status: isLoanReviewCandidate && formalMissingFields.length > 0 ? "waiting_delivery" : normalizeContractStatus(nullableString(formData, "status")),
+      status: isLoanReviewCandidate && formalMissingFields.length > 0 ? "contract_candidate" : normalizeContractStatus(nullableString(formData, "status")),
       memo: nullableString(formData, "contract_memo")
     },
     vehicle: {
@@ -686,7 +686,23 @@ function normalizeContractType(value: string): SalesContractType {
 }
 
 function normalizeContractStatus(value: string | null): SalesContractStatus {
-  const allowed: SalesContractStatus[] = ["contracted", "waiting_delivery", "delivered", "repayment", "payment_delay_contacted", "payoff_scheduled", "paid_off", "leasing", "lease_ended", "cancelled", "trouble"];
+  const allowed: SalesContractStatus[] = [
+    "contract_candidate",
+    "negotiating",
+    "terms_pending",
+    "contracted",
+    "waiting_delivery",
+    "delivered",
+    "repayment",
+    "payment_delay_contacted",
+    "payoff_scheduled",
+    "paid_off",
+    "leasing",
+    "lease_ended",
+    "completed",
+    "cancelled",
+    "trouble"
+  ];
   return allowed.includes(value as SalesContractStatus) ? (value as SalesContractStatus) : "contracted";
 }
 

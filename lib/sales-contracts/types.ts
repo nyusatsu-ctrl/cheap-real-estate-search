@@ -8,6 +8,9 @@ export type SalesContractSort = "updated_desc" | "created_desc" | "next_action_a
 export type SalesContractSourceFilter = "manual" | "gas_loan_review";
 export type SalesApprovalStatus = "unrequested" | "pending" | "approved" | "guarantor_required" | "rejected";
 export type SalesContractStatus =
+  | "contract_candidate"
+  | "negotiating"
+  | "terms_pending"
   | "contracted"
   | "waiting_delivery"
   | "delivered"
@@ -17,6 +20,7 @@ export type SalesContractStatus =
   | "paid_off"
   | "leasing"
   | "lease_ended"
+  | "completed"
   | "cancelled"
   | "trouble";
 export type SalesContactMethod = "phone" | "line" | "email" | "sms" | "visit" | "other";

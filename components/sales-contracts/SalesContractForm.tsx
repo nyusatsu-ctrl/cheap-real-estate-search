@@ -96,7 +96,7 @@ export function SalesContractForm({
   );
   const initialVehicleType = contract?.vehicle_type ?? sourceDefaults?.vehicle_type ?? "car";
   const initialContractType = contract?.contract_type ?? sourceDefaults?.contract_type ?? "cash";
-  const initialContractStatus = contract?.status ?? (isLoanReviewImport ? "waiting_delivery" : "contracted");
+  const initialContractStatus = contract?.status ?? (isLoanReviewImport ? "contract_candidate" : "contracted");
   const initialFinanceCompany: SalesFinanceCompany | "" = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
   const initialLeaseCompany: SalesLeaseCompany | "" = contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "";
   const initialInstallmentCount =

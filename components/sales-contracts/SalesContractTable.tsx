@@ -196,9 +196,10 @@ function getContractTypeClass(value: SalesContractListItem["contract"]["contract
 }
 
 function getStatusClass(value: SalesContractListItem["contract"]["status"]) {
+  if (value === "contract_candidate" || value === "negotiating" || value === "terms_pending") return "bg-violet-50 text-violet-800";
   if (value === "cancelled" || value === "trouble" || value === "payment_delay_contacted") return "bg-rose-50 text-rose-800";
   if (value === "waiting_delivery" || value === "payoff_scheduled") return "bg-amber-50 text-amber-800";
-  if (value === "paid_off" || value === "lease_ended" || value === "delivered") return "bg-slate-100 text-slate-700";
+  if (value === "paid_off" || value === "lease_ended" || value === "delivered" || value === "completed") return "bg-slate-100 text-slate-700";
   return "bg-teal-50 text-teal-800";
 }
 

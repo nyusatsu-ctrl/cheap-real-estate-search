@@ -559,6 +559,161 @@
         padding-top: 14px;
       }
 
+      .detail-section h3 {
+        margin: 0 0 10px;
+        font-size: 15px;
+      }
+
+      .detail-hero {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 12px;
+      }
+
+      .detail-hero.ready {
+        border-color: #abefc6;
+        background: #f6fef9;
+      }
+
+      .detail-hero.blocked {
+        border-color: #fecdca;
+        background: #fffbfa;
+      }
+
+      .detail-hero-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .detail-hero-name {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+
+      .detail-hero-sub {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
+      .detail-summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .detail-summary-item {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        padding: 8px;
+      }
+
+      .detail-summary-item label {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+
+      .detail-summary-item strong {
+        display: block;
+        min-height: 18px;
+        overflow-wrap: anywhere;
+      }
+
+      .detail-badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .detail-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #f9fafb;
+        color: #344054;
+      }
+
+      .detail-badge.green {
+        background: #ecfdf3;
+        border-color: #abefc6;
+        color: var(--green);
+      }
+
+      .detail-badge.red {
+        background: #fef3f2;
+        border-color: #fecdca;
+        color: var(--red);
+      }
+
+      .detail-badge.amber {
+        background: #fffaeb;
+        border-color: #fedf89;
+        color: var(--amber);
+      }
+
+      .detail-badge.blue {
+        background: #eff8ff;
+        border-color: #b2ddff;
+        color: #175cd3;
+      }
+
+      .detail-badge.gray {
+        background: #f2f4f7;
+        border-color: #d0d5dd;
+        color: #475467;
+      }
+
+      .detail-action-bar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .detail-action-bar button {
+        width: 100%;
+        font-weight: 700;
+      }
+
+      .detail-action-bar .contract-ready {
+        background: #12b76a;
+        border-color: #12b76a;
+        color: #fff;
+      }
+
+      .detail-action-note {
+        margin-top: 10px;
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #fffaeb;
+        color: #92400e;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: normal;
+      }
+
+      .detail-subtitle {
+        margin: 12px 0 8px;
+        color: #344054;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
       .field {
         margin-bottom: 10px;
       }
@@ -601,6 +756,7 @@
         padding: 28px;
         color: var(--muted);
         text-align: center;
+        line-height: 1.7;
       }
 
       .toast {
@@ -910,6 +1066,14 @@
         .detail {
           max-height: none;
         }
+
+        .detail-summary-grid,
+        .detail-action-bar,
+        .application-grid,
+        .market-grid,
+        .calc-preview {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -1196,7 +1360,9 @@
       </section>
 
       <aside class="detail" id="detailPane">
-        <div class="empty">左の一覧から顧客を選択してください。</div>
+        <div class="empty">
+          顧客を選択すると、審査状況・相場・信販依頼・契約管理への登録操作を確認できます。
+        </div>
       </aside>
     </main>
 
@@ -2505,13 +2671,43 @@
       function renderDetail(customer) {
         els.detail.className = 'detail';
         const showAstReview = isAstTargetPrefecture(customer.prefecture);
+        const registrationState = salesContractRegistrationState(customer);
         els.detail.innerHTML = `
-          <h2>${escapeHtml(customer.name || '名前未入力')}</h2>
-          <div class="muted">${escapeHtml(customer.receivedAt)} / ${escapeHtml(customer.applicationType)} / ${escapeHtml(customer.requestType)}</div>
+          <section class="detail-hero ${registrationState.canRegister ? 'ready' : 'blocked'}">
+            <div class="detail-hero-head">
+              <div>
+                <h2 class="detail-hero-name">${escapeHtml(customer.name || '名前未入力')}</h2>
+                <div class="detail-hero-sub">${escapeHtml(customer.receivedAt || '-')} / ${escapeHtml(customer.applicationType || '-')} / ${escapeHtml(customer.requestType || '-')}</div>
+              </div>
+              ${badge(customer.status)}
+            </div>
+            <div class="detail-summary-grid">
+              ${summaryItem('電話番号', customer.phone)}
+              ${summaryItem('都道府県', customer.prefecture)}
+              ${summaryItem('申込種別', customer.applicationType)}
+              ${summaryItem('希望車種', customer.desiredCar)}
+              ${summaryItem('支払目安', customer.monthlyPayment || customer.maxMonthlyPayment)}
+              ${summaryItem('相場ステータス', marketBadge(customer.market), true)}
+              ${summaryItem('架電回数', `${customer.callCount || 0}回${customer.latestCallResult ? ` / ${customer.latestCallResult}` : ''}`)}
+              ${summaryItem('プレミア依頼状況', badge(customer.review1), true)}
+              ${showAstReview ? summaryItem('アスト依頼状況', badge(customer.review2), true) : summaryItem('アスト依頼状況', '対象外')}
+            </div>
+            ${detailStatusBadgesHtml(customer, showAstReview)}
+            <div class="detail-action-bar">
+              <button type="button" id="contractRegisterButton" class="${registrationState.canRegister ? 'contract-ready' : 'danger'}" ${registrationState.canRegister ? '' : 'disabled'}>契約管理へ登録</button>
+              <button type="button" id="topMarketSearchButton" class="primary">相場取得</button>
+              <button type="button" id="premiumRequestButton">プレミア依頼</button>
+              <button type="button" id="astRequestButton" ${showAstReview ? '' : 'disabled'}>${showAstReview ? 'アスト依頼' : 'アスト対象外'}</button>
+              <button type="button" id="callJumpButton">架電記録</button>
+              <button type="button" id="statusJumpButton">ステータス更新</button>
+            </div>
+            ${registrationState.note ? `<div class="detail-action-note">${escapeHtml(registrationState.note)}</div>` : ''}
+          </section>
 
           <div class="detail-section">
-            ${readonlyField('電話番号', customer.phone)}
+            <h3>基本情報</h3>
             ${readonlyField('メールアドレス', customer.email)}
+            ${readonlyField('電話番号', customer.phone)}
             ${readonlyField('住所', customer.address)}
             ${readonlyField('勤務先', customer.workplace)}
             ${readonlyField('勤務先名フリガナ', customer.workplaceKana)}
@@ -2519,11 +2715,6 @@
             ${readonlyField('勤務先住所', customer.workAddress)}
             ${readonlyField('勤務先電話番号', customer.workPhone)}
             ${readonlyField('税込年収', customer.annualIncome)}
-            <div class="actions">
-              <button type="button" id="contractRegisterButton" class="primary">契約管理へ登録</button>
-              <button type="button" id="premiumPdfButton" class="primary">プレミア申込書を作成</button>
-              <button type="button" id="premiumDenialEmailButton" class="danger">プレミア否決メール送信</button>
-            </div>
           </div>
 
           <div class="detail-section">
@@ -2534,6 +2725,7 @@
           </div>
 
           <div class="detail-section">
+            <h3>契約・支払条件</h3>
             ${readonlyField('希望車種', customer.desiredCar)}
             ${readonlyField('年式', customer.desiredYear)}
             ${readonlyField('審査申込金額', customer.applicationAmount)}
@@ -2548,10 +2740,12 @@
           </div>
 
           <form id="marketForm" class="detail-section market-card">
+            <h3>相場情報</h3>
             ${marketCardHtml(customer)}
           </form>
 
           <form id="managementForm" class="detail-section">
+            <h3>審査・信販状況</h3>
             ${selectField('申込種別', 'applicationType', customer.applicationType, state.applicationTypeOptions)}
             ${customer.applicationType === 'お問い合わせ' ? '<div class="actions"><button type="button" id="fetchInquiryButton">お問い合わせ内容をGmailから取得</button></div>' : ''}
             ${inputField('審査申込金額', 'applicationAmount', customer.applicationAmount, '例: 1000000')}
@@ -2565,6 +2759,11 @@
             ${assigneeField('担当者', 'assignee', customer.assignee)}
             ${selectField('プレミアファイナンス審査結果', 'review1', customer.review1, state.reviewOptions)}
             ${showAstReview ? selectField('アスト審査結果', 'review2', customer.review2, state.reviewOptions) : hiddenField('review2', customer.review2)}
+            <div class="actions" style="justify-content:flex-start;">
+              <button type="button" id="premiumPdfButton" class="primary">プレミア申込書を作成</button>
+              <button type="button" id="premiumDenialEmailButton" class="danger">プレミア否決メール送信</button>
+            </div>
+            <div class="detail-subtitle">メモ・備考</div>
             ${textareaField('対応メモ', 'memo', customer.memo)}
             <div class="muted">最終更新: ${escapeHtml(customer.updatedAt || '-')} ${escapeHtml(customer.updatedBy || '')}</div>
             <div class="actions">
@@ -2585,7 +2784,7 @@
           </form>
 
           <div class="detail-section">
-            <h3>架電履歴 ${escapeHtml(customer.callCount || 0)}回</h3>
+            <h3>対応履歴 ${escapeHtml(customer.callCount || 0)}回</h3>
             ${callHistoryHtml(customer.callHistory || [])}
           </div>
         `;
@@ -2593,6 +2792,11 @@
         document.getElementById('saveButton').addEventListener('click', saveSelected);
         document.getElementById('deleteCustomerButton').addEventListener('click', deleteSelectedCustomer);
         document.getElementById('contractRegisterButton').addEventListener('click', () => openSalesContractRegistration(customer));
+        document.getElementById('topMarketSearchButton').addEventListener('click', searchMarketForSelected);
+        document.getElementById('premiumRequestButton').addEventListener('click', () => setReviewRequest('premium'));
+        document.getElementById('astRequestButton').addEventListener('click', () => setReviewRequest('ast'));
+        document.getElementById('callJumpButton').addEventListener('click', () => focusDetailSection('callForm', 'callResult'));
+        document.getElementById('statusJumpButton').addEventListener('click', () => focusDetailSection('managementForm', 'status'));
         document.getElementById('premiumPdfButton').addEventListener('click', createPremiumApplicationPdf);
         document.getElementById('premiumDenialEmailButton').addEventListener('click', openPremiumDenialEmailModal);
         document.getElementById('marketSearchButton').addEventListener('click', searchMarketForSelected);
@@ -2609,7 +2813,130 @@
         bindCustomerRateFields();
       }
 
+      function summaryItem(label, value, isHtml) {
+        const text = String(value || '').trim();
+        const content = text || '-';
+        const html = isHtml ? content : escapeHtml(content);
+        return `
+          <div class="detail-summary-item">
+            <label>${escapeHtml(label)}</label>
+            <strong>${html}</strong>
+          </div>
+        `;
+      }
+
+      function detailStatusBadgesHtml(customer, showAstReview) {
+        const labels = [
+          customer.status || '新規受付',
+          marketStatusLabel(customer.market),
+          noAnswerCallLabel(customer),
+          customer.review1 ? `プレミア${customer.review1}` : 'プレミア未依頼',
+          showAstReview ? (customer.review2 ? `アスト${customer.review2}` : 'アスト未依頼') : ''
+        ].filter(Boolean);
+        const uniqueLabels = uniqueStrings(labels);
+        return `<div class="detail-badge-row">${uniqueLabels.map((label) => detailBadge(label)).join('')}</div>`;
+      }
+
+      function detailBadge(value) {
+        const text = String(value || '-');
+        return `<span class="detail-badge ${detailBadgeTone(text)}">${escapeHtml(text)}</span>`;
+      }
+
+      function detailBadgeTone(text) {
+        if (text.indexOf('対応不可') !== -1 || text.indexOf('否決') !== -1 || text.indexOf('終了') !== -1) return 'red';
+        if (text.indexOf('可決') !== -1 || text.indexOf('相場済') !== -1 || text.indexOf('相場取得済') !== -1 || text.indexOf('契約予定') !== -1) return 'green';
+        if (text.indexOf('審査中') !== -1 || text.indexOf('相場未取得') !== -1 || text.indexOf('車種名確認') !== -1 || text.indexOf('電話がつながらない') !== -1) return 'amber';
+        if (text.indexOf('新規受付') !== -1 || text.indexOf('案内') !== -1 || text.indexOf('契約') !== -1) return 'blue';
+        return 'gray';
+      }
+
+      function marketStatusLabel(market) {
+        const status = market && market.status ? market.status : '相場未取得';
+        return status === '相場取得済み' ? '相場済' : status;
+      }
+
+      function noAnswerCallLabel(customer) {
+        const text = String(customer && customer.latestCallResult ? customer.latestCallResult : '');
+        return /つながら|繋がら|不在|不通|留守|未接続/.test(text) ? '電話がつながらない' : '';
+      }
+
+      function salesContractRegistrationState(customer) {
+        if (isResponseUnavailable(customer)) {
+          return {
+            canRegister: false,
+            note: '対応不可または相談終了のため、契約管理へ登録できません。'
+          };
+        }
+        if (isContractDeniedStatus(customer)) {
+          return {
+            canRegister: false,
+            note: '否決ステータスのため、契約管理へ登録する前に対応状況を確認してください。'
+          };
+        }
+        if (isSalesContractReady(customer)) {
+          return { canRegister: true, note: '' };
+        }
+        return {
+          canRegister: true,
+          note: '契約管理へ登録しても自動保存はされません。契約管理システム側で内容を確認してから保存してください。'
+        };
+      }
+
+      function isContractDeniedStatus(customer) {
+        const status = String(customer && customer.status ? customer.status : '');
+        return status.indexOf('否決') !== -1 || isCustomerDeniedForDisplay(customer);
+      }
+
+      function isSalesContractReady(customer) {
+        const status = String(customer && customer.status ? customer.status : '');
+        return isCustomerApproved(customer)
+          || status.indexOf('契約予定') !== -1
+          || status.indexOf('成約') !== -1
+          || status.indexOf('審査中') !== -1
+          || isPendingReview(customer);
+      }
+
+      function focusDetailSection(sectionId, fieldName) {
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const field = section.elements && fieldName ? section.elements[fieldName] : null;
+        if (field && typeof field.focus === 'function') {
+          setTimeout(() => field.focus(), 200);
+        }
+      }
+
+      function setReviewRequest(company) {
+        const form = document.getElementById('managementForm');
+        if (!form) return;
+        const isAst = company === 'ast';
+        const reviewField = isAst ? form.elements.review2 : form.elements.review1;
+        if (!reviewField || reviewField.type === 'hidden') {
+          showToast('この顧客はアスト審査の対象外です。');
+          return;
+        }
+        setSelectValueIfOption(reviewField, '審査中');
+        const statusValue = isAst ? 'アスト審査中' : 'プレミア審査中';
+        if (form.elements.status) {
+          setSelectValueIfOption(form.elements.status, statusValue);
+        }
+        reviewField.focus();
+        showToast(`${isAst ? 'アスト' : 'プレミア'}依頼状況を審査中にしました。保存ボタンで反映してください。`);
+      }
+
+      function setSelectValueIfOption(select, value) {
+        const options = Array.from(select.options || []);
+        if (options.some((option) => option.value === value)) {
+          select.value = value;
+        }
+      }
+
       function openSalesContractRegistration(customer) {
+        const registrationState = salesContractRegistrationState(customer);
+        if (!registrationState.canRegister) {
+          showToast(registrationState.note || 'この顧客は契約管理へ登録できません。');
+          return;
+        }
         const url = buildSalesContractRegistrationUrl(customer);
         const opened = window.open(url, '_blank', 'noopener');
         if (!opened) {

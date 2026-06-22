@@ -707,6 +707,13 @@
         white-space: normal;
       }
 
+      .detail-action-help {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
       .detail-subtitle {
         margin: 12px 0 8px;
         color: #344054;
@@ -2642,7 +2649,7 @@
             <td>${escapeHtml(customer.phone)}</td>
             <td>${escapeHtml(customer.workplace)}</td>
             <td>${escapeHtml(customer.desiredCar)}</td>
-            <td>${escapeHtml(customer.monthlyPayment || customer.maxMonthlyPayment)}</td>
+            <td>${escapeHtml(paymentEstimateValue(customer))}</td>
             <td>${marketBadge(customer.market)}</td>
             <td>${badge(customer.status)}</td>
             <td>${escapeHtml(customer.callCount || 0)}回<br><span class="muted">${escapeHtml(customer.latestCallResult || '')}</span></td>
@@ -2686,7 +2693,7 @@
               ${summaryItem('都道府県', customer.prefecture)}
               ${summaryItem('申込種別', customer.applicationType)}
               ${summaryItem('希望車種', customer.desiredCar)}
-              ${summaryItem('支払目安', customer.monthlyPayment || customer.maxMonthlyPayment)}
+              ${summaryItem('支払目安', paymentEstimateValue(customer))}
               ${summaryItem('相場ステータス', marketBadge(customer.market), true)}
               ${summaryItem('架電回数', `${customer.callCount || 0}回${customer.latestCallResult ? ` / ${customer.latestCallResult}` : ''}`)}
               ${summaryItem('プレミア依頼状況', badge(customer.review1), true)}
@@ -2696,11 +2703,12 @@
             <div class="detail-action-bar">
               <button type="button" id="contractRegisterButton" class="${registrationState.canRegister ? 'contract-ready' : 'danger'}" ${registrationState.canRegister ? '' : 'disabled'}>契約管理へ登録</button>
               <button type="button" id="topMarketSearchButton" class="primary">相場取得</button>
-              <button type="button" id="premiumRequestButton">プレミア依頼</button>
-              <button type="button" id="astRequestButton" ${showAstReview ? '' : 'disabled'}>${showAstReview ? 'アスト依頼' : 'アスト対象外'}</button>
+              <button type="button" id="premiumRequestButton">プレミア審査依頼</button>
+              <button type="button" id="astRequestButton" ${showAstReview ? '' : 'disabled'}>${showAstReview ? 'アスト審査依頼' : 'アスト対象外'}</button>
               <button type="button" id="callJumpButton">架電記録</button>
               <button type="button" id="statusJumpButton">ステータス更新</button>
             </div>
+            <div class="detail-action-help">審査依頼ボタンは依頼状況を「審査中」に変更します。保存ボタンを押すまで反映されません。</div>
             ${registrationState.note ? `<div class="detail-action-note">${escapeHtml(registrationState.note)}</div>` : ''}
           </section>
 
@@ -2732,7 +2740,7 @@
             ${readonlyField('支払い回数', customer.paymentCount)}
             ${readonlyField('お客様提示金利(%)', customer.customerRate)}
             ${readonlyField('1回目支払額', customer.firstPayment)}
-            ${readonlyField('2回目〜毎月', customer.monthlyPayment)}
+            ${readonlyField('2回目〜毎月', paymentAmountDisplay(customer.monthlyPayment))}
             ${readonlyField('総支払額', customer.totalPayment)}
             ${readonlyField('実際の金利(%)', customer.actualRate)}
             ${readonlyField('実コスト総額', customer.actualCostTotal)}
@@ -2959,7 +2967,7 @@
         appendUrlParam(params, 'vehicle_type', salesContractVehicleType(customer));
         appendUrlParam(params, 'contract_type', 'loan');
         appendUrlParam(params, 'finance_company', salesContractFinanceCompany(customer));
-        appendUrlParam(params, 'payment_estimate', customer.monthlyPayment || customer.maxMonthlyPayment);
+        appendUrlParam(params, 'payment_estimate', paymentEstimateValue(customer));
         appendUrlParam(params, 'application_amount', amountParam(customer.applicationAmount));
         appendUrlParam(params, 'payment_count', integerParam(customer.paymentCount));
         appendUrlParam(params, 'initial_payment_amount', amountParam(customer.firstPayment));
@@ -2986,8 +2994,25 @@
         appendUrlParam(minimalParams, 'vehicle_type', salesContractVehicleType(customer));
         appendUrlParam(minimalParams, 'contract_type', 'loan');
         appendUrlParam(minimalParams, 'finance_company', salesContractFinanceCompany(customer));
-        appendUrlParam(minimalParams, 'payment_estimate', customer.monthlyPayment || customer.maxMonthlyPayment);
+        appendUrlParam(minimalParams, 'payment_estimate', paymentEstimateValue(customer));
         return `${SALES_CONTRACT_REGISTRATION_URL}?${minimalParams.toString()}`;
+      }
+
+      function paymentEstimateValue(customer) {
+        return paymentAmountDisplay(customer && customer.monthlyPayment) || paymentAmountDisplay(customer && customer.maxMonthlyPayment);
+      }
+
+      function paymentAmountDisplay(value) {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        if (!isPaymentAmountLike(text)) return '';
+        return text;
+      }
+
+      function isPaymentAmountLike(value) {
+        const text = String(value || '').trim();
+        if (!/[0-9０-９]/.test(text)) return false;
+        return !/[^\d０-９\s,，.．円￥¥万万円月々毎税込税抜込以内以下以上程度約~〜\/／\-－]/.test(text);
       }
 
       function appendUrlParam(params, key, value) {

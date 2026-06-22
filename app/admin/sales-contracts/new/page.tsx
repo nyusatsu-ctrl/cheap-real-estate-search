@@ -98,7 +98,7 @@ function SourceImportSummary({
       </div>
       <dl className="mt-3 grid gap-2 text-sm md:grid-cols-4">
         <SummaryItem label="申込元" value="自社ローン審査管理" />
-        <SummaryItem label="GAS行番号" value={sourceDefaults.source_row_number} />
+        <SummaryItem label="申込管理番号" value={sourceDefaults.source_row_number} />
         <SummaryItem label="受信日時" value={sourceDefaults.source_received_at} />
         <SummaryItem label="希望車種" value={sourceDefaults.desired_vehicle} />
         <SummaryItem label="支払目安" value={sourceDefaults.payment_estimate} />

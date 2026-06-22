@@ -434,13 +434,13 @@ export function SalesContractForm({
         </CollapsibleSection>
       ) : null}
 
-      <CollapsibleSection title="申込参照情報" summary="GAS連携元の詳細を確認">
+      <CollapsibleSection title="申込参照情報" summary="申込元の詳細を確認">
         <SourceReferenceDetails
           sourceSystem={contract?.source_system ?? sourceDefaults?.source_system}
           sourceRowKey={contract?.source_row_key ?? sourceDefaults?.source_row_key}
           sourceRowNumber={contract?.source_row_number?.toString() ?? sourceDefaults?.source_row_number}
           sourceReceivedAt={contract?.source_received_at ?? sourceDefaults?.source_received_at}
-          sourceSnapshotJson={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson}
+          sourceSnapshotJson={formatSourceSnapshotForDisplay(contract?.source_snapshot_json ?? sourceDefaults)}
         />
       </CollapsibleSection>
 
@@ -504,11 +504,11 @@ function SourceReferenceDetails({
   return (
     <div className="grid gap-3 text-sm md:grid-cols-4">
       <ReadonlyItem label="申込元" value={sourceSystem === "gas_loan_review" ? "自社ローン審査管理" : sourceSystem} />
-      <ReadonlyItem label="GAS顧客ID" value={sourceRowKey} />
-      <ReadonlyItem label="GAS行番号" value={sourceRowNumber} />
+      <ReadonlyItem label="申込ID" value={sourceRowKey} />
+      <ReadonlyItem label="申込管理番号" value={sourceRowNumber} />
       <ReadonlyItem label="受信日時" value={sourceReceivedAt} />
       <div className="md:col-span-4">
-        <p className="mb-1 font-bold text-slate-700">連携データ</p>
+        <p className="mb-1 font-bold text-slate-700">申込データ詳細</p>
         <pre className="max-h-72 overflow-auto rounded border border-slate-200 bg-slate-50 p-3 text-xs font-normal text-slate-700">
           {sourceSnapshotJson || "-"}
         </pre>
@@ -647,18 +647,7 @@ function toHalfWidthNumberText(value: string) {
 
 function buildSourceLinkMemo(sourceDefaults?: SourceDefaults) {
   if (!sourceDefaults || !hasSourceDefaultValues(sourceDefaults)) return "";
-  return [
-    "GAS自社ローン審査管理から連携",
-    sourceDefaults.source_row_key ? `GAS顧客ID: ${sourceDefaults.source_row_key}` : "",
-    sourceDefaults.source_row_number ? `GAS行番号: ${sourceDefaults.source_row_number}` : "",
-    sourceDefaults.phone ? `電話番号: ${sourceDefaults.phone}` : "",
-    sourceDefaults.desired_vehicle ? `希望車種: ${sourceDefaults.desired_vehicle}` : "",
-    sourceDefaults.payment_estimate ? `支払目安: ${sourceDefaults.payment_estimate}` : "",
-    sourceDefaults.status ? `審査管理ステータス: ${sourceDefaults.status}` : "",
-    sourceDefaults.review1 ? `プレミア審査結果: ${sourceDefaults.review1}` : "",
-    sourceDefaults.review2 ? `アスト審査結果: ${sourceDefaults.review2}` : "",
-    sourceDefaults.source_memo ? `GAS対応メモ: ${sourceDefaults.source_memo}` : ""
-  ].filter(Boolean).join("\n");
+  return sourceDefaults.source_memo ?? "";
 }
 
 function buildSourceSnapshotJson(sourceDefaults?: SourceDefaults) {
@@ -671,4 +660,37 @@ function buildSourceSnapshotJson(sourceDefaults?: SourceDefaults) {
 
 function hasSourceDefaultValues(sourceDefaults: SourceDefaults) {
   return Object.values(sourceDefaults).some((value) => value !== undefined && value !== "");
+}
+
+function formatSourceSnapshotForDisplay(snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object") return "";
+  const labels: Record<string, string> = {
+    source_system: "申込元",
+    source_row_key: "申込ID",
+    source_row_number: "申込管理番号",
+    source_received_at: "受信日時",
+    customer_name: "顧客名",
+    phone: "電話番号",
+    email: "メール",
+    prefecture: "都道府県",
+    employer_name: "勤務先",
+    desired_vehicle: "希望車種",
+    vehicle_type: "車両区分",
+    contract_type: "契約方法",
+    finance_company: "信販会社",
+    payment_estimate: "支払目安",
+    application_amount: "申込金額",
+    payment_count: "支払回数",
+    initial_payment_amount: "初回支払額",
+    monthly_payment: "月額",
+    total_payment_amount: "支払総額",
+    status: "元ステータス",
+    review1: "プレミア審査結果",
+    review2: "アスト審査結果",
+    source_memo: "対応メモ"
+  };
+  const entries = Object.entries(snapshot as Record<string, unknown>)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(([key, value]) => [labels[key] ?? key, key === "source_system" && value === "gas_loan_review" ? "自社ローン審査管理" : value]);
+  return entries.length ? JSON.stringify(Object.fromEntries(entries), null, 2) : "";
 }

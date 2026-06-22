@@ -24,7 +24,8 @@ import type {
   SalesContactHistory,
   SalesContractDetail as SalesContractDetailType,
   SalesContractStatus,
-  SalesContractType
+  SalesContractType,
+  SalesDocument
 } from "@/lib/sales-contracts/types";
 
 export function SalesContractDetail({
@@ -37,7 +38,6 @@ export function SalesContractDetail({
   showCreatedActions?: boolean;
 }) {
   const item = detail;
-  const documentLabels = new Map<string, string>(DOCUMENT_TYPE_OPTIONS.map((option) => [option.value, option.label]));
   const canHideAsTestData = isTestSalesDetail(item);
   const vehicleName = [item.vehicle?.maker, item.vehicle?.model, item.vehicle?.grade].filter(Boolean).join(" ") || "車両情報未登録";
   const nextAction = getNextAction(item.contactHistories);
@@ -199,29 +199,7 @@ export function SalesContractDetail({
         )}
       </Section>
 
-      <Section title="書類">
-        {item.documents.length ? (
-          <div className="divide-y divide-slate-200">
-            {item.documents.map((document) => (
-              <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div>
-                  <p className="font-bold text-slate-950">{document.title || documentLabels.get(document.document_type) || document.document_type}</p>
-                  <p className="mt-1 text-xs text-slate-500">{DOCUMENT_VISIBILITY_LABELS[document.visibility]}</p>
-                </div>
-                {document.file_url ? (
-                  <Link href={document.file_url} className="font-bold text-brand-700">
-                    開く
-                  </Link>
-                ) : (
-                  <span className="font-mono text-xs text-slate-500">{document.storage_path}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm font-semibold text-slate-500">書類は登録されていません。</p>
-        )}
-      </Section>
+      <DocumentLinksSection item={item} />
 
       <Section title="対応履歴">
         {item.contactHistories.length ? (
@@ -309,6 +287,133 @@ function ContractCreatedActions({
       </div>
     </section>
   );
+}
+
+function DocumentLinksSection({ item }: { item: SalesContractDetailType }) {
+  const documentByType = new Map<string, SalesDocument>();
+  for (const document of item.documents) {
+    if (!documentByType.has(document.document_type)) {
+      documentByType.set(document.document_type, document);
+    }
+  }
+  const registeredCount = DOCUMENT_TYPE_OPTIONS.filter((option) => Boolean(documentByType.get(option.value)?.file_url)).length;
+  const importantMissingCount = DOCUMENT_TYPE_OPTIONS.filter((option) => {
+    const document = documentByType.get(option.value);
+    return isImportantDocument(option.value, item) && !document?.file_url;
+  }).length;
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-black text-slate-950">書類・添付URL</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">
+            契約書類、審査書類、車両書類を種類ごとに確認できます。
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge className="bg-slate-100 text-slate-700">登録済み {registeredCount}/{DOCUMENT_TYPE_OPTIONS.length}</Badge>
+          {importantMissingCount ? <Badge className="bg-amber-100 text-amber-900">重要書類 未登録 {importantMissingCount}</Badge> : null}
+        </div>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        {DOCUMENT_GROUPS.map((group) => (
+          <div key={group.title} className="rounded border border-slate-200 bg-slate-50 p-3">
+            <h4 className="text-sm font-black text-slate-950">{group.title}</h4>
+            <div className="mt-3 grid gap-2">
+              {group.types.map((type) => {
+                const option = DOCUMENT_TYPE_OPTIONS.find((itemOption) => itemOption.value === type);
+                if (!option) return null;
+                return (
+                  <DocumentLinkCard
+                    key={type}
+                    document={documentByType.get(type)}
+                    item={item}
+                    label={option.label}
+                    type={type}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DocumentLinkCard({
+  document,
+  item,
+  label,
+  type
+}: {
+  document: SalesDocument | undefined;
+  item: SalesContractDetailType;
+  label: string;
+  type: string;
+}) {
+  const hasUrl = Boolean(document?.file_url);
+  const isImportant = isImportantDocument(type, item);
+  const detailText = document?.title || (hasUrl && document ? DOCUMENT_VISIBILITY_LABELS[document.visibility] : "未登録");
+  const cardClass = hasUrl
+    ? "border-emerald-200 bg-white"
+    : isImportant
+      ? "border-amber-200 bg-amber-50"
+      : "border-slate-200 bg-white";
+
+  return (
+    <div className={`rounded border p-3 text-sm ${cardClass}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-black text-slate-950">{label}</p>
+            {isImportant ? <Badge className="bg-amber-100 text-amber-900">要確認</Badge> : null}
+          </div>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            {detailText}
+          </p>
+        </div>
+        {document?.file_url ? (
+          <Link
+            href={document.file_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded bg-brand-700 px-3 py-1.5 text-xs font-bold text-white focus-ring"
+          >
+            開く
+          </Link>
+        ) : (
+          <span className={`rounded px-2.5 py-1 text-xs font-bold ${isImportant ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-600"}`}>
+            未登録
+          </span>
+        )}
+      </div>
+      {document?.memo ? <p className="mt-2 whitespace-pre-wrap text-xs font-semibold text-slate-600">備考: {document.memo}</p> : null}
+    </div>
+  );
+}
+
+const DOCUMENT_GROUPS = [
+  {
+    title: "契約・審査書類",
+    types: ["order_contract", "finance_contract", "lease_contract"]
+  },
+  {
+    title: "本人確認・保証人",
+    types: ["identity_document", "guarantor_document"]
+  },
+  {
+    title: "車両・納車・GPS",
+    types: ["vehicle_inspection_certificate", "compulsory_insurance", "delivery_confirmation", "vehicle_photo", "gps_consent"]
+  }
+] as const;
+
+function isImportantDocument(type: string, item: SalesContractDetailType) {
+  if (type === "finance_contract") return item.contract.contract_type === "loan";
+  if (type === "lease_contract") return item.contract.contract_type === "lease";
+  if (type === "gps_consent") return item.vehicle?.gps_installed === true;
+  return type === "order_contract";
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

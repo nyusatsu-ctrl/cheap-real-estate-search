@@ -28,9 +28,9 @@ export function DocumentsSection({
               <p className="mt-1 text-xs text-slate-500">{DOCUMENT_VISIBILITY_LABELS[document.visibility]}</p>
             </div>
             {document.file_url ? (
-              <Link href={document.file_url} className="font-bold text-brand-700">開く</Link>
+              <Link href={document.file_url} target="_blank" rel="noopener noreferrer" className="font-bold text-brand-700">開く</Link>
             ) : (
-              <span className="font-mono text-xs text-slate-500">{document.storage_path}</span>
+              <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">URL未登録</span>
             )}
           </div>
         ))}

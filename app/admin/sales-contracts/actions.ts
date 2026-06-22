@@ -302,6 +302,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string) {
   const financeCompany = nullableString(formData, "finance_company") as SalesFinanceCompany | "";
   const leaseCompany = nullableString(formData, "lease_company") as SalesLeaseCompany | "";
   const installmentCount = numberField(formData, "installment_count");
+  const salePrice = numberField(formData, "sale_price");
   const selection = validateSalesContractSelection({
     vehicleType,
     contractType,
@@ -310,9 +311,12 @@ function getValidatedFormInput(formData: FormData, failurePath: string) {
     installmentCount
   });
 
-  const customerName = requiredString(formData, "customer_name");
-  if (!selection.valid) {
-    redirect(`${failurePath}?error=${encodeURIComponent(selection.errors.join(" / "))}`);
+  const customerName = nullableString(formData, "customer_name");
+  const errors = [...selection.errors];
+  if (!customerName) errors.push("顧客名を入力してください。");
+  if (salePrice === null) errors.push("契約金額を入力してください。");
+  if (errors.length > 0) {
+    redirect(`${failurePath}?error=${encodeURIComponent(errors.join(" / "))}`);
   }
 
   return {
@@ -340,7 +344,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string) {
       delivery_date: nullableString(formData, "delivery_date"),
       vehicle_type: vehicleType,
       contract_type: contractType,
-      sale_price: numberField(formData, "sale_price"),
+      sale_price: salePrice,
       fees: numberField(formData, "fees"),
       total_price: numberField(formData, "total_price"),
       down_payment: numberField(formData, "down_payment"),
@@ -382,7 +386,9 @@ function getLoanPayload(formData: FormData, financeCompany: SalesFinanceCompany,
     interest_rate: decimalField(formData, "interest_rate"),
     principal: numberField(formData, "principal"),
     installment_count: installmentCount,
+    initial_payment_amount: numberField(formData, "initial_payment_amount"),
     monthly_payment: numberField(formData, "monthly_payment"),
+    final_payment_amount: numberField(formData, "final_payment_amount"),
     bonus_payment_enabled: checkboxField(formData, "loan_bonus_payment_enabled"),
     bonus_payment_amount: numberField(formData, "bonus_payment_amount"),
     first_payment_date: nullableString(formData, "first_payment_date"),
@@ -399,7 +405,9 @@ function getLeasePayload(formData: FormData, leaseCompany: SalesLeaseCompany) {
     partner_company: nullableString(formData, "partner_company"),
     contract_number: nullableString(formData, "lease_contract_number"),
     lease_months: numberField(formData, "lease_months"),
+    initial_payment_amount: numberField(formData, "initial_payment_amount"),
     monthly_lease_fee: numberField(formData, "monthly_lease_fee"),
+    final_payment_amount: numberField(formData, "final_payment_amount"),
     bonus_payment_enabled: checkboxField(formData, "lease_bonus_payment_enabled"),
     bonus_payment_amount: numberField(formData, "lease_bonus_payment_amount"),
     lease_start_date: nullableString(formData, "lease_start_date"),

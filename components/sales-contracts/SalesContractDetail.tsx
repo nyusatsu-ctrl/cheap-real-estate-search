@@ -76,7 +76,7 @@ export function SalesContractDetail({ detail }: { detail: SalesContractDetailTyp
           <InfoGrid>
             <Info label="契約日" value={formatSalesDate(item.contract.contract_date)} />
             <Info label="納車日" value={formatSalesDate(item.contract.delivery_date)} />
-            <Info label="販売価格" value={formatYen(item.contract.sale_price)} />
+            <Info label="契約金額" value={formatYen(item.contract.sale_price)} />
             <Info label="諸費用" value={formatYen(item.contract.fees)} />
             <Info label="総支払額" value={formatYen(item.contract.total_price)} />
             <Info label="頭金" value={formatYen(item.contract.down_payment)} />
@@ -114,9 +114,12 @@ export function SalesContractDetail({ detail }: { detail: SalesContractDetailTyp
               <Info label="金利" value={item.loan.interest_rate === null ? "-" : `${item.loan.interest_rate}%`} />
               <Info label="ローン元金" value={formatYen(item.loan.principal)} />
               <Info label="支払回数" value={item.loan.installment_count ? `${item.loan.installment_count}回` : "-"} />
-              <Info label="月々支払額" value={formatYen(item.loan.monthly_payment)} />
-              <Info label="初回支払日" value={formatSalesDate(item.loan.first_payment_date)} />
-              <Info label="最終支払日" value={formatSalesDate(item.loan.final_payment_date)} />
+              <Info label="初回支払額" value={formatYen(item.loan.initial_payment_amount)} />
+              <Info label="月額" value={formatYen(item.loan.monthly_payment)} />
+              <Info label="最終支払額" value={formatYen(item.loan.final_payment_amount)} />
+              <Info label="支払開始日" value={formatSalesDate(item.loan.first_payment_date)} />
+              <Info label="支払終了日" value={formatSalesDate(item.loan.final_payment_date)} />
+              <Info label="支払総額" value={formatYen(item.loan.total_payment_amount)} />
               <Info label="所有権留保" value={item.loan.ownership_retention ? "あり" : "なし"} />
             </InfoGrid>
           ) : (
@@ -129,10 +132,12 @@ export function SalesContractDetail({ detail }: { detail: SalesContractDetailTyp
             <InfoGrid>
               <Info label="リース会社" value={LEASE_COMPANY_LABELS[item.lease.lease_company]} />
               <Info label="契約番号" value={item.lease.contract_number} />
-              <Info label="リース期間" value={item.lease.lease_months ? `${item.lease.lease_months}か月` : "-"} />
-              <Info label="月額リース料" value={formatYen(item.lease.monthly_lease_fee)} />
-              <Info label="開始日" value={formatSalesDate(item.lease.lease_start_date)} />
-              <Info label="終了日" value={formatSalesDate(item.lease.lease_end_date)} />
+              <Info label="支払回数・契約期間" value={item.lease.lease_months ? `${item.lease.lease_months}か月` : "-"} />
+              <Info label="初回支払額" value={formatYen(item.lease.initial_payment_amount)} />
+              <Info label="月額" value={formatYen(item.lease.monthly_lease_fee)} />
+              <Info label="最終支払額" value={formatYen(item.lease.final_payment_amount)} />
+              <Info label="支払開始日" value={formatSalesDate(item.lease.lease_start_date)} />
+              <Info label="支払終了日" value={formatSalesDate(item.lease.lease_end_date)} />
               <Info label="残価設定" value={item.lease.residual_value_enabled ? "あり" : "なし"} />
               <Info label="残価金額" value={formatYen(item.lease.residual_value_amount)} />
               <Info label="メンテ込み" value={item.lease.maintenance_included ? "あり" : "なし"} />

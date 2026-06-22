@@ -96,7 +96,9 @@ export type SalesLoan = {
   interest_rate: number | null;
   principal: number | null;
   installment_count: number | null;
+  initial_payment_amount: number | null;
   monthly_payment: number | null;
+  final_payment_amount: number | null;
   bonus_payment_enabled: boolean;
   bonus_payment_amount: number | null;
   first_payment_date: string | null;
@@ -116,7 +118,9 @@ export type SalesLease = {
   partner_company: string | null;
   contract_number: string | null;
   lease_months: number | null;
+  initial_payment_amount: number | null;
   monthly_lease_fee: number | null;
+  final_payment_amount: number | null;
   bonus_payment_enabled: boolean;
   bonus_payment_amount: number | null;
   lease_start_date: string | null;

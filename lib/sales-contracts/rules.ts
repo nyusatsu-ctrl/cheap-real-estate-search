@@ -141,15 +141,21 @@ export function validateSalesContractSelection(input: {
     errors.push("バイクではリース契約を選択できません。");
   }
 
+  if (input.contractType === "cash" && (input.financeCompany || input.leaseCompany || input.installmentCount)) {
+    errors.push("現金契約では信販会社・リース会社・支払回数を使用できません。");
+  }
+
   if (input.contractType === "loan") {
     if (!input.financeCompany) {
       errors.push("ローン契約では信販会社を選択してください。");
-    } else if (input.vehicleType === "bike" && input.financeCompany === "aplus") {
-      errors.push("バイクのローンではアプラスを選択できません。");
+    } else if (!getAllowedFinanceCompanies(input.vehicleType).some((option) => option.value === input.financeCompany)) {
+      errors.push("選択された信販会社は、この車両区分では使用できません。");
     }
 
     const allowedInstallments = getInstallmentOptions(input.vehicleType, input.financeCompany || "");
-    if (input.installmentCount && !allowedInstallments.includes(input.installmentCount)) {
+    if (!input.installmentCount) {
+      errors.push("ローン契約では支払回数を選択してください。");
+    } else if (!allowedInstallments.includes(input.installmentCount)) {
       errors.push("選択された支払回数は、この車両区分・信販会社では使用できません。");
     }
   }
@@ -160,6 +166,8 @@ export function validateSalesContractSelection(input: {
     }
     if (!input.leaseCompany) {
       errors.push("リース契約ではリース会社を選択してください。");
+    } else if (!getAllowedLeaseCompanies(input.vehicleType).some((option) => option.value === input.leaseCompany)) {
+      errors.push("選択されたリース会社は、この車両区分では使用できません。");
     }
   }
 

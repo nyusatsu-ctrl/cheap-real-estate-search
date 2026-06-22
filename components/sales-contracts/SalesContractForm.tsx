@@ -6,12 +6,9 @@ import {
   CONTACT_METHOD_OPTIONS,
   CONTACT_STATUS_OPTIONS,
   CONTRACT_STATUS_OPTIONS,
-  CONTRACT_TYPE_OPTIONS,
   DOCUMENT_TYPE_OPTIONS,
   FINANCE_COMPANY_LABELS,
-  FINANCE_COMPANY_OPTIONS,
   LEASE_COMPANY_LABELS,
-  LEASE_COMPANY_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
   getAllowedContractTypes,
   getAllowedFinanceCompanies,
@@ -59,9 +56,10 @@ export function SalesContractForm({
 
   const [vehicleType, setVehicleType] = useState<SalesVehicleType>(contract?.vehicle_type ?? "car");
   const [contractType, setContractType] = useState<SalesContractType>(contract?.contract_type ?? "cash");
-  const [financeCompany, setFinanceCompany] = useState<SalesFinanceCompany>(loan?.finance_company ?? "premium");
-  const [leaseCompany, setLeaseCompany] = useState<SalesLeaseCompany>(lease?.lease_company ?? "premium");
+  const [financeCompany, setFinanceCompany] = useState<SalesFinanceCompany | "">(contract?.contract_type === "loan" ? loan?.finance_company ?? "" : "");
+  const [leaseCompany, setLeaseCompany] = useState<SalesLeaseCompany | "">(contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "");
   const [installmentCount, setInstallmentCount] = useState<number | null>(loan?.installment_count ?? null);
+  const [clearFinancialDefaults, setClearFinancialDefaults] = useState(false);
 
   const allowedContractTypes = getAllowedContractTypes(vehicleType);
   const allowedFinanceCompanies = getAllowedFinanceCompanies(vehicleType);
@@ -74,16 +72,66 @@ export function SalesContractForm({
     leaseCompany: contractType === "lease" ? leaseCompany : "",
     installmentCount
   });
+  const financialNumberValue = (value: number | string | null | undefined) => clearFinancialDefaults ? "" : numberValue(value);
+  const financialDateValue = (value: string | null | undefined) => clearFinancialDefaults ? "" : dateValue(value);
+  const financialTextValue = (value: string | null | undefined) => clearFinancialDefaults ? "" : value;
+  const financialCheckboxValue = (value: boolean | null | undefined) => clearFinancialDefaults ? false : value ?? false;
 
   function handleVehicleTypeChange(nextValue: SalesVehicleType) {
     setVehicleType(nextValue);
-    if (nextValue === "bike" && contractType === "lease") setContractType("cash");
-    if (nextValue === "bike" && financeCompany === "aplus") setFinanceCompany("premium");
+    if (nextValue === "bike" && contractType === "lease") {
+      setContractType("cash");
+      resetFinancialFields();
+      return;
+    }
+    if (financeCompany && !getAllowedFinanceCompanies(nextValue).some((option) => option.value === financeCompany)) {
+      setFinanceCompany("");
+      setInstallmentCount(null);
+      return;
+    }
+    if (financeCompany && installmentCount && !getInstallmentOptions(nextValue, financeCompany).includes(installmentCount)) {
+      setInstallmentCount(null);
+    }
   }
 
   function handleContractTypeChange(nextValue: SalesContractType) {
+    if (!allowedContractTypes.some((option) => option.value === nextValue)) return;
     setContractType(nextValue);
-    if (nextValue === "lease" && vehicleType === "bike") setVehicleType("car");
+    if (nextValue === "cash") {
+      resetFinancialFields();
+      return;
+    }
+    if (nextValue === "loan") {
+      setLeaseCompany("");
+      if (financeCompany && !allowedFinanceCompanies.some((option) => option.value === financeCompany)) {
+        setFinanceCompany("");
+      }
+      if (financeCompany && installmentCount && !getInstallmentOptions(vehicleType, financeCompany).includes(installmentCount)) {
+        setInstallmentCount(null);
+      }
+      return;
+    }
+    if (nextValue === "lease") {
+      setFinanceCompany("");
+      setInstallmentCount(null);
+      if (leaseCompany && !allowedLeaseCompanies.some((option) => option.value === leaseCompany)) {
+        setLeaseCompany("");
+      }
+    }
+  }
+
+  function handleFinanceCompanyChange(nextValue: SalesFinanceCompany | "") {
+    setFinanceCompany(nextValue);
+    if (!nextValue || (installmentCount && !getInstallmentOptions(vehicleType, nextValue).includes(installmentCount))) {
+      setInstallmentCount(null);
+    }
+  }
+
+  function resetFinancialFields() {
+    setFinanceCompany("");
+    setLeaseCompany("");
+    setInstallmentCount(null);
+    setClearFinancialDefaults(true);
   }
 
   return (
@@ -130,13 +178,9 @@ export function SalesContractForm({
             {VEHICLE_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </SelectField>
           <SelectField label="契約方法" name="contract_type" value={contractType} onChange={(value) => handleContractTypeChange(value as SalesContractType)}>
-            {CONTRACT_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value} disabled={!allowedContractTypes.some((allowed) => allowed.value === option.value)}>
-                {option.label}
-              </option>
-            ))}
+            {allowedContractTypes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </SelectField>
-          <TextField label="販売価格" name="sale_price" type="number" defaultValue={numberValue(contract?.sale_price)} />
+          <TextField label="契約金額" name="sale_price" type="number" defaultValue={numberValue(contract?.sale_price)} required />
           <TextField label="諸費用" name="fees" type="number" defaultValue={numberValue(contract?.fees)} />
           <TextField label="総支払額" name="total_price" type="number" defaultValue={numberValue(contract?.total_price)} />
           <TextField label="頭金" name="down_payment" type="number" defaultValue={numberValue(contract?.down_payment)} />
@@ -149,7 +193,7 @@ export function SalesContractForm({
               {CONTRACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
-          <TextareaField label="契約メモ" name="contract_memo" defaultValue={contract?.memo} className="md:col-span-4" />
+          <TextareaField label="備考" name="contract_memo" defaultValue={contract?.memo} className="md:col-span-4" />
         </div>
       </Section>
 
@@ -192,28 +236,25 @@ export function SalesContractForm({
               <select
                 name="finance_company"
                 value={financeCompany}
-                onChange={(event) => setFinanceCompany(event.target.value as SalesFinanceCompany)}
+                onChange={(event) => handleFinanceCompanyChange(event.target.value as SalesFinanceCompany | "")}
                 required
                 className={inputClass}
               >
-                {FINANCE_COMPANY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value} disabled={!allowedFinanceCompanies.some((allowed) => allowed.value === option.value)}>
-                    {FINANCE_COMPANY_LABELS[option.value]}
-                  </option>
-                ))}
+                <option value="">選択</option>
+                {allowedFinanceCompanies.map((option) => <option key={option.value} value={option.value}>{FINANCE_COMPANY_LABELS[option.value]}</option>)}
               </select>
             </label>
-            <TextField label="信販申込番号" name="application_number" defaultValue={loan?.application_number} />
-            <TextField label="契約番号" name="loan_contract_number" defaultValue={loan?.contract_number} />
+            <TextField label="信販申込番号" name="application_number" defaultValue={financialTextValue(loan?.application_number)} />
+            <TextField label="契約番号" name="loan_contract_number" defaultValue={financialTextValue(loan?.contract_number)} />
             <label className="grid gap-1 text-sm font-bold text-slate-700">
               審査結果
-              <select name="approval_status" defaultValue={loan?.approval_status ?? ""} className={inputClass}>
+              <select name="approval_status" defaultValue={clearFinancialDefaults ? "" : loan?.approval_status ?? ""} className={inputClass}>
                 <option value="">未設定</option>
                 {APPROVAL_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <TextField label="金利" name="interest_rate" type="number" step="0.001" defaultValue={numberValue(loan?.interest_rate)} />
-            <TextField label="ローン元金" name="principal" type="number" defaultValue={numberValue(loan?.principal)} />
+            <TextField label="金利" name="interest_rate" type="number" step="0.001" defaultValue={financialNumberValue(loan?.interest_rate)} />
+            <TextField label="ローン元金" name="principal" type="number" defaultValue={financialNumberValue(loan?.principal)} />
             <label className="grid gap-1 text-sm font-bold text-slate-700">
               支払回数
               <select
@@ -227,20 +268,22 @@ export function SalesContractForm({
                 {installmentOptions.map((count) => <option key={count} value={count}>{count}回</option>)}
               </select>
             </label>
-            <TextField label="月々支払額" name="monthly_payment" type="number" defaultValue={numberValue(loan?.monthly_payment)} />
+            <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(loan?.initial_payment_amount)} />
+            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(loan?.monthly_payment)} />
+            <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(loan?.final_payment_amount)} />
+            <TextField label="支払開始日" name="first_payment_date" type="date" defaultValue={financialDateValue(loan?.first_payment_date)} />
+            <TextField label="支払終了日" name="final_payment_date" type="date" defaultValue={financialDateValue(loan?.final_payment_date)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
-              <input name="loan_bonus_payment_enabled" type="checkbox" defaultChecked={loan?.bonus_payment_enabled ?? false} className={checkboxClass} />
+              <input name="loan_bonus_payment_enabled" type="checkbox" defaultChecked={financialCheckboxValue(loan?.bonus_payment_enabled)} className={checkboxClass} />
               ボーナス払いあり
             </label>
-            <TextField label="ボーナス払い額" name="bonus_payment_amount" type="number" defaultValue={numberValue(loan?.bonus_payment_amount)} />
-            <TextField label="初回支払日" name="first_payment_date" type="date" defaultValue={dateValue(loan?.first_payment_date)} />
-            <TextField label="最終支払日" name="final_payment_date" type="date" defaultValue={dateValue(loan?.final_payment_date)} />
-            <TextField label="支払総額" name="total_payment_amount" type="number" defaultValue={numberValue(loan?.total_payment_amount)} />
+            <TextField label="ボーナス払い額" name="bonus_payment_amount" type="number" defaultValue={financialNumberValue(loan?.bonus_payment_amount)} />
+            <TextField label="支払総額" name="total_payment_amount" type="number" defaultValue={financialNumberValue(loan?.total_payment_amount)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
-              <input name="ownership_retention" type="checkbox" defaultChecked={loan?.ownership_retention ?? false} className={checkboxClass} />
+              <input name="ownership_retention" type="checkbox" defaultChecked={financialCheckboxValue(loan?.ownership_retention)} className={checkboxClass} />
               所有権留保あり
             </label>
-            <TextareaField label="ローンメモ" name="loan_memo" defaultValue={loan?.memo} className="md:col-span-4" />
+            <TextareaField label="ローンメモ" name="loan_memo" defaultValue={financialTextValue(loan?.memo)} className="md:col-span-4" />
           </div>
         </Section>
       ) : null}
@@ -253,40 +296,39 @@ export function SalesContractForm({
               <select
                 name="lease_company"
                 value={leaseCompany}
-                onChange={(event) => setLeaseCompany(event.target.value as SalesLeaseCompany)}
+                onChange={(event) => setLeaseCompany(event.target.value as SalesLeaseCompany | "")}
                 required
                 className={inputClass}
               >
-                {LEASE_COMPANY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value} disabled={!allowedLeaseCompanies.some((allowed) => allowed.value === option.value)}>
-                    {LEASE_COMPANY_LABELS[option.value]}
-                  </option>
-                ))}
+                <option value="">選択</option>
+                {allowedLeaseCompanies.map((option) => <option key={option.value} value={option.value}>{LEASE_COMPANY_LABELS[option.value]}</option>)}
               </select>
             </label>
-            <TextField label="提携会社" name="partner_company" defaultValue={lease?.partner_company} />
-            <TextField label="契約番号" name="lease_contract_number" defaultValue={lease?.contract_number} />
-            <TextField label="リース期間（月）" name="lease_months" type="number" defaultValue={numberValue(lease?.lease_months)} />
-            <TextField label="月額リース料" name="monthly_lease_fee" type="number" defaultValue={numberValue(lease?.monthly_lease_fee)} />
+            <TextField label="提携会社" name="partner_company" defaultValue={financialTextValue(lease?.partner_company)} />
+            <TextField label="契約番号" name="lease_contract_number" defaultValue={financialTextValue(lease?.contract_number)} />
+            <TextField label="支払回数・契約期間（月）" name="lease_months" type="number" defaultValue={financialNumberValue(lease?.lease_months)} />
+            <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(lease?.initial_payment_amount)} />
+            <TextField label="月額" name="monthly_lease_fee" type="number" defaultValue={financialNumberValue(lease?.monthly_lease_fee)} />
+            <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(lease?.final_payment_amount)} />
+            <TextField label="支払開始日" name="lease_start_date" type="date" defaultValue={financialDateValue(lease?.lease_start_date)} />
+            <TextField label="支払終了日" name="lease_end_date" type="date" defaultValue={financialDateValue(lease?.lease_end_date)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
-              <input name="lease_bonus_payment_enabled" type="checkbox" defaultChecked={lease?.bonus_payment_enabled ?? false} className={checkboxClass} />
+              <input name="lease_bonus_payment_enabled" type="checkbox" defaultChecked={financialCheckboxValue(lease?.bonus_payment_enabled)} className={checkboxClass} />
               ボーナス払いあり
             </label>
-            <TextField label="ボーナス払い額" name="lease_bonus_payment_amount" type="number" defaultValue={numberValue(lease?.bonus_payment_amount)} />
-            <TextField label="リース開始日" name="lease_start_date" type="date" defaultValue={dateValue(lease?.lease_start_date)} />
-            <TextField label="リース終了日" name="lease_end_date" type="date" defaultValue={dateValue(lease?.lease_end_date)} />
+            <TextField label="ボーナス払い額" name="lease_bonus_payment_amount" type="number" defaultValue={financialNumberValue(lease?.bonus_payment_amount)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
-              <input name="residual_value_enabled" type="checkbox" defaultChecked={lease?.residual_value_enabled ?? false} className={checkboxClass} />
+              <input name="residual_value_enabled" type="checkbox" defaultChecked={financialCheckboxValue(lease?.residual_value_enabled)} className={checkboxClass} />
               残価設定あり
             </label>
-            <TextField label="残価金額" name="residual_value_amount" type="number" defaultValue={numberValue(lease?.residual_value_amount)} />
+            <TextField label="残価金額" name="residual_value_amount" type="number" defaultValue={financialNumberValue(lease?.residual_value_amount)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
-              <input name="maintenance_included" type="checkbox" defaultChecked={lease?.maintenance_included ?? false} className={checkboxClass} />
+              <input name="maintenance_included" type="checkbox" defaultChecked={financialCheckboxValue(lease?.maintenance_included)} className={checkboxClass} />
               メンテナンス込み
             </label>
-            <TextField label="所有者" name="owner_name" defaultValue={lease?.owner_name} />
-            <TextField label="使用者" name="user_name" defaultValue={lease?.user_name} />
-            <TextareaField label="リースメモ" name="lease_memo" defaultValue={lease?.memo} className="md:col-span-4" />
+            <TextField label="所有者" name="owner_name" defaultValue={financialTextValue(lease?.owner_name)} />
+            <TextField label="使用者" name="user_name" defaultValue={financialTextValue(lease?.user_name)} />
+            <TextareaField label="リースメモ" name="lease_memo" defaultValue={financialTextValue(lease?.memo)} className="md:col-span-4" />
           </div>
         </Section>
       ) : null}

@@ -90,7 +90,9 @@ create table if not exists public.sales_loans (
   interest_rate numeric(6,3) check (interest_rate is null or interest_rate >= 0),
   principal bigint check (principal is null or principal >= 0),
   installment_count integer check (installment_count is null or installment_count > 0),
+  initial_payment_amount bigint check (initial_payment_amount is null or initial_payment_amount >= 0),
   monthly_payment bigint check (monthly_payment is null or monthly_payment >= 0),
+  final_payment_amount bigint check (final_payment_amount is null or final_payment_amount >= 0),
   bonus_payment_enabled boolean not null default false,
   bonus_payment_amount bigint check (bonus_payment_amount is null or bonus_payment_amount >= 0),
   first_payment_date date,
@@ -110,7 +112,9 @@ create table if not exists public.sales_leases (
   partner_company text,
   contract_number text,
   lease_months integer check (lease_months is null or lease_months > 0),
+  initial_payment_amount bigint check (initial_payment_amount is null or initial_payment_amount >= 0),
   monthly_lease_fee bigint check (monthly_lease_fee is null or monthly_lease_fee >= 0),
+  final_payment_amount bigint check (final_payment_amount is null or final_payment_amount >= 0),
   bonus_payment_enabled boolean not null default false,
   bonus_payment_amount bigint check (bonus_payment_amount is null or bonus_payment_amount >= 0),
   lease_start_date date,
@@ -189,6 +193,14 @@ create table if not exists public.sales_audit_logs (
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
 );
+
+alter table public.sales_loans
+  add column if not exists initial_payment_amount bigint check (initial_payment_amount is null or initial_payment_amount >= 0),
+  add column if not exists final_payment_amount bigint check (final_payment_amount is null or final_payment_amount >= 0);
+
+alter table public.sales_leases
+  add column if not exists initial_payment_amount bigint check (initial_payment_amount is null or initial_payment_amount >= 0),
+  add column if not exists final_payment_amount bigint check (final_payment_amount is null or final_payment_amount >= 0);
 
 create index if not exists sales_customers_name_idx on public.sales_customers(name);
 create index if not exists sales_customers_phone_idx on public.sales_customers(phone);

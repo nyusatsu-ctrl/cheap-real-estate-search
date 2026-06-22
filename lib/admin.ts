@@ -46,8 +46,17 @@ export async function getCurrentAdmin() {
   return { id: user.id, email: data.email ?? user.email ?? "" };
 }
 
-export async function requireAdmin() {
+function getAdminLoginPath(nextPath?: string) {
+  const path = String(nextPath ?? "").trim();
+  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/admin/login")) {
+    return "/admin/login";
+  }
+  const params = new URLSearchParams({ next: path });
+  return `/admin/login?${params.toString()}`;
+}
+
+export async function requireAdmin(nextPath?: string) {
   const admin = await getCurrentAdmin();
-  if (!admin) redirect("/admin/login");
+  if (!admin) redirect(getAdminLoginPath(nextPath));
   return admin;
 }

@@ -33,6 +33,25 @@ type SourceDefaults = {
   source_row_key?: string;
   source_row_number?: string;
   source_received_at?: string;
+  customer_name?: string;
+  phone?: string;
+  email?: string;
+  prefecture?: string;
+  employer_name?: string;
+  desired_vehicle?: string;
+  vehicle_type?: SalesVehicleType;
+  contract_type?: SalesContractType;
+  finance_company?: SalesFinanceCompany;
+  payment_estimate?: string;
+  application_amount?: string;
+  payment_count?: string;
+  initial_payment_amount?: string;
+  monthly_payment?: string;
+  total_payment_amount?: string;
+  status?: string;
+  review1?: string;
+  review2?: string;
+  source_memo?: string;
 };
 
 export function SalesContractForm({
@@ -54,11 +73,20 @@ export function SalesContractForm({
   const guarantor = detail?.guarantors[0] ?? null;
   const documentsByType = useMemo(() => new Map((detail?.documents ?? []).map((document) => [document.document_type, document])), [detail?.documents]);
 
-  const [vehicleType, setVehicleType] = useState<SalesVehicleType>(contract?.vehicle_type ?? "car");
-  const [contractType, setContractType] = useState<SalesContractType>(contract?.contract_type ?? "cash");
-  const [financeCompany, setFinanceCompany] = useState<SalesFinanceCompany | "">(contract?.contract_type === "loan" ? loan?.finance_company ?? "" : "");
+  const sourceLinkMemo = buildSourceLinkMemo(sourceDefaults);
+  const sourceSnapshotJson = buildSourceSnapshotJson(sourceDefaults);
+  const initialVehicleType = contract?.vehicle_type ?? sourceDefaults?.vehicle_type ?? "car";
+  const initialContractType = contract?.contract_type ?? sourceDefaults?.contract_type ?? "cash";
+  const initialFinanceCompany = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
+  const initialInstallmentCount =
+    loan?.installment_count ??
+    (initialContractType === "loan" && initialFinanceCompany ? parseOptionalInteger(sourceDefaults?.payment_count) : null);
+
+  const [vehicleType, setVehicleType] = useState<SalesVehicleType>(initialVehicleType);
+  const [contractType, setContractType] = useState<SalesContractType>(initialContractType);
+  const [financeCompany, setFinanceCompany] = useState<SalesFinanceCompany | "">(initialFinanceCompany);
   const [leaseCompany, setLeaseCompany] = useState<SalesLeaseCompany | "">(contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "");
-  const [installmentCount, setInstallmentCount] = useState<number | null>(loan?.installment_count ?? null);
+  const [installmentCount, setInstallmentCount] = useState<number | null>(initialInstallmentCount);
   const [clearFinancialDefaults, setClearFinancialDefaults] = useState(false);
 
   const allowedContractTypes = getAllowedContractTypes(vehicleType);
@@ -155,15 +183,15 @@ export function SalesContractForm({
 
       <Section title="顧客情報">
         <div className="grid gap-3 md:grid-cols-3">
-          <TextField label="氏名" name="customer_name" defaultValue={customer?.name} required />
+          <TextField label="氏名" name="customer_name" defaultValue={customer?.name ?? sourceDefaults?.customer_name} required />
           <TextField label="フリガナ" name="customer_kana" defaultValue={customer?.kana} />
           <TextField label="郵便番号" name="postal_code" defaultValue={customer?.postal_code} />
-          <TextField label="住所" name="address" defaultValue={customer?.address} className="md:col-span-3" />
-          <TextField label="電話番号" name="phone" defaultValue={customer?.phone} />
-          <TextField label="メール" name="email" type="email" defaultValue={customer?.email} />
+          <TextField label="住所" name="address" defaultValue={customer?.address ?? sourceDefaults?.prefecture} className="md:col-span-3" />
+          <TextField label="電話番号" name="phone" defaultValue={customer?.phone ?? sourceDefaults?.phone} />
+          <TextField label="メール" name="email" type="email" defaultValue={customer?.email ?? sourceDefaults?.email} />
           <TextField label="生年月日" name="birth_date" type="date" defaultValue={dateValue(customer?.birth_date)} />
           <TextField label="職業" name="occupation" defaultValue={customer?.occupation} />
-          <TextField label="勤務先" name="employer_name" defaultValue={customer?.employer_name} />
+          <TextField label="勤務先" name="employer_name" defaultValue={customer?.employer_name ?? sourceDefaults?.employer_name} />
           <TextField label="勤務先電話番号" name="employer_phone" defaultValue={customer?.employer_phone} />
           <TextField label="年収" name="annual_income" type="number" defaultValue={numberValue(customer?.annual_income)} />
           <TextareaField label="備考" name="customer_memo" defaultValue={customer?.memo} className="md:col-span-2" />
@@ -193,7 +221,7 @@ export function SalesContractForm({
               {CONTRACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
-          <TextareaField label="備考" name="contract_memo" defaultValue={contract?.memo} className="md:col-span-4" />
+          <TextareaField label="備考" name="contract_memo" defaultValue={contract?.memo ?? sourceLinkMemo} className="md:col-span-4" />
         </div>
       </Section>
 
@@ -203,14 +231,14 @@ export function SalesContractForm({
           <TextField label="source_row_key" name="source_row_key" defaultValue={contract?.source_row_key ?? sourceDefaults?.source_row_key} />
           <TextField label="source_row_number" name="source_row_number" type="number" defaultValue={contract?.source_row_number?.toString() ?? sourceDefaults?.source_row_number} />
           <TextField label="source_received_at" name="source_received_at" type="datetime-local" defaultValue={dateTimeLocalValue(contract?.source_received_at ?? sourceDefaults?.source_received_at)} />
-          <TextareaField label="source_snapshot_json" name="source_snapshot_json" defaultValue={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : ""} className="md:col-span-4" />
+          <TextareaField label="source_snapshot_json" name="source_snapshot_json" defaultValue={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson} className="md:col-span-4" />
         </div>
       </Section>
 
       <Section title="車両情報">
         <div className="grid gap-3 md:grid-cols-4">
           <TextField label="メーカー" name="maker" defaultValue={vehicle?.maker} />
-          <TextField label="車種" name="model" defaultValue={vehicle?.model} />
+          <TextField label="車種" name="model" defaultValue={vehicle?.model ?? sourceDefaults?.desired_vehicle} />
           <TextField label="グレード" name="grade" defaultValue={vehicle?.grade} />
           <TextField label="年式" name="model_year" type="number" defaultValue={numberValue(vehicle?.model_year)} />
           <TextField label="走行距離" name="mileage" type="number" defaultValue={numberValue(vehicle?.mileage)} />
@@ -254,7 +282,7 @@ export function SalesContractForm({
               </select>
             </label>
             <TextField label="金利" name="interest_rate" type="number" step="0.001" defaultValue={financialNumberValue(loan?.interest_rate)} />
-            <TextField label="ローン元金" name="principal" type="number" defaultValue={financialNumberValue(loan?.principal)} />
+            <TextField label="ローン元金" name="principal" type="number" defaultValue={financialNumberValue(loan?.principal ?? sourceDefaults?.application_amount)} />
             <label className="grid gap-1 text-sm font-bold text-slate-700">
               支払回数
               <select
@@ -268,8 +296,8 @@ export function SalesContractForm({
                 {installmentOptions.map((count) => <option key={count} value={count}>{count}回</option>)}
               </select>
             </label>
-            <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(loan?.initial_payment_amount)} />
-            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(loan?.monthly_payment)} />
+            <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(loan?.initial_payment_amount ?? sourceDefaults?.initial_payment_amount)} />
+            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(loan?.monthly_payment ?? sourceDefaults?.monthly_payment)} />
             <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(loan?.final_payment_amount)} />
             <TextField label="支払開始日" name="first_payment_date" type="date" defaultValue={financialDateValue(loan?.first_payment_date)} />
             <TextField label="支払終了日" name="final_payment_date" type="date" defaultValue={financialDateValue(loan?.final_payment_date)} />
@@ -278,7 +306,7 @@ export function SalesContractForm({
               ボーナス払いあり
             </label>
             <TextField label="ボーナス払い額" name="bonus_payment_amount" type="number" defaultValue={financialNumberValue(loan?.bonus_payment_amount)} />
-            <TextField label="支払総額" name="total_payment_amount" type="number" defaultValue={financialNumberValue(loan?.total_payment_amount)} />
+            <TextField label="支払総額" name="total_payment_amount" type="number" defaultValue={financialNumberValue(loan?.total_payment_amount ?? sourceDefaults?.total_payment_amount)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
               <input name="ownership_retention" type="checkbox" defaultChecked={financialCheckboxValue(loan?.ownership_retention)} className={checkboxClass} />
               所有権留保あり
@@ -497,4 +525,39 @@ function dateTimeLocalValue(value: string | null | undefined) {
 function numberValue(value: number | string | null | undefined) {
   if (value === null || value === undefined) return "";
   return String(value);
+}
+
+function parseOptionalInteger(value: string | null | undefined) {
+  if (!value) return null;
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
+  if (!Number.isFinite(parsed)) return null;
+  return Math.trunc(parsed);
+}
+
+function buildSourceLinkMemo(sourceDefaults?: SourceDefaults) {
+  if (!sourceDefaults || !hasSourceDefaultValues(sourceDefaults)) return "";
+  return [
+    "GAS自社ローン審査管理から連携",
+    sourceDefaults.source_row_key ? `GAS顧客ID: ${sourceDefaults.source_row_key}` : "",
+    sourceDefaults.source_row_number ? `GAS行番号: ${sourceDefaults.source_row_number}` : "",
+    sourceDefaults.phone ? `電話番号: ${sourceDefaults.phone}` : "",
+    sourceDefaults.desired_vehicle ? `希望車種: ${sourceDefaults.desired_vehicle}` : "",
+    sourceDefaults.payment_estimate ? `支払目安: ${sourceDefaults.payment_estimate}` : "",
+    sourceDefaults.status ? `審査管理ステータス: ${sourceDefaults.status}` : "",
+    sourceDefaults.review1 ? `プレミア審査結果: ${sourceDefaults.review1}` : "",
+    sourceDefaults.review2 ? `アスト審査結果: ${sourceDefaults.review2}` : "",
+    sourceDefaults.source_memo ? `GAS対応メモ: ${sourceDefaults.source_memo}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function buildSourceSnapshotJson(sourceDefaults?: SourceDefaults) {
+  if (!sourceDefaults || !hasSourceDefaultValues(sourceDefaults)) return "";
+  const snapshot = Object.fromEntries(
+    Object.entries(sourceDefaults).filter(([, value]) => value !== undefined && value !== "")
+  );
+  return JSON.stringify(snapshot, null, 2);
+}
+
+function hasSourceDefaultValues(sourceDefaults: SourceDefaults) {
+  return Object.values(sourceDefaults).some((value) => value !== undefined && value !== "");
 }

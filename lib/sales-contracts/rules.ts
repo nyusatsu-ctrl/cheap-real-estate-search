@@ -198,6 +198,65 @@ export function validateSalesContractSelection(input: {
   };
 }
 
+export type SalesContractMissingRequiredField = {
+  key: string;
+  message: string;
+};
+
+export function getSalesContractMissingRequiredFields(input: {
+  customerName?: string | number | null;
+  phone?: string | number | null;
+  vehicleType?: SalesVehicleType | "";
+  contractType: SalesContractType;
+  vehicleModel?: string | number | null;
+  salePrice?: string | number | null;
+  financeCompany?: SalesFinanceCompany | "";
+  leaseCompany?: SalesLeaseCompany | "";
+  installmentCount?: string | number | null;
+  principal?: string | number | null;
+  monthlyPayment?: string | number | null;
+  firstPaymentDate?: string | null;
+  leaseMonths?: string | number | null;
+  monthlyLeaseFee?: string | number | null;
+  leaseStartDate?: string | null;
+  leaseEndDate?: string | null;
+}): SalesContractMissingRequiredField[] {
+  const missing: SalesContractMissingRequiredField[] = [];
+  const add = (key: string, message: string) => missing.push({ key, message });
+
+  if (isBlank(input.customerName)) add("customer_name", "顧客名を入力してください。");
+  if (isBlank(input.phone)) add("phone", "電話番号を入力してください。");
+  if (!input.vehicleType) add("vehicle_type", "車両区分を選択してください。");
+  if (isBlank(input.vehicleModel)) add("model", "車種を入力してください。");
+
+  if (input.contractType === "cash") {
+    if (isBlank(input.salePrice)) add("sale_price", "契約金額を入力してください。");
+  }
+
+  if (input.contractType === "loan") {
+    if (!input.financeCompany) add("finance_company", "信販会社を選択してください。");
+    if (isBlank(input.installmentCount)) add("installment_count", "支払回数を選択してください。");
+    if (isBlank(input.salePrice) && isBlank(input.principal)) add("principal", "契約金額またはローン元金を入力してください。");
+    if (isBlank(input.monthlyPayment)) add("monthly_payment", "月額を入力してください。");
+    if (isBlank(input.firstPaymentDate)) add("first_payment_date", "支払開始日を入力してください。");
+  }
+
+  if (input.contractType === "lease") {
+    if (input.vehicleType !== "car") add("vehicle_type", "リース契約では車を選択してください。");
+    if (!input.leaseCompany) add("lease_company", "リース会社を選択してください。");
+    if (isBlank(input.leaseMonths)) add("lease_months", "リース期間を入力してください。");
+    if (isBlank(input.monthlyLeaseFee)) add("monthly_lease_fee", "月額を入力してください。");
+    if (isBlank(input.leaseStartDate)) add("lease_start_date", "支払開始日を入力してください。");
+    if (isBlank(input.leaseEndDate)) add("lease_end_date", "支払終了日を入力してください。");
+  }
+
+  return missing;
+}
+
+function isBlank(value: string | number | null | undefined) {
+  return value === null || value === undefined || String(value).trim() === "";
+}
+
 function range(start: number, end: number) {
   const values: number[] = [];
   for (let value = start; value <= end; value += 1) values.push(value);

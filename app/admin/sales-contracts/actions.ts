@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import {
   DOCUMENT_TYPE_OPTIONS,
+  getSalesContractMissingRequiredFields,
   validateSalesContractSelection
 } from "@/lib/sales-contracts/rules";
 import type {
@@ -32,7 +33,7 @@ export async function createSalesContractAction(formData: FormData) {
   const supabase = createSupabaseServiceRoleClient();
   if (!supabase) redirect(SETUP_REDIRECT);
 
-  const input = getValidatedFormInput(formData, "/admin/sales-contracts/new");
+  const input = getValidatedFormInput(formData, "/admin/sales-contracts/new", { validateMinimumFields: true });
   const now = new Date().toISOString();
 
   const customerResult = await supabase
@@ -390,13 +391,23 @@ async function upsertDocuments(
   }
 }
 
-function getValidatedFormInput(formData: FormData, failurePath: string) {
+function getValidatedFormInput(formData: FormData, failurePath: string, options: { validateMinimumFields?: boolean } = {}) {
   const vehicleType = normalizeVehicleType(requiredString(formData, "vehicle_type"));
   const contractType = normalizeContractType(requiredString(formData, "contract_type"));
   const financeCompany = nullableString(formData, "finance_company") as SalesFinanceCompany | "";
   const leaseCompany = nullableString(formData, "lease_company") as SalesLeaseCompany | "";
   const installmentCount = numberField(formData, "installment_count");
   const salePrice = numberField(formData, "sale_price");
+  const customerName = nullableString(formData, "customer_name");
+  const phone = nullableString(formData, "phone");
+  const vehicleModel = nullableString(formData, "model");
+  const principal = numberField(formData, "principal");
+  const monthlyPayment = numberField(formData, "monthly_payment");
+  const firstPaymentDate = nullableString(formData, "first_payment_date");
+  const leaseMonths = numberField(formData, "lease_months");
+  const monthlyLeaseFee = numberField(formData, "monthly_lease_fee");
+  const leaseStartDate = nullableString(formData, "lease_start_date");
+  const leaseEndDate = nullableString(formData, "lease_end_date");
   const selection = validateSalesContractSelection({
     vehicleType,
     contractType,
@@ -405,12 +416,32 @@ function getValidatedFormInput(formData: FormData, failurePath: string) {
     installmentCount
   });
 
-  const customerName = nullableString(formData, "customer_name");
   const errors = [...selection.errors];
-  if (!customerName) errors.push("顧客名を入力してください。");
-  if (salePrice === null) errors.push("契約金額を入力してください。");
+  if (options.validateMinimumFields) {
+    errors.push(...getSalesContractMissingRequiredFields({
+      customerName,
+      phone,
+      vehicleType,
+      contractType,
+      vehicleModel,
+      salePrice,
+      financeCompany,
+      leaseCompany,
+      installmentCount,
+      principal,
+      monthlyPayment,
+      firstPaymentDate,
+      leaseMonths,
+      monthlyLeaseFee,
+      leaseStartDate,
+      leaseEndDate
+    }).map((field) => field.message));
+  } else {
+    if (!customerName) errors.push("顧客名を入力してください。");
+    if (salePrice === null) errors.push("契約金額を入力してください。");
+  }
   if (errors.length > 0) {
-    redirect(`${failurePath}?error=${encodeURIComponent(errors.join(" / "))}`);
+    redirect(`${failurePath}?error=${encodeURIComponent(uniqueStrings(errors).join(" / "))}`);
   }
 
   return {
@@ -450,7 +481,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string) {
     },
     vehicle: {
       maker: nullableString(formData, "maker"),
-      model: nullableString(formData, "model"),
+      model: vehicleModel,
       grade: nullableString(formData, "grade"),
       model_year: numberField(formData, "model_year"),
       mileage: numberField(formData, "mileage"),
@@ -622,6 +653,10 @@ function decimalField(formData: FormData, key: string) {
 
 function checkboxField(formData: FormData, key: string) {
   return formData.get(key) === "on";
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values));
 }
 
 function jsonField(formData: FormData, key: string) {

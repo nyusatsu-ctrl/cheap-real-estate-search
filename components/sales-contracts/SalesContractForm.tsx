@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   APPROVAL_STATUS_OPTIONS,
   CONTACT_METHOD_OPTIONS,
@@ -14,6 +14,8 @@ import {
   getAllowedFinanceCompanies,
   getAllowedLeaseCompanies,
   getInstallmentOptions,
+  getSalesContractMissingRequiredFields,
+  type SalesContractMissingRequiredField,
   validateSalesContractSelection
 } from "@/lib/sales-contracts/rules";
 import type {
@@ -54,6 +56,14 @@ type SourceDefaults = {
   source_memo?: string;
 };
 
+type RequiredFieldOverrides = {
+  vehicleType: SalesVehicleType;
+  contractType: SalesContractType;
+  financeCompany: SalesFinanceCompany | "";
+  leaseCompany: SalesLeaseCompany | "";
+  installmentCount: number | null;
+};
+
 export function SalesContractForm({
   mode,
   action,
@@ -85,16 +95,36 @@ export function SalesContractForm({
   const initialVehicleType = contract?.vehicle_type ?? sourceDefaults?.vehicle_type ?? "car";
   const initialContractType = contract?.contract_type ?? sourceDefaults?.contract_type ?? "cash";
   const initialFinanceCompany = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
+  const initialLeaseCompany = contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "";
   const initialInstallmentCount =
     loan?.installment_count ??
     (initialContractType === "loan" && initialFinanceCompany ? parseOptionalInteger(sourceDefaults?.payment_count) : null);
 
+  const formRef = useRef<HTMLFormElement>(null);
   const [vehicleType, setVehicleType] = useState<SalesVehicleType>(initialVehicleType);
   const [contractType, setContractType] = useState<SalesContractType>(initialContractType);
   const [financeCompany, setFinanceCompany] = useState<SalesFinanceCompany | "">(initialFinanceCompany);
-  const [leaseCompany, setLeaseCompany] = useState<SalesLeaseCompany | "">(contract?.contract_type === "lease" ? lease?.lease_company ?? "" : "");
+  const [leaseCompany, setLeaseCompany] = useState<SalesLeaseCompany | "">(initialLeaseCompany);
   const [installmentCount, setInstallmentCount] = useState<number | null>(initialInstallmentCount);
   const [clearFinancialDefaults, setClearFinancialDefaults] = useState(false);
+  const [missingRequiredFields, setMissingRequiredFields] = useState<SalesContractMissingRequiredField[]>(() => mode === "create" ? getSalesContractMissingRequiredFields({
+    customerName: customer?.name ?? sourceDefaults?.customer_name,
+    phone: customer?.phone ?? sourceDefaults?.phone,
+    vehicleType: initialVehicleType,
+    contractType: initialContractType,
+    vehicleModel: sourceVehicleModel,
+    salePrice: contract?.sale_price,
+    financeCompany: initialContractType === "loan" ? initialFinanceCompany : "",
+    leaseCompany: initialContractType === "lease" ? initialLeaseCompany : "",
+    installmentCount: initialContractType === "loan" ? initialInstallmentCount : null,
+    principal: loan?.principal ?? sourceDefaults?.application_amount,
+    monthlyPayment: initialContractType === "loan" ? sourceMonthlyPayment : "",
+    firstPaymentDate: loan?.first_payment_date,
+    leaseMonths: lease?.lease_months,
+    monthlyLeaseFee: lease?.monthly_lease_fee,
+    leaseStartDate: lease?.lease_start_date,
+    leaseEndDate: lease?.lease_end_date
+  }) : []);
 
   const allowedContractTypes = getAllowedContractTypes(vehicleType);
   const allowedFinanceCompanies = getAllowedFinanceCompanies(vehicleType);
@@ -107,26 +137,73 @@ export function SalesContractForm({
     leaseCompany: contractType === "lease" ? leaseCompany : "",
     installmentCount
   });
+  const missingRequiredFieldKeys = useMemo(() => new Set(missingRequiredFields.map((field) => field.key)), [missingRequiredFields]);
+  const blockingMessages = useMemo(() => {
+    const requiredMessages = missingRequiredFields.map((field) => field.message);
+    const selectionMessages = validation.errors.filter((message) => !isCoveredByRequiredFieldMessage(message, missingRequiredFieldKeys));
+    return uniqueMessages([...requiredMessages, ...selectionMessages]);
+  }, [missingRequiredFieldKeys, missingRequiredFields, validation.errors]);
+  const canSubmit = mode === "create" ? blockingMessages.length === 0 : validation.valid;
   const financialNumberValue = (value: number | string | null | undefined) => clearFinancialDefaults ? "" : numberValue(value);
   const financialDateValue = (value: string | null | undefined) => clearFinancialDefaults ? "" : dateValue(value);
   const financialTextValue = (value: string | null | undefined) => clearFinancialDefaults ? "" : value;
   const financialCheckboxValue = (value: boolean | null | undefined) => clearFinancialDefaults ? false : value ?? false;
+  const isMissing = (key: string) => mode === "create" && missingRequiredFieldKeys.has(key);
+
+  const refreshMissingRequiredFields = useCallback((overrides: Partial<RequiredFieldOverrides> = {}) => {
+    if (mode !== "create") {
+      setMissingRequiredFields([]);
+      return;
+    }
+
+    const formData = formRef.current ? new FormData(formRef.current) : null;
+    const read = (key: string) => formData?.get(key)?.toString() ?? "";
+    const currentVehicleType = overrides.vehicleType ?? ((read("vehicle_type") as SalesVehicleType | "") || vehicleType);
+    const currentContractType = overrides.contractType ?? ((read("contract_type") as SalesContractType | "") || contractType);
+    const currentFinanceCompany = overrides.financeCompany ?? ((read("finance_company") as SalesFinanceCompany | "") || financeCompany);
+    const currentLeaseCompany = overrides.leaseCompany ?? ((read("lease_company") as SalesLeaseCompany | "") || leaseCompany);
+    const currentInstallmentCount = "installmentCount" in overrides ? overrides.installmentCount : read("installment_count") || installmentCount;
+
+    setMissingRequiredFields(getSalesContractMissingRequiredFields({
+      customerName: read("customer_name"),
+      phone: read("phone"),
+      vehicleType: currentVehicleType,
+      contractType: currentContractType,
+      vehicleModel: read("model"),
+      salePrice: read("sale_price"),
+      financeCompany: currentContractType === "loan" ? currentFinanceCompany : "",
+      leaseCompany: currentContractType === "lease" ? currentLeaseCompany : "",
+      installmentCount: currentContractType === "loan" ? currentInstallmentCount : null,
+      principal: read("principal"),
+      monthlyPayment: read("monthly_payment"),
+      firstPaymentDate: read("first_payment_date"),
+      leaseMonths: read("lease_months"),
+      monthlyLeaseFee: read("monthly_lease_fee"),
+      leaseStartDate: read("lease_start_date"),
+      leaseEndDate: read("lease_end_date")
+    }));
+  }, [contractType, financeCompany, installmentCount, leaseCompany, mode, vehicleType]);
 
   function handleVehicleTypeChange(nextValue: SalesVehicleType) {
     setVehicleType(nextValue);
     if (nextValue === "bike" && contractType === "lease") {
       setContractType("cash");
       resetFinancialFields();
+      refreshMissingRequiredFields({ vehicleType: nextValue, contractType: "cash", financeCompany: "", leaseCompany: "", installmentCount: null });
       return;
     }
     if (financeCompany && !getAllowedFinanceCompanies(nextValue).some((option) => option.value === financeCompany)) {
       setFinanceCompany("");
       setInstallmentCount(null);
+      refreshMissingRequiredFields({ vehicleType: nextValue, financeCompany: "", installmentCount: null });
       return;
     }
     if (financeCompany && installmentCount && !getInstallmentOptions(nextValue, financeCompany).includes(installmentCount)) {
       setInstallmentCount(null);
+      refreshMissingRequiredFields({ vehicleType: nextValue, installmentCount: null });
+      return;
     }
+    refreshMissingRequiredFields({ vehicleType: nextValue });
   }
 
   function handleContractTypeChange(nextValue: SalesContractType) {
@@ -134,16 +211,22 @@ export function SalesContractForm({
     setContractType(nextValue);
     if (nextValue === "cash") {
       resetFinancialFields();
+      refreshMissingRequiredFields({ contractType: "cash", financeCompany: "", leaseCompany: "", installmentCount: null });
       return;
     }
     if (nextValue === "loan") {
       setLeaseCompany("");
       if (financeCompany && !allowedFinanceCompanies.some((option) => option.value === financeCompany)) {
         setFinanceCompany("");
+        refreshMissingRequiredFields({ contractType: "loan", financeCompany: "", leaseCompany: "", installmentCount: null });
+        return;
       }
       if (financeCompany && installmentCount && !getInstallmentOptions(vehicleType, financeCompany).includes(installmentCount)) {
         setInstallmentCount(null);
+        refreshMissingRequiredFields({ contractType: "loan", financeCompany, leaseCompany: "", installmentCount: null });
+        return;
       }
+      refreshMissingRequiredFields({ contractType: "loan", financeCompany, leaseCompany: "" });
       return;
     }
     if (nextValue === "lease") {
@@ -151,7 +234,10 @@ export function SalesContractForm({
       setInstallmentCount(null);
       if (leaseCompany && !allowedLeaseCompanies.some((option) => option.value === leaseCompany)) {
         setLeaseCompany("");
+        refreshMissingRequiredFields({ contractType: "lease", financeCompany: "", leaseCompany: "", installmentCount: null });
+        return;
       }
+      refreshMissingRequiredFields({ contractType: "lease", financeCompany: "", leaseCompany, installmentCount: null });
     }
   }
 
@@ -159,7 +245,21 @@ export function SalesContractForm({
     setFinanceCompany(nextValue);
     if (!nextValue || (installmentCount && !getInstallmentOptions(vehicleType, nextValue).includes(installmentCount))) {
       setInstallmentCount(null);
+      refreshMissingRequiredFields({ financeCompany: nextValue, installmentCount: null });
+      return;
     }
+    refreshMissingRequiredFields({ financeCompany: nextValue });
+  }
+
+  function handleLeaseCompanyChange(nextValue: SalesLeaseCompany | "") {
+    setLeaseCompany(nextValue);
+    refreshMissingRequiredFields({ leaseCompany: nextValue });
+  }
+
+  function handleInstallmentCountChange(nextValue: string) {
+    const nextCount = nextValue ? Number(nextValue) : null;
+    setInstallmentCount(nextCount);
+    refreshMissingRequiredFields({ installmentCount: nextCount });
   }
 
   function resetFinancialFields() {
@@ -170,7 +270,7 @@ export function SalesContractForm({
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form ref={formRef} action={action} className="space-y-5" onChange={() => refreshMissingRequiredFields()}>
       {mode === "edit" && detail ? (
         <>
           <input type="hidden" name="contract_id" value={detail.contract.id} />
@@ -188,19 +288,15 @@ export function SalesContractForm({
       <input type="hidden" name="source_received_at" value={sourceReceivedAtValue} />
       <input type="hidden" name="source_snapshot_json" value={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson} />
 
-      {!validation.valid ? (
-        <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          {validation.errors.join(" ")}
-        </div>
-      ) : null}
+      <MissingRequiredFieldsNotice messages={blockingMessages} />
 
       <Section title="顧客情報">
         <div className="grid gap-3 md:grid-cols-3">
-          <TextField label="氏名" name="customer_name" defaultValue={customer?.name ?? sourceDefaults?.customer_name} required />
+          <TextField label="氏名" name="customer_name" defaultValue={customer?.name ?? sourceDefaults?.customer_name} required missing={isMissing("customer_name")} />
           <TextField label="フリガナ" name="customer_kana" defaultValue={customer?.kana} />
           <TextField label="郵便番号" name="postal_code" defaultValue={customer?.postal_code} />
           <TextField label="住所" name="address" defaultValue={customer?.address ?? sourceDefaults?.prefecture} className="md:col-span-3" />
-          <TextField label="電話番号" name="phone" defaultValue={customer?.phone ?? sourceDefaults?.phone} />
+          <TextField label="電話番号" name="phone" defaultValue={customer?.phone ?? sourceDefaults?.phone} missing={isMissing("phone")} />
           <TextField label="メール" name="email" type="email" defaultValue={customer?.email ?? sourceDefaults?.email} />
           <TextField label="生年月日" name="birth_date" type="date" defaultValue={dateValue(customer?.birth_date)} />
           <TextField label="職業" name="occupation" defaultValue={customer?.occupation} />
@@ -215,13 +311,13 @@ export function SalesContractForm({
         <div className="grid gap-3 md:grid-cols-4">
           <TextField label="契約日" name="contract_date" type="date" defaultValue={dateValue(contract?.contract_date)} />
           <TextField label="納車日" name="delivery_date" type="date" defaultValue={dateValue(contract?.delivery_date)} />
-          <SelectField label="車・バイク" name="vehicle_type" value={vehicleType} onChange={(value) => handleVehicleTypeChange(value as SalesVehicleType)}>
+          <SelectField label="車・バイク" name="vehicle_type" value={vehicleType} onChange={(value) => handleVehicleTypeChange(value as SalesVehicleType)} missing={isMissing("vehicle_type")}>
             {VEHICLE_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </SelectField>
           <SelectField label="契約方法" name="contract_type" value={contractType} onChange={(value) => handleContractTypeChange(value as SalesContractType)}>
             {allowedContractTypes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </SelectField>
-          <TextField label="契約金額" name="sale_price" type="number" defaultValue={numberValue(contract?.sale_price)} required />
+          <TextField label="契約金額" name="sale_price" type="number" defaultValue={numberValue(contract?.sale_price)} required={contractType === "cash"} missing={isMissing("sale_price") || isMissing("principal")} />
           <TextField label="諸費用" name="fees" type="number" defaultValue={numberValue(contract?.fees)} />
           <TextField label="総支払額" name="total_price" type="number" defaultValue={numberValue(contract?.total_price)} />
           <TextField label="頭金" name="down_payment" type="number" defaultValue={numberValue(contract?.down_payment)} />
@@ -241,7 +337,7 @@ export function SalesContractForm({
       <Section title="車両情報">
         <div className="grid gap-3 md:grid-cols-4">
           <TextField label="メーカー" name="maker" defaultValue={vehicle?.maker} />
-          <TextField label="車種" name="model" defaultValue={sourceVehicleModel} required={mode === "create"} />
+          <TextField label="車種" name="model" defaultValue={sourceVehicleModel} required={mode === "create"} missing={isMissing("model")} />
           <TextField label="グレード" name="grade" defaultValue={vehicle?.grade} />
           <TextField label="年式" name="model_year" type="number" defaultValue={numberValue(vehicle?.model_year)} />
           <TextField label="走行距離" name="mileage" type="number" defaultValue={numberValue(vehicle?.mileage)} />
@@ -269,11 +365,13 @@ export function SalesContractForm({
                 value={financeCompany}
                 onChange={(event) => handleFinanceCompanyChange(event.target.value as SalesFinanceCompany | "")}
                 required
-                className={inputClass}
+                aria-invalid={isMissing("finance_company") || undefined}
+                className={fieldClass(isMissing("finance_company"))}
               >
                 <option value="">選択</option>
                 {allowedFinanceCompanies.map((option) => <option key={option.value} value={option.value}>{FINANCE_COMPANY_LABELS[option.value]}</option>)}
               </select>
+              {isMissing("finance_company") ? <span className="text-xs font-bold text-amber-700">信販会社を選択してください。</span> : null}
             </label>
             <TextField label="信販申込番号" name="application_number" defaultValue={financialTextValue(loan?.application_number)} />
             <TextField label="契約番号" name="loan_contract_number" defaultValue={financialTextValue(loan?.contract_number)} />
@@ -285,24 +383,26 @@ export function SalesContractForm({
               </select>
             </label>
             <TextField label="金利" name="interest_rate" type="number" step="0.001" defaultValue={financialNumberValue(loan?.interest_rate)} />
-            <TextField label="ローン元金" name="principal" type="number" defaultValue={financialNumberValue(loan?.principal ?? sourceDefaults?.application_amount)} />
+            <TextField label="ローン元金" name="principal" type="number" defaultValue={financialNumberValue(loan?.principal ?? sourceDefaults?.application_amount)} missing={isMissing("principal")} helperText="契約金額またはローン元金を入力してください。" />
             <label className="grid gap-1 text-sm font-bold text-slate-700">
               支払回数
               <select
                 name="installment_count"
                 value={installmentCount ?? ""}
-                onChange={(event) => setInstallmentCount(event.target.value ? Number(event.target.value) : null)}
+                onChange={(event) => handleInstallmentCountChange(event.target.value)}
                 required
-                className={inputClass}
+                aria-invalid={isMissing("installment_count") || undefined}
+                className={fieldClass(isMissing("installment_count"))}
               >
                 <option value="">選択</option>
                 {installmentOptions.map((count) => <option key={count} value={count}>{count}回</option>)}
               </select>
+              {isMissing("installment_count") ? <span className="text-xs font-bold text-amber-700">支払回数を選択してください。支払回数が未確定の場合は、審査結果確定後に入力してください。</span> : null}
             </label>
             <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(loan?.initial_payment_amount ?? sourceDefaults?.initial_payment_amount)} />
-            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(sourceMonthlyPayment)} />
+            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(sourceMonthlyPayment)} missing={isMissing("monthly_payment")} />
             <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(loan?.final_payment_amount)} />
-            <TextField label="支払開始日" name="first_payment_date" type="date" defaultValue={financialDateValue(loan?.first_payment_date)} />
+            <TextField label="支払開始日" name="first_payment_date" type="date" defaultValue={financialDateValue(loan?.first_payment_date)} missing={isMissing("first_payment_date")} />
             <TextField label="支払終了日" name="final_payment_date" type="date" defaultValue={financialDateValue(loan?.final_payment_date)} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
               <input name="loan_bonus_payment_enabled" type="checkbox" defaultChecked={financialCheckboxValue(loan?.bonus_payment_enabled)} className={checkboxClass} />
@@ -327,22 +427,24 @@ export function SalesContractForm({
               <select
                 name="lease_company"
                 value={leaseCompany}
-                onChange={(event) => setLeaseCompany(event.target.value as SalesLeaseCompany | "")}
+                onChange={(event) => handleLeaseCompanyChange(event.target.value as SalesLeaseCompany | "")}
                 required
-                className={inputClass}
+                aria-invalid={isMissing("lease_company") || undefined}
+                className={fieldClass(isMissing("lease_company"))}
               >
                 <option value="">選択</option>
                 {allowedLeaseCompanies.map((option) => <option key={option.value} value={option.value}>{LEASE_COMPANY_LABELS[option.value]}</option>)}
               </select>
+              {isMissing("lease_company") ? <span className="text-xs font-bold text-amber-700">リース会社を選択してください。</span> : null}
             </label>
             <TextField label="提携会社" name="partner_company" defaultValue={financialTextValue(lease?.partner_company)} />
             <TextField label="契約番号" name="lease_contract_number" defaultValue={financialTextValue(lease?.contract_number)} />
-            <TextField label="支払回数・契約期間（月）" name="lease_months" type="number" defaultValue={financialNumberValue(lease?.lease_months)} />
+            <TextField label="支払回数・契約期間（月）" name="lease_months" type="number" defaultValue={financialNumberValue(lease?.lease_months)} missing={isMissing("lease_months")} />
             <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(lease?.initial_payment_amount)} />
-            <TextField label="月額" name="monthly_lease_fee" type="number" defaultValue={financialNumberValue(lease?.monthly_lease_fee)} />
+            <TextField label="月額" name="monthly_lease_fee" type="number" defaultValue={financialNumberValue(lease?.monthly_lease_fee)} missing={isMissing("monthly_lease_fee")} />
             <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(lease?.final_payment_amount)} />
-            <TextField label="支払開始日" name="lease_start_date" type="date" defaultValue={financialDateValue(lease?.lease_start_date)} />
-            <TextField label="支払終了日" name="lease_end_date" type="date" defaultValue={financialDateValue(lease?.lease_end_date)} />
+            <TextField label="支払開始日" name="lease_start_date" type="date" defaultValue={financialDateValue(lease?.lease_start_date)} missing={isMissing("lease_start_date")} />
+            <TextField label="支払終了日" name="lease_end_date" type="date" defaultValue={financialDateValue(lease?.lease_end_date)} missing={isMissing("lease_end_date")} />
             <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
               <input name="lease_bonus_payment_enabled" type="checkbox" defaultChecked={financialCheckboxValue(lease?.bonus_payment_enabled)} className={checkboxClass} />
               ボーナス払いあり
@@ -444,10 +546,24 @@ export function SalesContractForm({
         />
       </CollapsibleSection>
 
-      <div className="sticky bottom-0 z-10 -mx-1 flex justify-end gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-1 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
+          {blockingMessages.length > 0 ? (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="font-black">契約登録に必要な項目が不足しています</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 font-bold">
+                {blockingMessages.map((message) => <li key={message}>{message}</li>)}
+              </ul>
+            </div>
+          ) : (
+            <p className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
+              入力内容を確認して登録できます。
+            </p>
+          )}
+        </div>
         <button
-          className="rounded bg-brand-700 px-5 py-3 text-sm font-black text-white focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!validation.valid}
+          className="rounded bg-brand-700 px-5 py-3 text-sm font-black text-white focus-ring disabled:cursor-not-allowed disabled:opacity-60 md:min-w-36"
+          disabled={!canSubmit}
         >
           {mode === "create" ? "契約を登録" : "契約を保存"}
         </button>
@@ -485,6 +601,19 @@ function CollapsibleSection({
       </summary>
       <div className="mt-3 border-t border-slate-100 pt-3">{children}</div>
     </details>
+  );
+}
+
+function MissingRequiredFieldsNotice({ messages }: { messages: string[] }) {
+  if (messages.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+      <p className="font-black">契約登録に必要な項目が不足しています</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 font-bold">
+        {messages.map((message) => <li key={message}>{message}</li>)}
+      </ul>
+    </div>
   );
 }
 
@@ -533,6 +662,8 @@ function TextField({
   required,
   type = "text",
   step,
+  missing = false,
+  helperText,
   className = ""
 }: {
   label: string;
@@ -541,12 +672,23 @@ function TextField({
   required?: boolean;
   type?: string;
   step?: string;
+  missing?: boolean;
+  helperText?: string;
   className?: string;
 }) {
   return (
     <label className={`grid gap-1 text-sm font-bold text-slate-700 ${className}`}>
       {label}
-      <input name={name} type={type} step={step} defaultValue={defaultValue ?? ""} required={required} className={inputClass} />
+      <input
+        name={name}
+        type={type}
+        step={step}
+        defaultValue={defaultValue ?? ""}
+        required={required}
+        aria-invalid={missing || undefined}
+        className={fieldClass(missing)}
+      />
+      {missing ? <span className="text-xs font-bold text-amber-700">{helperText ?? "この項目を入力してください。"}</span> : null}
     </label>
   );
 }
@@ -575,22 +717,41 @@ function SelectField({
   name,
   value,
   onChange,
+  missing = false,
   children
 }: {
   label: string;
   name: string;
   value: string;
   onChange: (value: string) => void;
+  missing?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="grid gap-1 text-sm font-bold text-slate-700">
       {label}
-      <select name={name} value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>
+      <select name={name} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={missing || undefined} className={fieldClass(missing)}>
         {children}
       </select>
+      {missing ? <span className="text-xs font-bold text-amber-700">この項目を選択してください。</span> : null}
     </label>
   );
+}
+
+function fieldClass(missing: boolean) {
+  return missing ? `${inputClass} border-amber-500 bg-amber-50 ring-1 ring-amber-300` : inputClass;
+}
+
+function uniqueMessages(messages: string[]) {
+  return Array.from(new Set(messages));
+}
+
+function isCoveredByRequiredFieldMessage(message: string, missingRequiredFieldKeys: Set<string>) {
+  if (missingRequiredFieldKeys.has("finance_company") && message.includes("信販会社")) return true;
+  if (missingRequiredFieldKeys.has("lease_company") && message.includes("リース会社")) return true;
+  if (missingRequiredFieldKeys.has("installment_count") && message.includes("支払回数")) return true;
+  if (missingRequiredFieldKeys.has("vehicle_type") && message.includes("リース契約では車")) return true;
+  return false;
 }
 
 function dateValue(value: string | null | undefined) {

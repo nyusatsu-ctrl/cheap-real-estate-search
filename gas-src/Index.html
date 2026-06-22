@@ -45,6 +45,45 @@
         z-index: 5;
       }
 
+      .app-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .app-brand-logo {
+        display: block;
+        width: auto;
+        height: 38px;
+        flex: 0 0 auto;
+        object-fit: contain;
+      }
+
+      .app-brand-text {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 2px 6px;
+        min-width: 0;
+      }
+
+      .app-brand-company,
+      .app-brand-title {
+        white-space: nowrap;
+      }
+
+      .app-brand-company {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .app-brand-separator {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
       h1 {
         margin: 0;
         font-size: 18px;
@@ -821,7 +860,29 @@
       }
 
       @media (max-width: 980px) {
-      .toolbar {
+        header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .app-brand {
+          align-items: flex-start;
+        }
+
+        .app-brand-logo {
+          height: 34px;
+        }
+
+        .app-brand-text {
+          display: grid;
+          gap: 2px;
+        }
+
+        .app-brand-separator {
+          display: none;
+        }
+
+        .toolbar {
           grid-template-columns: 1fr 1fr;
         }
 
@@ -1036,7 +1097,18 @@
     </section>
 
     <header>
-      <h1>自社ローン審査管理</h1>
+      <div class="app-brand">
+        <img
+          src="https://cheap-real-estate-search.vercel.app/brand/ecoloop-logo.png"
+          alt="株式会社エコループ ロゴ"
+          class="app-brand-logo"
+        >
+        <div class="app-brand-text">
+          <span class="app-brand-company">株式会社エコループ</span>
+          <span class="app-brand-separator" aria-hidden="true">｜</span>
+          <h1 class="app-brand-title">自社ローン審査管理</h1>
+        </div>
+      </div>
       <button id="refreshButton" type="button">更新</button>
     </header>
 

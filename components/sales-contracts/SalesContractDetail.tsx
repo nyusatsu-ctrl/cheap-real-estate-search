@@ -4,6 +4,7 @@ import {
   formatSalesDateTime,
   formatYen,
   getCounterpartyLabel,
+  getMonthlyAmount,
   getTermLabel
 } from "@/lib/sales-contracts/data";
 import {
@@ -18,7 +19,12 @@ import {
   LEASE_COMPANY_LABELS,
   VEHICLE_TYPE_LABELS
 } from "@/lib/sales-contracts/rules";
-import type { SalesContractDetail as SalesContractDetailType } from "@/lib/sales-contracts/types";
+import type {
+  SalesContactHistory,
+  SalesContractDetail as SalesContractDetailType,
+  SalesContractStatus,
+  SalesContractType
+} from "@/lib/sales-contracts/types";
 
 export function SalesContractDetail({
   detail,
@@ -30,6 +36,9 @@ export function SalesContractDetail({
   const item = detail;
   const documentLabels = new Map<string, string>(DOCUMENT_TYPE_OPTIONS.map((option) => [option.value, option.label]));
   const canHideAsTestData = isTestSalesDetail(item);
+  const vehicleName = [item.vehicle?.maker, item.vehicle?.model, item.vehicle?.grade].filter(Boolean).join(" ") || "車両情報未登録";
+  const nextAction = getNextAction(item.contactHistories);
+  const hasSourceInfo = Boolean(item.contract.source_system || item.contract.source_row_key || item.contract.source_row_number || item.contract.source_received_at);
 
   return (
     <div className="space-y-5">
@@ -37,37 +46,121 @@ export function SalesContractDetail({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-black text-slate-950">{item.customer?.name ?? "顧客未登録"}</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {[item.vehicle?.maker, item.vehicle?.model, item.vehicle?.registration_number].filter(Boolean).join(" / ") || "車両情報未登録"}
-            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-600">{[vehicleName, item.vehicle?.registration_number].filter(Boolean).join(" / ")}</p>
           </div>
-          <span className="rounded bg-slate-900 px-3 py-1.5 text-sm font-bold text-white">
-            {CONTRACT_STATUS_LABELS[item.contract.status]}
-          </span>
+          <div className="flex flex-wrap gap-2">
+            <Badge className={getContractTypeClass(item.contract.contract_type)}>
+              {CONTRACT_TYPE_LABELS[item.contract.contract_type]}
+            </Badge>
+            <Badge className={getStatusClass(item.contract.status)}>
+              {CONTRACT_STATUS_LABELS[item.contract.status]}
+            </Badge>
+          </div>
         </div>
-        <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
-          <Info label="車・バイク" value={VEHICLE_TYPE_LABELS[item.contract.vehicle_type]} />
-          <Info label="契約方法" value={CONTRACT_TYPE_LABELS[item.contract.contract_type]} />
-          <Info label="信販・リース" value={getCounterpartyLabel(item)} />
-          <Info label="回数・期間" value={getTermLabel(item)} />
+        <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <SummaryItem label="車両区分" value={VEHICLE_TYPE_LABELS[item.contract.vehicle_type]} />
+          <SummaryItem label="契約方法" value={CONTRACT_TYPE_LABELS[item.contract.contract_type]} />
+          <SummaryItem label="信販会社" value={getCounterpartyLabel(item)} />
+          <SummaryItem label="回数・期間" value={getTermLabel(item)} />
+          <SummaryItem label="月額" value={formatYen(getMonthlyAmount(item))} />
+          <SummaryItem label="次回対応日" value={nextAction ? formatSalesDate(nextAction.next_action_date) : "期限なし"} />
+          <SummaryItem label="契約ステータス" value={CONTRACT_STATUS_LABELS[item.contract.status]} />
         </dl>
+        <NextActionPanel history={nextAction} />
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="基本情報">
+      <div className="grid gap-5 xl:grid-cols-3">
+        <Section title="顧客情報">
           <InfoGrid>
+            <Info label="顧客名" value={item.customer?.name} />
             <Info label="フリガナ" value={item.customer?.kana} />
             <Info label="電話番号" value={item.customer?.phone} />
             <Info label="メール" value={item.customer?.email} />
-            <Info label="住所" value={item.customer?.address} />
             <Info label="生年月日" value={formatSalesDate(item.customer?.birth_date)} />
-            <Info label="職業" value={item.customer?.occupation} />
             <Info label="勤務先" value={item.customer?.employer_name} />
             <Info label="勤務先電話" value={item.customer?.employer_phone} />
-            <Info label="年収" value={item.customer?.annual_income ? `${item.customer.annual_income.toLocaleString("ja-JP")}円` : "-"} />
+            <Info label="住所" value={item.customer?.address} className="md:col-span-2" />
+            <Info label="備考" value={item.customer?.memo} className="md:col-span-2" multiline />
           </InfoGrid>
         </Section>
 
+        <Section title="車両情報">
+          <InfoGrid>
+            <Info label="車両区分" value={VEHICLE_TYPE_LABELS[item.contract.vehicle_type]} />
+            <Info label="車種" value={vehicleName} />
+            <Info label="年式" value={item.vehicle?.model_year?.toString()} />
+            <Info label="走行距離" value={formatMileage(item.vehicle?.mileage)} />
+            <Info label="車台番号" value={item.vehicle?.chassis_number} />
+            <Info label="ナンバー" value={item.vehicle?.registration_number} />
+            <Info label="色" value={item.vehicle?.color} />
+            <Info label="GPS装着" value={item.vehicle?.gps_installed ? "あり" : "なし"} />
+          </InfoGrid>
+        </Section>
+
+        <Section title="契約概要">
+          <InfoGrid>
+            <Info label="契約方法" value={<Badge className={getContractTypeClass(item.contract.contract_type)}>{CONTRACT_TYPE_LABELS[item.contract.contract_type]}</Badge>} />
+            <Info label="契約ステータス" value={<Badge className={getStatusClass(item.contract.status)}>{CONTRACT_STATUS_LABELS[item.contract.status]}</Badge>} />
+            <Info label="契約日" value={formatSalesDate(item.contract.contract_date)} />
+            <Info label="納車予定/納車日" value={formatSalesDate(item.contract.delivery_date)} />
+            <Info label="契約金額" value={formatYen(item.contract.sale_price)} />
+            <Info label="頭金" value={formatYen(item.contract.down_payment)} />
+            <Info label="総支払額" value={formatYen(item.contract.total_price)} />
+            <Info label="担当者" value={item.contract.staff_name} />
+            <Info label="備考" value={item.contract.memo} className="md:col-span-2" multiline />
+          </InfoGrid>
+        </Section>
+      </div>
+
+      {item.contract.contract_type === "loan" ? (
+        <Section title="ローン情報">
+          {item.loan ? (
+            <InfoGrid columns="md:grid-cols-4">
+              <Info label="信販会社" value={FINANCE_COMPANY_LABELS[item.loan.finance_company]} />
+              <Info label="支払回数" value={item.loan.installment_count ? `${item.loan.installment_count}回` : "-"} />
+              <Info label="初回支払額" value={formatYen(item.loan.initial_payment_amount)} />
+              <Info label="月額" value={formatYen(item.loan.monthly_payment)} />
+              <Info label="最終支払額" value={formatYen(item.loan.final_payment_amount)} />
+              <Info label="支払開始日" value={formatSalesDate(item.loan.first_payment_date)} />
+              <Info label="支払終了日" value={formatSalesDate(item.loan.final_payment_date)} />
+              <Info label="審査結果" value={item.loan.approval_status ? APPROVAL_STATUS_LABELS[item.loan.approval_status] : "-"} />
+              <Info label="ローン元金" value={formatYen(item.loan.principal)} />
+              <Info label="支払総額" value={formatYen(item.loan.total_payment_amount)} />
+              <Info label="契約番号" value={item.loan.contract_number} />
+              <Info label="所有権留保" value={item.loan.ownership_retention ? "あり" : "なし"} />
+              <Info label="備考" value={item.loan.memo} className="md:col-span-4" multiline />
+            </InfoGrid>
+          ) : (
+            <p className="text-sm font-semibold text-slate-500">ローン情報は未登録です。</p>
+          )}
+        </Section>
+      ) : null}
+
+      {item.contract.contract_type === "lease" ? (
+        <Section title="リース情報">
+          {item.lease ? (
+            <InfoGrid columns="md:grid-cols-4">
+              <Info label="リース会社" value={LEASE_COMPANY_LABELS[item.lease.lease_company]} />
+              <Info label="リース期間" value={item.lease.lease_months ? `${item.lease.lease_months}か月` : "-"} />
+              <Info label="初回支払額" value={formatYen(item.lease.initial_payment_amount)} />
+              <Info label="月額" value={formatYen(item.lease.monthly_lease_fee)} />
+              <Info label="最終支払額" value={formatYen(item.lease.final_payment_amount)} />
+              <Info label="残価" value={formatYen(item.lease.residual_value_amount)} />
+              <Info label="支払開始日" value={formatSalesDate(item.lease.lease_start_date)} />
+              <Info label="支払終了日" value={formatSalesDate(item.lease.lease_end_date)} />
+              <Info label="契約番号" value={item.lease.contract_number} />
+              <Info label="メンテ込み" value={item.lease.maintenance_included ? "あり" : "なし"} />
+              <Info label="所有者" value={item.lease.owner_name} />
+              <Info label="使用者" value={item.lease.user_name} />
+              <Info label="備考" value={item.lease.memo} className="md:col-span-4" multiline />
+            </InfoGrid>
+          ) : (
+            <p className="text-sm font-semibold text-slate-500">リース情報は未登録です。</p>
+          )}
+        </Section>
+      ) : null}
+
+      {hasSourceInfo ? (
         <Section title="申込参照情報">
           <InfoGrid>
             <Info label="source_system" value={item.contract.source_system} />
@@ -76,86 +169,7 @@ export function SalesContractDetail({
             <Info label="source_received_at" value={formatSalesDateTime(item.contract.source_received_at)} />
           </InfoGrid>
         </Section>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="契約情報">
-          <InfoGrid>
-            <Info label="契約日" value={formatSalesDate(item.contract.contract_date)} />
-            <Info label="納車日" value={formatSalesDate(item.contract.delivery_date)} />
-            <Info label="契約金額" value={formatYen(item.contract.sale_price)} />
-            <Info label="諸費用" value={formatYen(item.contract.fees)} />
-            <Info label="総支払額" value={formatYen(item.contract.total_price)} />
-            <Info label="頭金" value={formatYen(item.contract.down_payment)} />
-            <Info label="下取金額" value={formatYen(item.contract.trade_in_amount)} />
-            <Info label="ローン元金" value={formatYen(item.contract.financed_amount)} />
-            <Info label="担当者" value={item.contract.staff_name} />
-          </InfoGrid>
-        </Section>
-
-        <Section title="車両情報">
-          <InfoGrid>
-            <Info label="メーカー" value={item.vehicle?.maker} />
-            <Info label="車種" value={item.vehicle?.model} />
-            <Info label="グレード" value={item.vehicle?.grade} />
-            <Info label="年式" value={item.vehicle?.model_year?.toString()} />
-            <Info label="走行距離" value={item.vehicle?.mileage ? `${item.vehicle.mileage.toLocaleString("ja-JP")}km` : "-"} />
-            <Info label="色" value={item.vehicle?.color} />
-            <Info label="車台番号" value={item.vehicle?.chassis_number} />
-            <Info label="登録番号" value={item.vehicle?.registration_number} />
-            <Info label="車検満了日" value={formatSalesDate(item.vehicle?.inspection_expiry_date)} />
-            <Info label="自賠責満了日" value={formatSalesDate(item.vehicle?.compulsory_insurance_expiry_date)} />
-            <Info label="GPS装着" value={item.vehicle?.gps_installed ? "あり" : "なし"} />
-          </InfoGrid>
-        </Section>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="ローン情報">
-          {item.loan ? (
-            <InfoGrid>
-              <Info label="信販会社" value={FINANCE_COMPANY_LABELS[item.loan.finance_company]} />
-              <Info label="信販申込番号" value={item.loan.application_number} />
-              <Info label="契約番号" value={item.loan.contract_number} />
-              <Info label="審査結果" value={item.loan.approval_status ? APPROVAL_STATUS_LABELS[item.loan.approval_status] : "-"} />
-              <Info label="金利" value={item.loan.interest_rate === null ? "-" : `${item.loan.interest_rate}%`} />
-              <Info label="ローン元金" value={formatYen(item.loan.principal)} />
-              <Info label="支払回数" value={item.loan.installment_count ? `${item.loan.installment_count}回` : "-"} />
-              <Info label="初回支払額" value={formatYen(item.loan.initial_payment_amount)} />
-              <Info label="月額" value={formatYen(item.loan.monthly_payment)} />
-              <Info label="最終支払額" value={formatYen(item.loan.final_payment_amount)} />
-              <Info label="支払開始日" value={formatSalesDate(item.loan.first_payment_date)} />
-              <Info label="支払終了日" value={formatSalesDate(item.loan.final_payment_date)} />
-              <Info label="支払総額" value={formatYen(item.loan.total_payment_amount)} />
-              <Info label="所有権留保" value={item.loan.ownership_retention ? "あり" : "なし"} />
-            </InfoGrid>
-          ) : (
-            <p className="text-sm font-semibold text-slate-500">ローン情報はありません。</p>
-          )}
-        </Section>
-
-        <Section title="リース情報">
-          {item.lease ? (
-            <InfoGrid>
-              <Info label="リース会社" value={LEASE_COMPANY_LABELS[item.lease.lease_company]} />
-              <Info label="契約番号" value={item.lease.contract_number} />
-              <Info label="支払回数・契約期間" value={item.lease.lease_months ? `${item.lease.lease_months}か月` : "-"} />
-              <Info label="初回支払額" value={formatYen(item.lease.initial_payment_amount)} />
-              <Info label="月額" value={formatYen(item.lease.monthly_lease_fee)} />
-              <Info label="最終支払額" value={formatYen(item.lease.final_payment_amount)} />
-              <Info label="支払開始日" value={formatSalesDate(item.lease.lease_start_date)} />
-              <Info label="支払終了日" value={formatSalesDate(item.lease.lease_end_date)} />
-              <Info label="残価設定" value={item.lease.residual_value_enabled ? "あり" : "なし"} />
-              <Info label="残価金額" value={formatYen(item.lease.residual_value_amount)} />
-              <Info label="メンテ込み" value={item.lease.maintenance_included ? "あり" : "なし"} />
-              <Info label="所有者" value={item.lease.owner_name} />
-              <Info label="使用者" value={item.lease.user_name} />
-            </InfoGrid>
-          ) : (
-            <p className="text-sm font-semibold text-slate-500">リース情報はありません。</p>
-          )}
-        </Section>
-      </div>
+      ) : null}
 
       <Section title="保証人">
         {item.guarantors.length ? (
@@ -203,9 +217,9 @@ export function SalesContractDetail({
 
       <Section title="対応履歴">
         {item.contactHistories.length ? (
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-slate-200 rounded border border-slate-200">
             {item.contactHistories.map((history) => (
-              <div key={history.id} className="py-3 text-sm">
+              <div key={history.id} className="p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-bold text-slate-950">
                     {formatSalesDateTime(history.handled_at)} / {CONTACT_METHOD_LABELS[history.method]} / {CONTACT_STATUS_LABELS[history.status]}
@@ -213,7 +227,10 @@ export function SalesContractDetail({
                   <p className="text-xs font-semibold text-slate-500">{history.handled_by ?? "-"}</p>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-slate-700">{history.content}</p>
-                {history.next_action_date ? <p className="mt-2 text-xs font-semibold text-slate-500">次回対応: {formatSalesDate(history.next_action_date)}</p> : null}
+                <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                  {history.next_action_date ? <span>次回対応: {formatSalesDate(history.next_action_date)}</span> : null}
+                  {history.memo ? <span>備考: {history.memo}</span> : null}
+                </div>
               </div>
             ))}
           </div>
@@ -249,17 +266,150 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function InfoGrid({ children }: { children: React.ReactNode }) {
-  return <dl className="grid gap-3 text-sm md:grid-cols-2">{children}</dl>;
+function InfoGrid({
+  children,
+  columns = "md:grid-cols-2"
+}: {
+  children: React.ReactNode;
+  columns?: string;
+}) {
+  return <dl className={`grid gap-3 text-sm ${columns}`}>{children}</dl>;
 }
 
-function Info({ label, value }: { label: string; value: string | number | null | undefined }) {
+function Info({
+  label,
+  value,
+  className = "",
+  multiline = false
+}: {
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+  multiline?: boolean;
+}) {
+  const isEmpty = value === null || value === undefined || value === "";
   return (
-    <div>
+    <div className={className}>
       <dt className="text-xs font-bold text-slate-500">{label}</dt>
-      <dd className="mt-1 font-semibold text-slate-950">{value || "-"}</dd>
+      <dd className={`mt-1 font-semibold text-slate-950 ${multiline ? "whitespace-pre-wrap" : ""}`}>{isEmpty ? "-" : value}</dd>
     </div>
   );
+}
+
+function SummaryItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+      <dt className="text-xs font-bold text-slate-500">{label}</dt>
+      <dd className="mt-1 font-black text-slate-950">{value || "-"}</dd>
+    </div>
+  );
+}
+
+function Badge({ className, children }: { className: string; children: React.ReactNode }) {
+  return <span className={`inline-flex rounded px-2.5 py-1 text-xs font-bold ${className}`}>{children}</span>;
+}
+
+function NextActionPanel({ history }: { history: SalesContactHistory | null }) {
+  const status = getNextActionStatus(history?.next_action_date ?? null);
+  return (
+    <div className={`mt-5 rounded border px-4 py-3 ${status.panelClass}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-black">次回やること</p>
+        <Badge className={status.badgeClass}>{status.label}</Badge>
+      </div>
+      {history ? (
+        <div className="mt-2 text-sm">
+          <p className="font-bold text-slate-950">{formatSalesDate(history.next_action_date)} / {CONTACT_METHOD_LABELS[history.method]} / {CONTACT_STATUS_LABELS[history.status]}</p>
+          <p className="mt-1 whitespace-pre-wrap text-slate-700">{history.content}</p>
+          {history.memo ? <p className="mt-1 whitespace-pre-wrap text-xs font-semibold text-slate-500">備考: {history.memo}</p> : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm font-semibold text-slate-600">次回対応日は未設定です。</p>
+      )}
+    </div>
+  );
+}
+
+function getNextAction(histories: SalesContactHistory[]) {
+  return histories
+    .filter((history) => Boolean(history.next_action_date))
+    .sort((a, b) => {
+      const dateCompare = String(a.next_action_date).localeCompare(String(b.next_action_date));
+      if (dateCompare !== 0) return dateCompare;
+      return String(b.handled_at ?? b.created_at).localeCompare(String(a.handled_at ?? a.created_at));
+    })[0] ?? null;
+}
+
+function getNextActionStatus(value: string | null) {
+  if (!value) {
+    return {
+      label: "期限なし",
+      panelClass: "border-slate-200 bg-slate-50",
+      badgeClass: "bg-slate-200 text-slate-700"
+    };
+  }
+
+  const today = getTodayYmd();
+  const target = value.slice(0, 10);
+  if (target < today) {
+    return {
+      label: "期限切れ",
+      panelClass: "border-rose-200 bg-rose-50",
+      badgeClass: "bg-rose-700 text-white"
+    };
+  }
+  if (target <= today) {
+    return {
+      label: "今日まで",
+      panelClass: "border-amber-200 bg-amber-50",
+      badgeClass: "bg-amber-700 text-white"
+    };
+  }
+  if (target <= addDaysYmd(today, 7)) {
+    return {
+      label: "7日以内",
+      panelClass: "border-blue-200 bg-blue-50",
+      badgeClass: "bg-blue-700 text-white"
+    };
+  }
+  return {
+    label: "予定あり",
+    panelClass: "border-slate-200 bg-white",
+    badgeClass: "bg-slate-900 text-white"
+  };
+}
+
+function getContractTypeClass(value: SalesContractType) {
+  if (value === "loan") return "bg-indigo-50 text-indigo-800";
+  if (value === "lease") return "bg-emerald-50 text-emerald-800";
+  return "bg-slate-100 text-slate-700";
+}
+
+function getStatusClass(value: SalesContractStatus) {
+  if (value === "cancelled" || value === "trouble" || value === "payment_delay_contacted") return "bg-rose-50 text-rose-800";
+  if (value === "waiting_delivery" || value === "payoff_scheduled") return "bg-amber-50 text-amber-800";
+  if (value === "paid_off" || value === "lease_ended" || value === "delivered") return "bg-slate-100 text-slate-700";
+  return "bg-teal-50 text-teal-800";
+}
+
+function formatMileage(value: number | null | undefined) {
+  if (value === null || value === undefined) return "-";
+  return `${value.toLocaleString("ja-JP")}km`;
+}
+
+function getTodayYmd() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function addDaysYmd(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function isTestSalesDetail(item: SalesContractDetailType) {

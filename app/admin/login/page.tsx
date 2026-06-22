@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "格安不動産サーチ 管理者ログイン",
-  description: "格安不動産サーチの物件情報と問い合わせ対応状況を管理するためのログイン画面です。"
+  title: "契約管理システム 管理者ログイン",
+  description: "契約台帳、顧客、車両、ローン、リース、満期管理を管理するためのログイン画面です。"
 };
 
 export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
@@ -13,9 +13,9 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-bold text-brand-700">格安不動産サーチ</p>
+        <p className="text-sm font-bold text-brand-700">契約管理システム</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
-        <p className="mt-2 text-sm text-slate-600">物件情報、取込候補、問い合わせ対応を管理するアカウントでログインしてください。</p>
+        <p className="mt-2 text-sm text-slate-600">契約台帳、顧客、車両、ローン、リース、満期管理を管理するアカウントでログインしてください。</p>
         {!hasSupabaseEnv() ? (
           <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Supabase 環境変数が未設定です。.env.local を設定するとログインできます。
@@ -34,11 +34,11 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
         <form action={signInAction} className="mt-5 grid gap-4">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             メールアドレス
-            <input name="email" type="email" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
+            <input id="email" name="email" type="email" autoComplete="username" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             パスワード
-            <input name="password" type="password" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
+            <input id="password" name="password" type="password" autoComplete="current-password" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
           </label>
           <button className="rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">ログイン</button>
         </form>

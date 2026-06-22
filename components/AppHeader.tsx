@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 
 export function AppHeader() {
   const pathname = usePathname();
+  const isAdminLogin = pathname === "/admin/login";
   const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities");
-  const title = isSalesAdmin ? "契約管理システム" : "格安不動産サーチ";
-  const href = isSalesAdmin ? "/admin/sales-contracts" : "/";
+  const isContractAdmin = isAdminLogin || isSalesAdmin;
+  const title = isContractAdmin ? "契約管理システム" : "格安不動産サーチ";
+  const href = isSalesAdmin ? "/admin/sales-contracts" : isAdminLogin ? "/admin/login" : "/";
 
   return (
     <header className="border-b border-slate-200 bg-white">
@@ -15,7 +17,7 @@ export function AppHeader() {
         <Link href={href} className="text-base font-bold text-slate-950">
           {title}
         </Link>
-        {!isSalesAdmin ? (
+        {!isContractAdmin ? (
           <nav className="flex items-center gap-3 text-sm font-medium text-slate-700">
             <Link href="/properties" className="hover:text-brand-700">
               物件一覧

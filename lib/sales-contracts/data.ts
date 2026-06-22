@@ -44,6 +44,7 @@ const EMPTY_LEASE_MATURITY_SUMMARY: SalesLeaseMaturitySummary = {
 };
 const EMPTY_LEASE_MATURITY_LIST_RESULT: SalesLeaseMaturityListResult = {
   items: [],
+  uncreatedCandidates: [],
   summary: EMPTY_LEASE_MATURITY_SUMMARY
 };
 
@@ -199,6 +200,8 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
     return { data: EMPTY_LEASE_MATURITY_LIST_RESULT, tableMissing: true, errorMessage: TABLE_MISSING_MESSAGE };
   }
 
+  const todayYmd = getTodayYmd();
+  const ninetyDaysLaterYmd = addDaysYmd(todayYmd, 90);
   let maturitiesQuery = supabase
     .from("sales_lease_maturities")
     .select("*")
@@ -209,18 +212,39 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
   if (filters.maturityStatus) maturitiesQuery = maturitiesQuery.eq("maturity_status", filters.maturityStatus);
   if (filters.customerChoice) maturitiesQuery = maturitiesQuery.eq("customer_choice", filters.customerChoice);
 
-  const maturitiesResult = await maturitiesQuery;
-  if (maturitiesResult.error) return handleDataError<SalesLeaseMaturityListResult>(maturitiesResult.error, EMPTY_LEASE_MATURITY_LIST_RESULT);
+  const [maturitiesResult, allMaturitiesResult, candidateLeasesResult] = await Promise.all([
+    maturitiesQuery,
+    supabase.from("sales_lease_maturities").select("id, contract_id, lease_id").is("deleted_at", null),
+    supabase
+      .from("sales_leases")
+      .select("*")
+      .is("deleted_at", null)
+      .not("lease_end_date", "is", null)
+      .lte("lease_end_date", ninetyDaysLaterYmd)
+      .order("lease_end_date", { ascending: true, nullsFirst: false })
+      .limit(1000)
+  ]);
+
+  const initialError = [maturitiesResult.error, allMaturitiesResult.error, candidateLeasesResult.error].find(Boolean);
+  if (initialError) return handleDataError<SalesLeaseMaturityListResult>(initialError, EMPTY_LEASE_MATURITY_LIST_RESULT);
 
   const maturities = (maturitiesResult.data ?? []) as SalesLeaseMaturity[];
-  if (maturities.length === 0) return { data: EMPTY_LEASE_MATURITY_LIST_RESULT, tableMissing: false };
-
+  const activeMaturityLeaseIds = new Set(((allMaturitiesResult.data ?? []) as Array<Pick<SalesLeaseMaturity, "lease_id">>).map((maturity) => maturity.lease_id));
+  const candidateLeases = ((candidateLeasesResult.data ?? []) as SalesLease[])
+    .filter((lease) => !activeMaturityLeaseIds.has(lease.id));
   const leaseIds = unique(maturities.map((maturity) => maturity.lease_id));
-  const contractIds = unique(maturities.map((maturity) => maturity.contract_id));
+  const contractIds = unique([
+    ...maturities.map((maturity) => maturity.contract_id),
+    ...candidateLeases.map((lease) => lease.contract_id)
+  ]);
+
+  if (contractIds.length === 0) return { data: EMPTY_LEASE_MATURITY_LIST_RESULT, tableMissing: false };
 
   const [contractsResult, leasesResult, vehiclesResult] = await Promise.all([
     supabase.from("sales_contracts").select("*").in("id", contractIds).is("deleted_at", null),
-    supabase.from("sales_leases").select("*").in("id", leaseIds).is("deleted_at", null),
+    leaseIds.length
+      ? supabase.from("sales_leases").select("*").in("id", leaseIds).is("deleted_at", null)
+      : Promise.resolve({ data: [], error: null }),
     supabase.from("sales_vehicles").select("*").in("contract_id", contractIds).is("deleted_at", null)
   ]);
 
@@ -229,7 +253,7 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
 
   const contracts = ((contractsResult.data ?? []) as SalesContract[]).filter((contract) => contract.contract_type === "lease");
   const contractsById = mapById(contracts);
-  const leasesById = mapById((leasesResult.data ?? []) as SalesLease[]);
+  const leasesById = mapById([...(leasesResult.data ?? []) as SalesLease[], ...candidateLeases]);
   const customerIds = unique(contracts.map((contract) => contract.customer_id));
   const customersResult = customerIds.length
     ? await supabase.from("sales_customers").select("*").in("id", customerIds).is("deleted_at", null)
@@ -251,11 +275,24 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
       maturity
     }];
   });
+  const uncreatedCandidates = candidateLeases.flatMap((lease) => {
+    const contract = contractsById.get(lease.contract_id);
+    if (!contract || contract.contract_type !== "lease") return [];
+    const item: SalesLeaseMaturityListItem = {
+      contract,
+      customer: customersById.get(contract.customer_id) ?? null,
+      vehicle: vehiclesByContractId.get(contract.id) ?? null,
+      lease,
+      maturity: null
+    };
+    return isLeaseMaturityUncreatedCandidate(item, todayYmd) ? [item] : [];
+  }).sort(compareLeaseMaturityItems);
 
   const baseItems = applyLeaseMaturityFilters(items, filters);
   return {
     data: {
       items: applyLeaseMaturityQuickFilter(baseItems, filters).sort(compareLeaseMaturityItems),
+      uncreatedCandidates,
       summary: summarizeLeaseMaturities(baseItems)
     },
     tableMissing: false
@@ -511,6 +548,12 @@ function compareLeaseMaturityItems(a: SalesLeaseMaturityListItem, b: SalesLeaseM
   const bTime = dateSortValue(getEffectiveMaturityDate(b));
   if (aTime !== bTime) return aTime - bTime;
   return String(a.customer?.name ?? "").localeCompare(String(b.customer?.name ?? ""), "ja");
+}
+
+function isLeaseMaturityUncreatedCandidate(item: SalesLeaseMaturityListItem, todayYmd: string) {
+  const maturityDate = toYmd(getEffectiveMaturityDate(item));
+  if (!maturityDate) return false;
+  return maturityDate < todayYmd || (maturityDate >= todayYmd && maturityDate <= addDaysYmd(todayYmd, 90));
 }
 
 export function getEffectiveMaturityDate(item: Pick<SalesLeaseMaturityListItem, "lease" | "maturity">) {

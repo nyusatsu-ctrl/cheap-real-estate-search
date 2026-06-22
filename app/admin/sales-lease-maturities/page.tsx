@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import { LeaseMaturityTable } from "@/components/sales-contracts/LeaseMaturityTable";
+import { LeaseMaturityUncreatedCandidates } from "@/components/sales-contracts/LeaseMaturityUncreatedCandidates";
 import { requireAdmin } from "@/lib/admin";
 import { getSalesLeaseMaturityList } from "@/lib/sales-contracts/data";
 import {
@@ -37,7 +38,7 @@ export default async function SalesLeaseMaturitiesPage({ searchParams }: { searc
   const params = await searchParams;
   const filters = getFilters(params);
   const result = await getSalesLeaseMaturityList(filters);
-  const { items, summary } = result.data;
+  const { items, summary, uncreatedCandidates } = result.data;
   const setupMissing = firstParam(params.setup) === "missing";
 
   return (
@@ -63,6 +64,7 @@ export default async function SalesLeaseMaturitiesPage({ searchParams }: { searc
         </div>
       ) : null}
 
+      <LeaseMaturityUncreatedCandidates items={uncreatedCandidates} />
       <SummaryCards summary={summary} />
       <QuickFilterNav filters={filters} summary={summary} />
 

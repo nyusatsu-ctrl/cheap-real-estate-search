@@ -305,6 +305,7 @@ export type SalesLeaseMaturitySummary = {
 
 export type SalesLeaseMaturityListResult = {
   items: SalesLeaseMaturityListItem[];
+  uncreatedCandidates: SalesLeaseMaturityListItem[];
   summary: SalesLeaseMaturitySummary;
 };
 

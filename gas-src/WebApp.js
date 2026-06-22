@@ -103,6 +103,7 @@ function doGet(e) {
   template.isMarketAdmin = isMarketAdminRequest;
   template.marketAdminPasscode = isMarketAdminRequest ? marketAdminAuth.input : '';
   template.marketAdminPasscodeJson = jsonForInlineScript_(template.marketAdminPasscode);
+  template.initialLoanReviewParamsJson = jsonForInlineScript_(pickLoanReviewReturnParams_(e));
 
   // The web app is published for WordPress/staff access and runs as USER_DEPLOYING.
   // Market admin pages/actions must stay guarded by MARKET_ADMIN_PASSCODE.
@@ -114,6 +115,18 @@ function doGet(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function pickLoanReviewReturnParams_(e) {
+  var params = e && e.parameter ? e.parameter : {};
+  return {
+    row: String(params.row || '').trim(),
+    source_row_key: String(params.source_row_key || '').trim(),
+    source_row_number: String(params.source_row_number || '').trim(),
+    q: String(params.q || '').trim(),
+    phone: String(params.phone || '').trim(),
+    customer_name: String(params.customer_name || '').trim()
+  };
 }
 
 function backfillAddressKanaFromWeb() {

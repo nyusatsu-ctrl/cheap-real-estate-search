@@ -1613,6 +1613,7 @@
     <script>
       const IS_MARKET_ADMIN = document.body.dataset.marketAdmin === '1';
       const MARKET_ADMIN_PASSCODE = <?!= typeof marketAdminPasscodeJson !== 'undefined' ? marketAdminPasscodeJson : '""' ?>;
+      const INITIAL_LOAN_REVIEW_PARAMS = <?!= typeof initialLoanReviewParamsJson !== 'undefined' ? initialLoanReviewParamsJson : '{}' ?>;
       if (IS_MARKET_ADMIN && !MARKET_ADMIN_PASSCODE) {
         document.body.innerHTML = `
           <div style="max-width:420px;margin:32px auto;background:#fff;border:1px solid #d9dee5;border-radius:8px;padding:20px;font-family:Arial,'Hiragino Sans','Yu Gothic',sans-serif;color:#20242a;">
@@ -1644,6 +1645,7 @@
         marketFilterOptions: [],
         marketLogs: [],
         quickFilter: '',
+        initialLoanReviewApplied: false,
         saving: false
       };
       const SALES_CONTRACT_REGISTRATION_URL = 'https://cheap-real-estate-search.vercel.app/admin/sales-contracts/new';
@@ -1773,6 +1775,43 @@
         }
       }
 
+      function applyInitialLoanReviewParams() {
+        if (state.initialLoanReviewApplied) return;
+        state.initialLoanReviewApplied = true;
+        const params = INITIAL_LOAN_REVIEW_PARAMS || {};
+        const hasParams = ['row', 'source_row_key', 'source_row_number', 'q', 'phone', 'customer_name']
+          .some((key) => String(params[key] || '').trim() !== '');
+        if (!hasParams) return;
+
+        const matched = findInitialLoanReviewCustomer(params);
+        if (matched) {
+          selectCustomer(matched);
+          showToast('契約管理システムから戻りました。該当顧客を表示しました。');
+          return;
+        }
+
+        const keyword = String(params.q || params.phone || params.customer_name || params.row || params.source_row_number || params.source_row_key || '').trim();
+        if (keyword && els.search) {
+          els.search.value = keyword;
+          applyFilters();
+          showToast('契約管理システムから戻りました。検索欄に申込情報を入れました。');
+        }
+      }
+
+      function findInitialLoanReviewCustomer(params) {
+        const rowKey = String(params.source_row_key || '').trim();
+        const rowNumber = String(params.row || params.source_row_number || '').trim();
+        if (rowKey) {
+          const matchedByKey = state.customers.find((customer) => String(customer.rowKey || '') === rowKey);
+          if (matchedByKey) return matchedByKey;
+        }
+        if (rowNumber) {
+          const matchedByRow = state.customers.find((customer) => String(customer.rowNumber || '') === rowNumber);
+          if (matchedByRow) return matchedByRow;
+        }
+        return null;
+      }
+
       function handleQuickFilterClick(event) {
         const target = event.target;
         const button = target && typeof target.closest === 'function' ? target.closest('[data-quick-filter]') : null;
@@ -1802,6 +1841,7 @@
             renderMarketFilter();
             els.setupNotice.classList.toggle('visible', Boolean(data.needsSetup));
             applyFilters();
+            applyInitialLoanReviewParams();
             if (state.selected) {
               renderDetail(state.selected);
             }

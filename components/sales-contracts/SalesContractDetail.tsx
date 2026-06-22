@@ -26,6 +26,8 @@ import type {
   SalesContractType
 } from "@/lib/sales-contracts/types";
 
+const LOAN_REVIEW_APP_URL = "https://script.google.com/macros/s/AKfycbxqQtu-w9tcr_uXEs2dl0ykUfH18b58xXiyiDk72unfhhIBcrujkGQULzFCUP5hU_Sv/exec";
+
 export function SalesContractDetail({
   detail,
   hideAction
@@ -39,6 +41,7 @@ export function SalesContractDetail({
   const vehicleName = [item.vehicle?.maker, item.vehicle?.model, item.vehicle?.grade].filter(Boolean).join(" ") || "車両情報未登録";
   const nextAction = getNextAction(item.contactHistories);
   const hasSourceInfo = Boolean(item.contract.source_system || item.contract.source_row_key || item.contract.source_row_number || item.contract.source_received_at);
+  const isLoanReviewSource = item.contract.source_system === "gas_loan_review";
 
   return (
     <div className="space-y-5">
@@ -68,6 +71,8 @@ export function SalesContractDetail({
         </dl>
         <NextActionPanel history={nextAction} />
       </section>
+
+      {isLoanReviewSource ? <LoanReviewSourceCard item={item} /> : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
         <Section title="顧客情報">
@@ -163,10 +168,10 @@ export function SalesContractDetail({
       {hasSourceInfo ? (
         <Section title="申込参照情報">
           <InfoGrid>
-            <Info label="source_system" value={item.contract.source_system} />
-            <Info label="source_row_key" value={item.contract.source_row_key ? "保存済み" : "-"} />
-            <Info label="source_row_number" value={item.contract.source_row_number?.toString()} />
-            <Info label="source_received_at" value={formatSalesDateTime(item.contract.source_received_at)} />
+            <Info label="申込元" value={sourceSystemLabel(item.contract.source_system)} />
+            <Info label="申込ID" value={item.contract.source_row_key ? "保存済み" : "-"} />
+            <Info label="申込管理番号" value={item.contract.source_row_number?.toString()} />
+            <Info label="受信日時" value={formatSalesDateTime(item.contract.source_received_at)} />
           </InfoGrid>
         </Section>
       ) : null}
@@ -264,6 +269,66 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <div className="mt-4">{children}</div>
     </section>
   );
+}
+
+function LoanReviewSourceCard({ item }: { item: SalesContractDetailType }) {
+  const url = buildLoanReviewReturnUrl(item);
+  return (
+    <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-black text-emerald-950">自社ローン審査管理</h3>
+          <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-xs font-bold text-emerald-700">申込元</dt>
+              <dd className="mt-1 font-black text-slate-950">自社ローン審査管理</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold text-emerald-700">申込管理番号</dt>
+              <dd className="mt-1 font-black text-slate-950">{item.contract.source_row_number ?? "-"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold text-emerald-700">受信日時</dt>
+              <dd className="mt-1 font-black text-slate-950">{formatSalesDateTime(item.contract.source_received_at)}</dd>
+            </div>
+          </dl>
+        </div>
+        <Link
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm focus-ring"
+        >
+          自社ローン審査管理へ戻る
+        </Link>
+      </div>
+      <p className="mt-3 text-xs font-semibold text-emerald-800">
+        元の審査管理アプリを新しいタブで開きます。申込管理番号または申込IDが一致する場合は、GAS側で該当顧客を探しやすくします。
+      </p>
+    </section>
+  );
+}
+
+function buildLoanReviewReturnUrl(item: SalesContractDetailType) {
+  const params = new URLSearchParams();
+  if (item.contract.source_row_number) {
+    params.set("row", item.contract.source_row_number.toString());
+    params.set("source_row_number", item.contract.source_row_number.toString());
+  }
+  if (item.contract.source_row_key) {
+    params.set("source_row_key", item.contract.source_row_key);
+  }
+  const query = item.customer?.phone || item.customer?.name || "";
+  if (query) {
+    params.set("q", query);
+  }
+  const queryString = params.toString();
+  return queryString ? `${LOAN_REVIEW_APP_URL}?${queryString}` : LOAN_REVIEW_APP_URL;
+}
+
+function sourceSystemLabel(value: string | null) {
+  if (value === "gas_loan_review") return "自社ローン審査管理";
+  return value || "-";
 }
 
 function InfoGrid({

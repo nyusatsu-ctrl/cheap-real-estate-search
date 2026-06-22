@@ -1,5 +1,6 @@
 "use client";
 
+import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -14,8 +15,10 @@ export function AppHeader() {
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href={href} className="text-base font-bold text-slate-950">
-          {title}
+        <Link href={href} className={isContractAdmin ? "min-w-0" : "text-base font-bold text-slate-950"}>
+          {isContractAdmin ? (
+            <EcoloopAdminBrand showSystemName logoClassName="h-8 sm:h-9" priority={isAdminLogin} />
+          ) : title}
         </Link>
         {!isContractAdmin ? (
           <nav className="flex items-center gap-3 text-sm font-medium text-slate-700">

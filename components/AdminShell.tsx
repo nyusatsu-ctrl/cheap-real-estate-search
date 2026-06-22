@@ -1,3 +1,4 @@
+import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
 import Link from "next/link";
 import { signOutAction } from "@/app/admin/actions";
 
@@ -21,17 +22,24 @@ type AdminShellProps = {
 };
 
 export function AdminShell({ children, email, systemName = "格安不動産サーチ" }: AdminShellProps) {
-  const menuItems = systemName === "契約管理システム" ? salesAdminMenuItems : defaultAdminMenuItems;
+  const isSalesAdmin = systemName === "契約管理システム";
+  const menuItems = isSalesAdmin ? salesAdminMenuItems : defaultAdminMenuItems;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-500">{systemName} 管理画面</p>
-          <h1 className="text-2xl font-black text-slate-950">{systemName}</h1>
+          {isSalesAdmin ? (
+            <EcoloopAdminBrand showSystemName logoClassName="h-10" textClassName="text-base sm:text-lg" />
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-slate-500">{systemName} 管理画面</p>
+              <h1 className="text-2xl font-black text-slate-950">{systemName}</h1>
+            </>
+          )}
           <p className="mt-1 text-xs text-slate-500">{email}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {menuItems.map((item) => (
             <Link key={item.href} href={item.href} className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
               {item.label}

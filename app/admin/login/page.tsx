@@ -1,4 +1,5 @@
 import { signInAction } from "@/app/admin/actions";
+import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
 import { hasSupabaseEnv } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -29,7 +30,8 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-bold text-brand-700">契約管理システム</p>
+        <EcoloopAdminBrand showSystemName={false} logoClassName="h-10" textClassName="text-base" priority />
+        <p className="mt-4 text-sm font-bold text-brand-700">契約管理システム</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
         <p className="mt-2 text-sm text-slate-600">契約台帳、顧客、車両、ローン、リース、満期管理を管理するアカウントでログインしてください。</p>
         {!hasSupabaseEnv() ? (

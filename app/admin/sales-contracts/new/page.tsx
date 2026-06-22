@@ -28,7 +28,7 @@ export default async function NewSalesContractPage({ searchParams }: { searchPar
     email: firstParam(params.email),
     prefecture: firstParam(params.prefecture),
     employer_name: firstParam(params.employer_name),
-    desired_vehicle: firstParam(params.desired_vehicle),
+    desired_vehicle: firstNonEmpty(params.desired_vehicle, params.desired_car, params.model, params.vehicle_model),
     vehicle_type: normalizeVehicleType(firstParam(params.vehicle_type)),
     contract_type: normalizeContractType(firstParam(params.contract_type)),
     finance_company: normalizeFinanceCompany(firstParam(params.finance_company)),
@@ -57,11 +57,7 @@ export default async function NewSalesContractPage({ searchParams }: { searchPar
       {error ? (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</div>
       ) : null}
-      {hasSourceParams ? (
-        <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          自社ローン審査管理から初期値を受け取りました。内容を確認し、必要な契約条件を補完してから保存してください。
-        </div>
-      ) : null}
+      {hasSourceParams ? <SourceImportSummary sourceDefaults={sourceDefaults} /> : null}
       <SalesContractForm mode="create" action={createSalesContractAction} sourceDefaults={sourceDefaults} />
     </AdminShell>
   );
@@ -69,6 +65,58 @@ export default async function NewSalesContractPage({ searchParams }: { searchPar
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function firstNonEmpty(...values: Array<string | string[] | undefined>) {
+  for (const value of values) {
+    const text = firstParam(value).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function SourceImportSummary({
+  sourceDefaults
+}: {
+  sourceDefaults: {
+    source_row_number?: string;
+    source_received_at?: string;
+    desired_vehicle?: string;
+    payment_estimate?: string;
+    status?: string;
+    customer_name?: string;
+    phone?: string;
+  };
+}) {
+  return (
+    <section className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-black text-emerald-900">自社ローン審査管理から連携しました</p>
+          <p className="mt-1 text-sm text-emerald-800">内容を確認し、契約金額や支払条件を補完してから保存してください。自動登録は行いません。</p>
+        </div>
+      </div>
+      <dl className="mt-3 grid gap-2 text-sm md:grid-cols-4">
+        <SummaryItem label="申込元" value="自社ローン審査管理" />
+        <SummaryItem label="GAS行番号" value={sourceDefaults.source_row_number} />
+        <SummaryItem label="受信日時" value={sourceDefaults.source_received_at} />
+        <SummaryItem label="希望車種" value={sourceDefaults.desired_vehicle} />
+        <SummaryItem label="支払目安" value={sourceDefaults.payment_estimate} />
+        <SummaryItem label="元ステータス" value={sourceDefaults.status} />
+        <SummaryItem label="顧客名" value={sourceDefaults.customer_name} />
+        <SummaryItem label="電話番号" value={sourceDefaults.phone} />
+      </dl>
+    </section>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="rounded border border-emerald-100 bg-white/75 px-3 py-2">
+      <dt className="text-xs font-bold text-emerald-700">{label}</dt>
+      <dd className="mt-1 break-words font-bold text-slate-950">{value || "-"}</dd>
+    </div>
+  );
 }
 
 function buildCurrentPath(params: Awaited<NewSalesContractSearchParams>) {

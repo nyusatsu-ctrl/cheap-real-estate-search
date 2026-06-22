@@ -175,7 +175,7 @@ export function validateSalesContractSelection(input: {
 
     const allowedInstallments = getInstallmentOptions(input.vehicleType, input.financeCompany || "");
     if (!input.installmentCount) {
-      errors.push("ローン契約では支払回数を選択してください。");
+      errors.push("支払回数を選択してください。支払回数が未確定の場合は、審査結果確定後に入力してください。");
     } else if (!allowedInstallments.includes(input.installmentCount)) {
       errors.push("選択された支払回数は、この車両区分・信販会社では使用できません。");
     }

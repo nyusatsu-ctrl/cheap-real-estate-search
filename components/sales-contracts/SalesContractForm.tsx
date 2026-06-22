@@ -75,6 +75,9 @@ export function SalesContractForm({
 
   const sourceLinkMemo = buildSourceLinkMemo(sourceDefaults);
   const sourceSnapshotJson = buildSourceSnapshotJson(sourceDefaults);
+  const sourceReceivedAtValue = dateTimeLocalValue(contract?.source_received_at ?? sourceDefaults?.source_received_at);
+  const sourceVehicleModel = vehicle?.model ?? sourceDefaults?.desired_vehicle ?? "";
+  const sourceMonthlyPayment = loan?.monthly_payment ?? sourceDefaults?.monthly_payment ?? parsePaymentEstimateAmount(sourceDefaults?.payment_estimate);
   const initialVehicleType = contract?.vehicle_type ?? sourceDefaults?.vehicle_type ?? "car";
   const initialContractType = contract?.contract_type ?? sourceDefaults?.contract_type ?? "cash";
   const initialFinanceCompany = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
@@ -175,6 +178,12 @@ export function SalesContractForm({
         </>
       ) : null}
 
+      <input type="hidden" name="source_system" value={contract?.source_system ?? sourceDefaults?.source_system ?? ""} />
+      <input type="hidden" name="source_row_key" value={contract?.source_row_key ?? sourceDefaults?.source_row_key ?? ""} />
+      <input type="hidden" name="source_row_number" value={contract?.source_row_number?.toString() ?? sourceDefaults?.source_row_number ?? ""} />
+      <input type="hidden" name="source_received_at" value={sourceReceivedAtValue} />
+      <input type="hidden" name="source_snapshot_json" value={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson} />
+
       {!validation.valid ? (
         <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
           {validation.errors.join(" ")}
@@ -225,20 +234,10 @@ export function SalesContractForm({
         </div>
       </Section>
 
-      <Section title="申込参照情報">
-        <div className="grid gap-3 md:grid-cols-4">
-          <TextField label="source_system" name="source_system" defaultValue={contract?.source_system ?? sourceDefaults?.source_system} />
-          <TextField label="source_row_key" name="source_row_key" defaultValue={contract?.source_row_key ?? sourceDefaults?.source_row_key} />
-          <TextField label="source_row_number" name="source_row_number" type="number" defaultValue={contract?.source_row_number?.toString() ?? sourceDefaults?.source_row_number} />
-          <TextField label="source_received_at" name="source_received_at" type="datetime-local" defaultValue={dateTimeLocalValue(contract?.source_received_at ?? sourceDefaults?.source_received_at)} />
-          <TextareaField label="source_snapshot_json" name="source_snapshot_json" defaultValue={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson} className="md:col-span-4" />
-        </div>
-      </Section>
-
       <Section title="車両情報">
         <div className="grid gap-3 md:grid-cols-4">
           <TextField label="メーカー" name="maker" defaultValue={vehicle?.maker} />
-          <TextField label="車種" name="model" defaultValue={vehicle?.model ?? sourceDefaults?.desired_vehicle} />
+          <TextField label="車種" name="model" defaultValue={sourceVehicleModel} required={mode === "create"} />
           <TextField label="グレード" name="grade" defaultValue={vehicle?.grade} />
           <TextField label="年式" name="model_year" type="number" defaultValue={numberValue(vehicle?.model_year)} />
           <TextField label="走行距離" name="mileage" type="number" defaultValue={numberValue(vehicle?.mileage)} />
@@ -297,7 +296,7 @@ export function SalesContractForm({
               </select>
             </label>
             <TextField label="初回支払額" name="initial_payment_amount" type="number" defaultValue={financialNumberValue(loan?.initial_payment_amount ?? sourceDefaults?.initial_payment_amount)} />
-            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(loan?.monthly_payment ?? sourceDefaults?.monthly_payment)} />
+            <TextField label="月額" name="monthly_payment" type="number" defaultValue={financialNumberValue(sourceMonthlyPayment)} />
             <TextField label="最終支払額" name="final_payment_amount" type="number" defaultValue={financialNumberValue(loan?.final_payment_amount)} />
             <TextField label="支払開始日" name="first_payment_date" type="date" defaultValue={financialDateValue(loan?.first_payment_date)} />
             <TextField label="支払終了日" name="final_payment_date" type="date" defaultValue={financialDateValue(loan?.final_payment_date)} />
@@ -361,7 +360,15 @@ export function SalesContractForm({
         </Section>
       ) : null}
 
-      <Section title="保証人情報">
+      {contractType === "cash" ? (
+        <Section title="現金情報">
+          <p className="text-sm font-semibold text-slate-700">
+            現金契約では信販会社、支払回数、月額などのローン・リース項目は使用しません。契約金額と頭金を確認してください。
+          </p>
+        </Section>
+      ) : null}
+
+      <CollapsibleSection title="保証人情報" summary="必要な場合だけ入力">
         <div className="grid gap-3 md:grid-cols-3">
           <TextField label="保証人氏名" name="guarantor_name" defaultValue={guarantor?.name} />
           <TextField label="フリガナ" name="guarantor_kana" defaultValue={guarantor?.kana} />
@@ -375,9 +382,9 @@ export function SalesContractForm({
           <TextField label="本人確認書類URL" name="guarantor_identity_document_url" type="url" defaultValue={guarantor?.identity_document_url} className="md:col-span-2" />
           <TextareaField label="備考" name="guarantor_memo" defaultValue={guarantor?.memo} className="md:col-span-3" />
         </div>
-      </Section>
+      </CollapsibleSection>
 
-      <Section title="書類URL">
+      <CollapsibleSection title="書類URL" summary="契約書類や本人確認書類のURLを後から追加">
         <div className="grid gap-3 md:grid-cols-2">
           {DOCUMENT_TYPE_OPTIONS.map((option) => {
             const document = documentsByType.get(option.value) as SalesDocument | undefined;
@@ -396,10 +403,10 @@ export function SalesContractForm({
             );
           })}
         </div>
-      </Section>
+      </CollapsibleSection>
 
       {mode === "create" ? (
-        <Section title="初回対応履歴">
+        <CollapsibleSection title="初回対応履歴" summary="初回の連絡内容を残す場合だけ入力">
           <div className="grid gap-3 md:grid-cols-3">
             <TextField label="対応日時" name="contact_handled_at" type="datetime-local" />
             <TextField label="対応者" name="contact_handled_by" />
@@ -420,10 +427,20 @@ export function SalesContractForm({
             <TextareaField label="対応内容" name="contact_content" className="md:col-span-3" />
             <TextareaField label="備考" name="contact_memo" className="md:col-span-3" />
           </div>
-        </Section>
+        </CollapsibleSection>
       ) : null}
 
-      <div className="flex justify-end gap-2">
+      <CollapsibleSection title="申込参照情報" summary="GAS連携元の詳細を確認">
+        <SourceReferenceDetails
+          sourceSystem={contract?.source_system ?? sourceDefaults?.source_system}
+          sourceRowKey={contract?.source_row_key ?? sourceDefaults?.source_row_key}
+          sourceRowNumber={contract?.source_row_number?.toString() ?? sourceDefaults?.source_row_number}
+          sourceReceivedAt={contract?.source_received_at ?? sourceDefaults?.source_received_at}
+          sourceSnapshotJson={contract?.source_snapshot_json ? JSON.stringify(contract.source_snapshot_json, null, 2) : sourceSnapshotJson}
+        />
+      </CollapsibleSection>
+
+      <div className="sticky bottom-0 z-10 -mx-1 flex justify-end gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
         <button
           className="rounded bg-brand-700 px-5 py-3 text-sm font-black text-white focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           disabled={!validation.valid}
@@ -437,10 +454,71 @@ export function SalesContractForm({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-black text-slate-950">{title}</h2>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  summary,
+  children
+}: {
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-black text-slate-950">{title}</h2>
+          <span className="text-sm font-bold text-brand-700">詳細を表示</span>
+        </div>
+        <p className="mt-1 text-sm text-slate-600">{summary}</p>
+      </summary>
+      <div className="mt-3 border-t border-slate-100 pt-3">{children}</div>
+    </details>
+  );
+}
+
+function SourceReferenceDetails({
+  sourceSystem,
+  sourceRowKey,
+  sourceRowNumber,
+  sourceReceivedAt,
+  sourceSnapshotJson
+}: {
+  sourceSystem?: string | null;
+  sourceRowKey?: string | null;
+  sourceRowNumber?: string | null;
+  sourceReceivedAt?: string | null;
+  sourceSnapshotJson?: string | null;
+}) {
+  return (
+    <div className="grid gap-3 text-sm md:grid-cols-4">
+      <ReadonlyItem label="申込元" value={sourceSystem === "gas_loan_review" ? "自社ローン審査管理" : sourceSystem} />
+      <ReadonlyItem label="GAS顧客ID" value={sourceRowKey} />
+      <ReadonlyItem label="GAS行番号" value={sourceRowNumber} />
+      <ReadonlyItem label="受信日時" value={sourceReceivedAt} />
+      <div className="md:col-span-4">
+        <p className="mb-1 font-bold text-slate-700">連携データ</p>
+        <pre className="max-h-72 overflow-auto rounded border border-slate-200 bg-slate-50 p-3 text-xs font-normal text-slate-700">
+          {sourceSnapshotJson || "-"}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+function ReadonlyItem({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 break-words font-bold text-slate-900">{value || "-"}</p>
+    </div>
   );
 }
 
@@ -532,6 +610,28 @@ function parseOptionalInteger(value: string | null | undefined) {
   const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
   if (!Number.isFinite(parsed)) return null;
   return Math.trunc(parsed);
+}
+
+function parsePaymentEstimateAmount(value: string | null | undefined) {
+  const normalized = toHalfWidthNumberText(String(value ?? "").trim()).replace(/,/g, "");
+  if (!normalized) return "";
+  const tenThousandMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万/);
+  if (tenThousandMatch) {
+    const parsed = Number(tenThousandMatch[1]);
+    return Number.isFinite(parsed) ? String(Math.round(parsed * 10000)) : "";
+  }
+  const digits = normalized.replace(/[^\d.-]/g, "");
+  if (!digits) return "";
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) ? String(Math.round(parsed)) : "";
+}
+
+function toHalfWidthNumberText(value: string) {
+  return value.replace(/[０-９．，]/g, (char) => {
+    if (char === "．") return ".";
+    if (char === "，") return ",";
+    return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
+  });
 }
 
 function buildSourceLinkMemo(sourceDefaults?: SourceDefaults) {

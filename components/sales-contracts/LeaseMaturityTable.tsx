@@ -68,7 +68,7 @@ export function LeaseMaturityTable({ items }: { items: SalesLeaseMaturityListIte
             {items.length === 0 ? (
               <tr>
                 <td colSpan={12} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">
-                  対象のリース満期データはありません。
+                  登録済みのリース満期管理はありません。
                 </td>
               </tr>
             ) : null}

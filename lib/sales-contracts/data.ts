@@ -166,35 +166,37 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
     return { data: [], tableMissing: true, errorMessage: TABLE_MISSING_MESSAGE };
   }
 
-  let leasesQuery = supabase
-    .from("sales_leases")
+  let maturitiesQuery = supabase
+    .from("sales_lease_maturities")
     .select("*")
     .is("deleted_at", null)
-    .order("lease_end_date", { ascending: true, nullsFirst: false })
+    .order("maturity_date", { ascending: true, nullsFirst: false })
     .limit(1000);
 
-  if (filters.leaseCompany) leasesQuery = leasesQuery.eq("lease_company", filters.leaseCompany);
+  if (filters.maturityStatus) maturitiesQuery = maturitiesQuery.eq("maturity_status", filters.maturityStatus);
+  if (filters.customerChoice) maturitiesQuery = maturitiesQuery.eq("customer_choice", filters.customerChoice);
 
-  const leasesResult = await leasesQuery;
-  if (leasesResult.error) return handleDataError<SalesLeaseMaturityListItem[]>(leasesResult.error, []);
+  const maturitiesResult = await maturitiesQuery;
+  if (maturitiesResult.error) return handleDataError<SalesLeaseMaturityListItem[]>(maturitiesResult.error, []);
 
-  const leases = (leasesResult.data ?? []) as SalesLease[];
-  if (leases.length === 0) return { data: [], tableMissing: false };
+  const maturities = (maturitiesResult.data ?? []) as SalesLeaseMaturity[];
+  if (maturities.length === 0) return { data: [], tableMissing: false };
 
-  const leaseIds = leases.map((lease) => lease.id);
-  const contractIds = unique(leases.map((lease) => lease.contract_id));
+  const leaseIds = unique(maturities.map((maturity) => maturity.lease_id));
+  const contractIds = unique(maturities.map((maturity) => maturity.contract_id));
 
-  const [contractsResult, vehiclesResult, maturitiesResult] = await Promise.all([
+  const [contractsResult, leasesResult, vehiclesResult] = await Promise.all([
     supabase.from("sales_contracts").select("*").in("id", contractIds).is("deleted_at", null),
-    supabase.from("sales_vehicles").select("*").in("contract_id", contractIds).is("deleted_at", null),
-    supabase.from("sales_lease_maturities").select("*").in("lease_id", leaseIds).is("deleted_at", null)
+    supabase.from("sales_leases").select("*").in("id", leaseIds).is("deleted_at", null),
+    supabase.from("sales_vehicles").select("*").in("contract_id", contractIds).is("deleted_at", null)
   ]);
 
-  const firstError = [contractsResult.error, vehiclesResult.error, maturitiesResult.error].find(Boolean);
+  const firstError = [contractsResult.error, leasesResult.error, vehiclesResult.error].find(Boolean);
   if (firstError) return handleDataError<SalesLeaseMaturityListItem[]>(firstError, []);
 
   const contracts = ((contractsResult.data ?? []) as SalesContract[]).filter((contract) => contract.contract_type === "lease");
   const contractsById = mapById(contracts);
+  const leasesById = mapById((leasesResult.data ?? []) as SalesLease[]);
   const customerIds = unique(contracts.map((contract) => contract.customer_id));
   const customersResult = customerIds.length
     ? await supabase.from("sales_customers").select("*").in("id", customerIds).is("deleted_at", null)
@@ -203,17 +205,17 @@ export async function getSalesLeaseMaturityList(filters: SalesLeaseMaturityFilte
 
   const customersById = mapById((customersResult.data ?? []) as SalesCustomer[]);
   const vehiclesByContractId = mapFirstByContractId((vehiclesResult.data ?? []) as SalesVehicle[]);
-  const maturitiesByLeaseId = mapFirstByLeaseId((maturitiesResult.data ?? []) as SalesLeaseMaturity[]);
 
-  const items = leases.flatMap((lease) => {
-    const contract = contractsById.get(lease.contract_id);
-    if (!contract) return [];
+  const items = maturities.flatMap((maturity) => {
+    const contract = contractsById.get(maturity.contract_id);
+    const lease = leasesById.get(maturity.lease_id);
+    if (!contract || !lease) return [];
     return [{
       contract,
       customer: customersById.get(contract.customer_id) ?? null,
       vehicle: vehiclesByContractId.get(contract.id) ?? null,
       lease,
-      maturity: maturitiesByLeaseId.get(lease.id) ?? null
+      maturity
     }];
   });
 
@@ -347,6 +349,7 @@ function applyFilters(items: SalesContractListItem[], filters: SalesContractFilt
 
 function applyLeaseMaturityFilters(items: SalesLeaseMaturityListItem[], filters: SalesLeaseMaturityFilters) {
   return items.filter((item) => {
+    if (filters.leaseCompany && item.lease.lease_company !== filters.leaseCompany) return false;
     if (filters.maturityStatus && (item.maturity?.maturity_status ?? "not_started") !== filters.maturityStatus) return false;
     if (filters.customerChoice && (item.maturity?.customer_choice ?? "undecided") !== filters.customerChoice) return false;
     if (filters.maturityMonth && !getEffectiveMaturityDate(item).startsWith(filters.maturityMonth)) return false;
@@ -391,14 +394,6 @@ function mapFirstByContractId<T extends { contract_id: string }>(items: T[]) {
   const map = new Map<string, T>();
   for (const item of items) {
     if (!map.has(item.contract_id)) map.set(item.contract_id, item);
-  }
-  return map;
-}
-
-function mapFirstByLeaseId<T extends { lease_id: string }>(items: T[]) {
-  const map = new Map<string, T>();
-  for (const item of items) {
-    if (!map.has(item.lease_id)) map.set(item.lease_id, item);
   }
   return map;
 }

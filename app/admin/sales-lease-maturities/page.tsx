@@ -15,7 +15,7 @@ type LeaseMaturitiesSearchParams = Promise<Record<string, string | string[] | un
 
 export const metadata: Metadata = {
   title: "リース満期 | 契約管理システム",
-  description: "リース満期予定、顧客選択、残価、追加精算金、次回連絡予定を管理します。"
+  description: "登録済みのリース満期予定、顧客選択、残価、追加精算金、次回連絡予定を管理します。"
 };
 
 export default async function SalesLeaseMaturitiesPage({ searchParams }: { searchParams: LeaseMaturitiesSearchParams }) {
@@ -30,7 +30,7 @@ export default async function SalesLeaseMaturitiesPage({ searchParams }: { searc
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-950">リース満期</h1>
-          <p className="mt-1 text-sm text-slate-600">リース満期予定、顧客選択、残価、追加精算金、次回連絡予定を管理します。</p>
+          <p className="mt-1 text-sm text-slate-600">契約詳細で作成済みのリース満期管理だけを表示します。</p>
         </div>
         <Link href="/admin/sales-contracts" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
           契約台帳

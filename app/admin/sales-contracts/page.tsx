@@ -7,7 +7,7 @@ import { getSalesContractList } from "@/lib/sales-contracts/data";
 import {
   CONTRACT_STATUS_OPTIONS,
   CONTRACT_TYPE_OPTIONS,
-  FINANCE_COMPANY_OPTIONS
+  VEHICLE_TYPE_OPTIONS
 } from "@/lib/sales-contracts/rules";
 import type { SalesContractFilters } from "@/lib/sales-contracts/types";
 
@@ -17,6 +17,25 @@ export const metadata: Metadata = {
   title: "契約台帳 | 契約管理システム",
   description: "販売後の顧客、契約、車両、ローン、リース、書類、対応履歴を管理します。"
 };
+
+const COUNTERPARTY_FILTER_OPTIONS = [
+  { value: "aplus", label: "アプラス" },
+  { value: "aplus_showa", label: "アプラス・昭和リース連携" },
+  { value: "premium", label: "プレミアファイナンス" },
+  { value: "ast", label: "アスト" }
+] as const;
+
+const NEXT_ACTION_FILTER_OPTIONS = [
+  { value: "due_today", label: "今日まで" },
+  { value: "within_7_days", label: "7日以内" },
+  { value: "overdue", label: "期限切れ" }
+] as const;
+
+const SORT_OPTIONS = [
+  { value: "updated_desc", label: "更新日が新しい順" },
+  { value: "created_desc", label: "登録日が新しい順" },
+  { value: "next_action_asc", label: "次回対応日が近い順" }
+] as const;
 
 export default async function SalesContractsPage({ searchParams }: { searchParams: SalesContractsSearchParams }) {
   const admin = await requireAdmin();
@@ -49,10 +68,17 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
       ) : null}
 
       <form className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="grid gap-1 text-xs font-bold text-slate-600">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          <label className="grid gap-1 text-xs font-bold text-slate-600 lg:col-span-2">
             検索
             <input name="q" defaultValue={filters.keyword ?? ""} placeholder="氏名・電話・車種・ナンバー・車台番号" className="rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 focus-ring" />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            車両区分
+            <select name="vehicle_type" defaultValue={filters.vehicleType ?? ""} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring">
+              <option value="">すべて</option>
+              {VEHICLE_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
           </label>
           <label className="grid gap-1 text-xs font-bold text-slate-600">
             契約方法
@@ -65,7 +91,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
             信販会社
             <select name="finance_company" defaultValue={filters.financeCompany ?? ""} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring">
               <option value="">すべて</option>
-              {FINANCE_COMPANY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {COUNTERPARTY_FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
           <label className="grid gap-1 text-xs font-bold text-slate-600">
@@ -75,12 +101,26 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
               {CONTRACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            次回対応日
+            <select name="next_action" defaultValue={filters.nextAction ?? ""} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring">
+              <option value="">すべて</option>
+              {NEXT_ACTION_FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            並び順
+            <select name="sort" defaultValue={filters.sort ?? "updated_desc"} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring">
+              {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <button className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white focus-ring">絞り込み</button>
           <Link href="/admin/sales-contracts" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
             クリア
           </Link>
+          <span className="text-xs font-bold text-slate-500">表示件数: {result.data.length.toLocaleString("ja-JP")}件</span>
         </div>
       </form>
 
@@ -90,14 +130,20 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
 }
 
 function getFilters(params: Record<string, string | string[] | undefined>): SalesContractFilters {
+  const vehicleType = firstParam(params.vehicle_type);
   const contractType = firstParam(params.contract_type);
   const status = firstParam(params.status);
   const financeCompany = firstParam(params.finance_company);
+  const nextAction = firstParam(params.next_action);
+  const sort = firstParam(params.sort);
   return {
     keyword: firstParam(params.q) || undefined,
+    vehicleType: VEHICLE_TYPE_OPTIONS.some((option) => option.value === vehicleType) ? vehicleType as SalesContractFilters["vehicleType"] : undefined,
     contractType: CONTRACT_TYPE_OPTIONS.some((option) => option.value === contractType) ? contractType as SalesContractFilters["contractType"] : undefined,
     status: CONTRACT_STATUS_OPTIONS.some((option) => option.value === status) ? status as SalesContractFilters["status"] : undefined,
-    financeCompany: FINANCE_COMPANY_OPTIONS.some((option) => option.value === financeCompany) ? financeCompany as SalesContractFilters["financeCompany"] : undefined
+    financeCompany: COUNTERPARTY_FILTER_OPTIONS.some((option) => option.value === financeCompany) ? financeCompany as SalesContractFilters["financeCompany"] : undefined,
+    nextAction: NEXT_ACTION_FILTER_OPTIONS.some((option) => option.value === nextAction) ? nextAction as SalesContractFilters["nextAction"] : undefined,
+    sort: SORT_OPTIONS.some((option) => option.value === sort) ? sort as SalesContractFilters["sort"] : "updated_desc"
   };
 }
 

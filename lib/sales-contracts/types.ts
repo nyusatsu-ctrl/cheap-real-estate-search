@@ -2,6 +2,9 @@ export type SalesVehicleType = "car" | "bike";
 export type SalesContractType = "cash" | "loan" | "lease";
 export type SalesFinanceCompany = "premium" | "aplus" | "ast";
 export type SalesLeaseCompany = "premium" | "aplus_showa";
+export type SalesCounterpartyFilter = SalesFinanceCompany | SalesLeaseCompany;
+export type SalesNextActionFilter = "due_today" | "within_7_days" | "overdue";
+export type SalesContractSort = "updated_desc" | "created_desc" | "next_action_asc";
 export type SalesApprovalStatus = "unrequested" | "pending" | "approved" | "guarantor_required" | "rejected";
 export type SalesContractStatus =
   | "contracted"
@@ -247,6 +250,7 @@ export type SalesContractListItem = {
   vehicle: SalesVehicle | null;
   loan: SalesLoan | null;
   lease: SalesLease | null;
+  contactHistories: SalesContactHistory[];
 };
 
 export type SalesContractDetail = SalesContractListItem & {
@@ -259,9 +263,12 @@ export type SalesContractDetail = SalesContractListItem & {
 
 export type SalesContractFilters = {
   keyword?: string;
+  vehicleType?: SalesVehicleType;
   contractType?: SalesContractType;
   status?: SalesContractStatus;
-  financeCompany?: SalesFinanceCompany;
+  financeCompany?: SalesCounterpartyFilter;
+  nextAction?: SalesNextActionFilter;
+  sort?: SalesContractSort;
 };
 
 export type SalesLeaseMaturityListItem = {

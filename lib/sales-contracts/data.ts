@@ -11,6 +11,7 @@ import type {
   SalesContractDetail,
   SalesContractFilters,
   SalesContractListItem,
+  SalesContactHistory,
   SalesCustomer,
   SalesDataResult,
   SalesDocument,
@@ -37,12 +38,20 @@ export async function getSalesContractList(filters: SalesContractFilters = {}): 
     return { data: [], tableMissing: true, errorMessage: TABLE_MISSING_MESSAGE };
   }
 
-  const contractsResult = await supabase
+  const sort = filters.sort ?? "updated_desc";
+  const orderColumn = sort === "created_desc" ? "created_at" : "updated_at";
+  let contractsQuery = supabase
     .from("sales_contracts")
     .select("*")
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .limit(300);
+    .is("deleted_at", null);
+
+  if (filters.vehicleType) contractsQuery = contractsQuery.eq("vehicle_type", filters.vehicleType);
+  if (filters.contractType) contractsQuery = contractsQuery.eq("contract_type", filters.contractType);
+  if (filters.status) contractsQuery = contractsQuery.eq("status", filters.status);
+
+  const contractsResult = await contractsQuery
+    .order(orderColumn, { ascending: false })
+    .limit(1000);
 
   if (contractsResult.error) return handleDataError<SalesContractListItem[]>(contractsResult.error, []);
 
@@ -52,33 +61,42 @@ export async function getSalesContractList(filters: SalesContractFilters = {}): 
   const contractIds = contracts.map((contract) => contract.id);
   const customerIds = unique(contracts.map((contract) => contract.customer_id));
 
-  const [customersResult, vehiclesResult, loansResult, leasesResult] = await Promise.all([
+  const [customersResult, vehiclesResult, loansResult, leasesResult, contactHistoriesResult] = await Promise.all([
     customerIds.length
       ? supabase.from("sales_customers").select("*").in("id", customerIds).is("deleted_at", null)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("sales_vehicles").select("*").in("contract_id", contractIds).is("deleted_at", null),
     supabase.from("sales_loans").select("*").in("contract_id", contractIds).is("deleted_at", null),
-    supabase.from("sales_leases").select("*").in("contract_id", contractIds).is("deleted_at", null)
+    supabase.from("sales_leases").select("*").in("contract_id", contractIds).is("deleted_at", null),
+    supabase
+      .from("sales_contact_histories")
+      .select("*")
+      .in("contract_id", contractIds)
+      .is("deleted_at", null)
+      .not("next_action_date", "is", null)
+      .order("next_action_date", { ascending: true })
   ]);
 
-  const firstError = [customersResult.error, vehiclesResult.error, loansResult.error, leasesResult.error].find(Boolean);
+  const firstError = [customersResult.error, vehiclesResult.error, loansResult.error, leasesResult.error, contactHistoriesResult.error].find(Boolean);
   if (firstError) return handleDataError<SalesContractListItem[]>(firstError, []);
 
   const customersById = mapById((customersResult.data ?? []) as SalesCustomer[]);
   const vehiclesByContractId = mapFirstByContractId((vehiclesResult.data ?? []) as SalesVehicle[]);
   const loansByContractId = mapFirstByContractId((loansResult.data ?? []) as SalesLoan[]);
   const leasesByContractId = mapFirstByContractId((leasesResult.data ?? []) as SalesLease[]);
+  const contactHistoriesByContractId = groupByContractId((contactHistoriesResult.data ?? []) as SalesContactHistory[]);
 
   const items = contracts.map((contract) => ({
     contract,
     customer: customersById.get(contract.customer_id) ?? null,
     vehicle: vehiclesByContractId.get(contract.id) ?? null,
     loan: loansByContractId.get(contract.id) ?? null,
-    lease: leasesByContractId.get(contract.id) ?? null
+    lease: leasesByContractId.get(contract.id) ?? null,
+    contactHistories: contactHistoriesByContractId.get(contract.id) ?? []
   }));
 
   return {
-    data: applyFilters(items, filters),
+    data: sortSalesContractItems(applyFilters(items, filters), sort),
     tableMissing: false
   };
 }
@@ -261,6 +279,8 @@ export function getSalesContractTableMissingMessage() {
 
 export function formatSalesDate(value: string | null | undefined) {
   if (!value) return "-";
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}/${match[2]}/${match[3]}`;
   return new Intl.DateTimeFormat("ja-JP", { dateStyle: "short" }).format(new Date(value));
 }
 
@@ -292,6 +312,23 @@ export function getMonthlyAmount(item: Pick<SalesContractListItem, "contract" | 
   return null;
 }
 
+export function getInitialPaymentAmount(item: Pick<SalesContractListItem, "contract" | "loan" | "lease">) {
+  if (item.contract.contract_type === "loan") return item.loan?.initial_payment_amount ?? null;
+  if (item.contract.contract_type === "lease") return item.lease?.initial_payment_amount ?? null;
+  return null;
+}
+
+export function getFinalPaymentAmount(item: Pick<SalesContractListItem, "contract" | "loan" | "lease">) {
+  if (item.contract.contract_type === "loan") return item.loan?.final_payment_amount ?? null;
+  if (item.contract.contract_type === "lease") return item.lease?.final_payment_amount ?? null;
+  return null;
+}
+
+export function getResidualValueAmount(item: Pick<SalesContractListItem, "contract" | "lease">) {
+  if (item.contract.contract_type === "lease") return item.lease?.residual_value_amount ?? null;
+  return null;
+}
+
 export function getStartDate(item: Pick<SalesContractListItem, "contract" | "loan" | "lease">) {
   if (item.contract.contract_type === "loan") return item.loan?.first_payment_date ?? null;
   if (item.contract.contract_type === "lease") return item.lease?.lease_start_date ?? null;
@@ -302,6 +339,14 @@ export function getEndDate(item: Pick<SalesContractListItem, "contract" | "loan"
   if (item.contract.contract_type === "loan") return item.loan?.final_payment_date ?? null;
   if (item.contract.contract_type === "lease") return item.lease?.lease_end_date ?? null;
   return null;
+}
+
+export function getNextActionDate(item: Pick<SalesContractListItem, "contactHistories">) {
+  const dates = item.contactHistories
+    .map((history) => history.next_action_date)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+  return dates[0] ?? null;
 }
 
 function handleDataError<T>(error: SupabaseErrorLike, fallback: T): SalesDataResult<T> {
@@ -322,10 +367,10 @@ function isMissingSalesTableError(error: SupabaseErrorLike) {
 
 function applyFilters(items: SalesContractListItem[], filters: SalesContractFilters) {
   const keyword = normalize(filters.keyword);
+  const today = getTodayYmd();
   return items.filter((item) => {
-    if (filters.contractType && item.contract.contract_type !== filters.contractType) return false;
-    if (filters.status && item.contract.status !== filters.status) return false;
-    if (filters.financeCompany && item.loan?.finance_company !== filters.financeCompany) return false;
+    if (filters.financeCompany && !matchesCounterparty(item, filters.financeCompany)) return false;
+    if (filters.nextAction && !matchesNextActionFilter(getNextActionDate(item), filters.nextAction, today)) return false;
 
     if (!keyword) return true;
     const searchable = [
@@ -344,6 +389,40 @@ function applyFilters(items: SalesContractListItem[], filters: SalesContractFilt
     ].map(normalize);
 
     return searchable.some((value) => value.includes(keyword));
+  });
+}
+
+function matchesCounterparty(item: Pick<SalesContractListItem, "loan" | "lease">, financeCompany: NonNullable<SalesContractFilters["financeCompany"]>) {
+  if (financeCompany === "premium") {
+    return item.loan?.finance_company === "premium" || item.lease?.lease_company === "premium";
+  }
+  if (financeCompany === "aplus_showa") {
+    return item.lease?.lease_company === "aplus_showa";
+  }
+  return item.loan?.finance_company === financeCompany;
+}
+
+function matchesNextActionFilter(value: string | null, filter: NonNullable<SalesContractFilters["nextAction"]>, today: string) {
+  if (!value) return false;
+  const target = toYmd(value);
+  if (filter === "overdue") return target < today;
+  if (filter === "due_today") return target <= today;
+  return target >= today && target <= addDaysYmd(today, 7);
+}
+
+function sortSalesContractItems(items: SalesContractListItem[], sort: NonNullable<SalesContractFilters["sort"]>) {
+  return [...items].sort((a, b) => {
+    if (sort === "next_action_asc") {
+      const aTime = dateSortValue(getNextActionDate(a) ?? "");
+      const bTime = dateSortValue(getNextActionDate(b) ?? "");
+      if (aTime !== bTime) return aTime - bTime;
+    }
+
+    const column = sort === "created_desc" ? "created_at" : "updated_at";
+    const aTime = dateTimeSortValue(a.contract[column]);
+    const bTime = dateTimeSortValue(b.contract[column]);
+    if (aTime !== bTime) return bTime - aTime;
+    return String(a.customer?.name ?? "").localeCompare(String(b.customer?.name ?? ""), "ja");
   });
 }
 
@@ -378,8 +457,33 @@ function dateSortValue(value: string) {
   return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
 }
 
+function dateTimeSortValue(value: string | null | undefined) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function normalize(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
+}
+
+function toYmd(value: string) {
+  return value.slice(0, 10);
+}
+
+function getTodayYmd() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function addDaysYmd(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function unique(values: string[]) {
@@ -394,6 +498,16 @@ function mapFirstByContractId<T extends { contract_id: string }>(items: T[]) {
   const map = new Map<string, T>();
   for (const item of items) {
     if (!map.has(item.contract_id)) map.set(item.contract_id, item);
+  }
+  return map;
+}
+
+function groupByContractId<T extends { contract_id: string }>(items: T[]) {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const values = map.get(item.contract_id) ?? [];
+    values.push(item);
+    map.set(item.contract_id, values);
   }
   return map;
 }

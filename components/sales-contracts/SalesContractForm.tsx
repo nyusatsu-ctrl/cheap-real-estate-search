@@ -77,7 +77,11 @@ export function SalesContractForm({
   const sourceSnapshotJson = buildSourceSnapshotJson(sourceDefaults);
   const sourceReceivedAtValue = dateTimeLocalValue(contract?.source_received_at ?? sourceDefaults?.source_received_at);
   const sourceVehicleModel = vehicle?.model ?? sourceDefaults?.desired_vehicle ?? "";
-  const sourceMonthlyPayment = loan?.monthly_payment ?? sourceDefaults?.monthly_payment ?? parsePaymentEstimateAmount(sourceDefaults?.payment_estimate);
+  const sourceMonthlyPayment = firstPresentValue(
+    loan?.monthly_payment,
+    sourceDefaults?.monthly_payment,
+    parsePaymentEstimateAmount(sourceDefaults?.payment_estimate)
+  );
   const initialVehicleType = contract?.vehicle_type ?? sourceDefaults?.vehicle_type ?? "car";
   const initialContractType = contract?.contract_type ?? sourceDefaults?.contract_type ?? "cash";
   const initialFinanceCompany = contract?.contract_type === "loan" ? loan?.finance_company ?? "" : initialContractType === "loan" ? sourceDefaults?.finance_company ?? "" : "";
@@ -603,6 +607,13 @@ function dateTimeLocalValue(value: string | null | undefined) {
 function numberValue(value: number | string | null | undefined) {
   if (value === null || value === undefined) return "";
   return String(value);
+}
+
+function firstPresentValue(...values: Array<number | string | null | undefined>) {
+  for (const value of values) {
+    if (value !== null && value !== undefined && String(value).trim() !== "") return value;
+  }
+  return "";
 }
 
 function parseOptionalInteger(value: string | null | undefined) {

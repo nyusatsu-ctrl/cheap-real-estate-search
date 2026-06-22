@@ -217,9 +217,14 @@ export type SalesLeaseMaturity = {
   maturity_mileage: number | null;
   contracted_mileage_limit: number | null;
   mileage_over_limit: boolean;
+  mileage_excess_km: number | null;
+  mileage_overage_rate_yen: number | null;
+  mileage_overage_amount: number | null;
   vehicle_condition_memo: string | null;
+  condition_settlement_amount: number | null;
   additional_settlement_amount: number | null;
   additional_settlement_reason: string | null;
+  renewal_maintenance_fee_amount: number | null;
   final_settlement_amount: number | null;
   purchase_payment_due_date: string | null;
   purchase_paid_date: string | null;

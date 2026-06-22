@@ -5,15 +5,11 @@ import {
 } from "@/lib/sales-contracts/data";
 import {
   CONTACT_METHOD_LABELS,
-  CONTACT_STATUS_LABELS,
-  LEASE_MATURITY_CHOICE_OPTIONS,
-  LEASE_MATURITY_STATUS_OPTIONS
+  CONTACT_STATUS_LABELS
 } from "@/lib/sales-contracts/rules";
 import type { SalesContractDetail } from "@/lib/sales-contracts/types";
 import { LeaseMaturityHistoryForm } from "@/components/sales-contracts/LeaseMaturityHistoryForm";
-
-const inputClass = "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 focus-ring";
-const checkboxClass = "h-4 w-4 rounded border-slate-300";
+import { LeaseMaturitySettlementForm } from "@/components/sales-contracts/LeaseMaturitySettlementForm";
 
 export function LeaseMaturityCard({
   detail,
@@ -45,79 +41,7 @@ export function LeaseMaturityCard({
         ) : null}
       </div>
 
-      <form action={action} className="mt-4">
-        <input type="hidden" name="maturity_id" value={maturity?.id ?? ""} />
-        <input type="hidden" name="contract_id" value={detail.contract.id} />
-        <input type="hidden" name="lease_id" value={lease.id} />
-        <input type="hidden" name="return_to" value={`/admin/sales-contracts/${detail.contract.id}`} />
-        <div className="grid gap-3 md:grid-cols-4">
-          <Field label="満期予定日">
-            <input name="maturity_date" type="date" defaultValue={dateValue(maturityDate)} className={inputClass} />
-          </Field>
-          <Field label="満期ステータス">
-            <select name="maturity_status" defaultValue={maturity?.maturity_status ?? "not_started"} className={inputClass}>
-              {LEASE_MATURITY_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </Field>
-          <Field label="お客様の選択">
-            <select name="customer_choice" defaultValue={maturity?.customer_choice ?? "undecided"} className={inputClass}>
-              {LEASE_MATURITY_CHOICE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </Field>
-          <Field label="残価金額">
-            <input name="residual_value_amount" type="number" defaultValue={numberValue(residualValueAmount)} className={inputClass} />
-          </Field>
-          <Field label="満期時走行距離">
-            <input name="maturity_mileage" type="number" defaultValue={numberValue(maturity?.maturity_mileage)} className={inputClass} />
-          </Field>
-          <Field label="契約上の走行距離上限">
-            <input name="contracted_mileage_limit" type="number" defaultValue={numberValue(maturity?.contracted_mileage_limit)} className={inputClass} />
-          </Field>
-          <label className="flex items-center gap-2 pt-7 text-sm font-bold text-slate-700">
-            <input name="mileage_over_limit" type="checkbox" defaultChecked={maturity?.mileage_over_limit ?? false} className={checkboxClass} />
-            走行距離超過あり
-          </label>
-          <Field label="追加精算金">
-            <input name="additional_settlement_amount" type="number" defaultValue={numberValue(maturity?.additional_settlement_amount)} className={inputClass} />
-          </Field>
-          <Field label="最終精算金額">
-            <input name="final_settlement_amount" type="number" defaultValue={numberValue(maturity?.final_settlement_amount)} className={inputClass} />
-          </Field>
-          <Field label="買取入金予定日">
-            <input name="purchase_payment_due_date" type="date" defaultValue={dateValue(maturity?.purchase_payment_due_date)} className={inputClass} />
-          </Field>
-          <Field label="買取入金済み日">
-            <input name="purchase_paid_date" type="date" defaultValue={dateValue(maturity?.purchase_paid_date)} className={inputClass} />
-          </Field>
-          <Field label="再リース新契約ID">
-            <input name="renewal_contract_id" defaultValue={maturity?.renewal_contract_id ?? ""} className={inputClass} />
-          </Field>
-          <Field label="返却予定日">
-            <input name="return_scheduled_date" type="date" defaultValue={dateValue(maturity?.return_scheduled_date)} className={inputClass} />
-          </Field>
-          <Field label="返却完了日">
-            <input name="return_completed_date" type="date" defaultValue={dateValue(maturity?.return_completed_date)} className={inputClass} />
-          </Field>
-          <Field label="満期案内日">
-            <input name="maturity_notice_sent_date" type="date" defaultValue={dateValue(maturity?.maturity_notice_sent_date)} className={inputClass} />
-          </Field>
-          <Field label="次回連絡予定日">
-            <input name="next_contact_date" type="date" defaultValue={dateValue(maturity?.next_contact_date)} className={inputClass} />
-          </Field>
-          <Field label="追加精算金の理由" className="md:col-span-2">
-            <textarea name="additional_settlement_reason" rows={2} defaultValue={maturity?.additional_settlement_reason ?? ""} className={inputClass} />
-          </Field>
-          <Field label="傷・事故・修復・内外装状態メモ" className="md:col-span-2">
-            <textarea name="vehicle_condition_memo" rows={2} defaultValue={maturity?.vehicle_condition_memo ?? ""} className={inputClass} />
-          </Field>
-          <Field label="備考" className="md:col-span-4">
-            <textarea name="maturity_memo" rows={3} defaultValue={maturity?.memo ?? ""} className={inputClass} />
-          </Field>
-        </div>
-        <button className="mt-4 rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
-          {maturity ? "満期管理を保存" : "満期管理を作成"}
-        </button>
-      </form>
+      <LeaseMaturitySettlementForm detail={detail} action={action} />
 
       <div className="mt-6 space-y-4">
         <div>
@@ -146,30 +70,4 @@ export function LeaseMaturityCard({
       </div>
     </section>
   );
-}
-
-function Field({
-  label,
-  children,
-  className = ""
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`grid gap-1 text-sm font-bold text-slate-700 ${className}`}>
-      {label}
-      {children}
-    </label>
-  );
-}
-
-function dateValue(value: string | null | undefined) {
-  return value ? value.slice(0, 10) : "";
-}
-
-function numberValue(value: number | string | null | undefined) {
-  if (value === null || value === undefined) return "";
-  return String(value);
 }

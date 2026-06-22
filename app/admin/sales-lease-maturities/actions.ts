@@ -119,9 +119,14 @@ function getLeaseMaturityPayload(formData: FormData, contractId: string, leaseId
     maturity_mileage: numberField(formData, "maturity_mileage"),
     contracted_mileage_limit: numberField(formData, "contracted_mileage_limit"),
     mileage_over_limit: checkboxField(formData, "mileage_over_limit"),
+    mileage_excess_km: nonNegativeNumberField(formData, "mileage_excess_km"),
+    mileage_overage_rate_yen: nonNegativeNumberField(formData, "mileage_overage_rate_yen"),
+    mileage_overage_amount: nonNegativeNumberField(formData, "mileage_overage_amount"),
     vehicle_condition_memo: nullableString(formData, "vehicle_condition_memo"),
+    condition_settlement_amount: nonNegativeNumberField(formData, "condition_settlement_amount"),
     additional_settlement_amount: numberField(formData, "additional_settlement_amount"),
     additional_settlement_reason: nullableString(formData, "additional_settlement_reason"),
+    renewal_maintenance_fee_amount: nonNegativeNumberField(formData, "renewal_maintenance_fee_amount"),
     final_settlement_amount: numberField(formData, "final_settlement_amount"),
     purchase_payment_due_date: nullableString(formData, "purchase_payment_due_date"),
     purchase_paid_date: nullableString(formData, "purchase_paid_date"),
@@ -171,6 +176,12 @@ function numberField(formData: FormData, key: string) {
   const normalized = value.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0)).replace(/[,\s円回km]/g, "");
   const number = Number.parseInt(normalized, 10);
   return Number.isFinite(number) ? number : null;
+}
+
+function nonNegativeNumberField(formData: FormData, key: string) {
+  const value = numberField(formData, key);
+  if (value !== null && value < 0) throw new Error(`${key} must be greater than or equal to 0`);
+  return value;
 }
 
 function checkboxField(formData: FormData, key: string) {

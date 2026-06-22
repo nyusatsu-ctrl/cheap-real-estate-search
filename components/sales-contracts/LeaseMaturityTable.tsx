@@ -29,8 +29,7 @@ export function LeaseMaturityTable({ items }: { items: SalesLeaseMaturityListIte
               <th className="px-3 py-3">満期予定日</th>
               <th className="px-3 py-3">残価</th>
               <th className="px-3 py-3">お客様の選択</th>
-              <th className="px-3 py-3">追加精算金</th>
-              <th className="px-3 py-3">最終精算金</th>
+              <th className="px-3 py-3">精算内訳</th>
               <th className="px-3 py-3">ステータス</th>
               <th className="px-3 py-3">次回連絡予定日</th>
               <th className="px-3 py-3">詳細</th>
@@ -63,8 +62,13 @@ export function LeaseMaturityTable({ items }: { items: SalesLeaseMaturityListIte
                   <td className="whitespace-nowrap px-3 py-3">
                     <Badge tone={customerChoice === "undecided" ? "muted" : "success"}>{LEASE_MATURITY_CHOICE_LABELS[customerChoice]}</Badge>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{formatYen(item.maturity?.additional_settlement_amount)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{formatYen(item.maturity?.final_settlement_amount)}</td>
+                  <td className="min-w-[180px] px-3 py-3 text-xs font-semibold text-slate-700">
+                    <SettlementLine label="過走行" value={item.maturity?.mileage_overage_amount} />
+                    <SettlementLine label="状態" value={item.maturity?.condition_settlement_amount} />
+                    <SettlementLine label="メンテ" value={item.maturity?.renewal_maintenance_fee_amount} />
+                    <SettlementLine label="その他" value={item.maturity?.additional_settlement_amount} />
+                    <SettlementLine label="最終" value={item.maturity?.final_settlement_amount} strong />
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3">
                     <Badge tone={statusTone(maturityStatus)}>{LEASE_MATURITY_STATUS_LABELS[maturityStatus]}</Badge>
                   </td>
@@ -82,7 +86,7 @@ export function LeaseMaturityTable({ items }: { items: SalesLeaseMaturityListIte
             })}
             {items.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">
+                <td colSpan={12} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">
                   登録済みのリース満期管理はありません。
                 </td>
               </tr>
@@ -90,6 +94,15 @@ export function LeaseMaturityTable({ items }: { items: SalesLeaseMaturityListIte
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function SettlementLine({ label, value, strong = false }: { label: string; value: number | null | undefined; strong?: boolean }) {
+  return (
+    <div className={`flex justify-between gap-3 ${strong ? "mt-1 border-t border-slate-200 pt-1 text-slate-950" : ""}`}>
+      <span className="text-slate-500">{label}</span>
+      <span className={strong ? "font-black" : ""}>{formatYen(value)}</span>
     </div>
   );
 }

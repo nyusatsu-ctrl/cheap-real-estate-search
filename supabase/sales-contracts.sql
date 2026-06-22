@@ -218,9 +218,14 @@ create table if not exists public.sales_lease_maturities (
   maturity_mileage integer check (maturity_mileage is null or maturity_mileage >= 0),
   contracted_mileage_limit integer check (contracted_mileage_limit is null or contracted_mileage_limit >= 0),
   mileage_over_limit boolean not null default false,
+  mileage_excess_km integer check (mileage_excess_km is null or mileage_excess_km >= 0),
+  mileage_overage_rate_yen integer check (mileage_overage_rate_yen is null or mileage_overage_rate_yen >= 0),
+  mileage_overage_amount bigint check (mileage_overage_amount is null or mileage_overage_amount >= 0),
   vehicle_condition_memo text,
+  condition_settlement_amount bigint check (condition_settlement_amount is null or condition_settlement_amount >= 0),
   additional_settlement_amount bigint check (additional_settlement_amount is null or additional_settlement_amount >= 0),
   additional_settlement_reason text,
+  renewal_maintenance_fee_amount bigint check (renewal_maintenance_fee_amount is null or renewal_maintenance_fee_amount >= 0),
   final_settlement_amount bigint check (final_settlement_amount is null or final_settlement_amount >= 0),
   purchase_payment_due_date date,
   purchase_paid_date date,
@@ -260,6 +265,18 @@ alter table public.sales_loans
 alter table public.sales_leases
   add column if not exists initial_payment_amount bigint check (initial_payment_amount is null or initial_payment_amount >= 0),
   add column if not exists final_payment_amount bigint check (final_payment_amount is null or final_payment_amount >= 0);
+
+alter table public.sales_lease_maturities
+  add column if not exists mileage_excess_km integer
+    check (mileage_excess_km is null or mileage_excess_km >= 0),
+  add column if not exists mileage_overage_rate_yen integer
+    check (mileage_overage_rate_yen is null or mileage_overage_rate_yen >= 0),
+  add column if not exists mileage_overage_amount bigint
+    check (mileage_overage_amount is null or mileage_overage_amount >= 0),
+  add column if not exists condition_settlement_amount bigint
+    check (condition_settlement_amount is null or condition_settlement_amount >= 0),
+  add column if not exists renewal_maintenance_fee_amount bigint
+    check (renewal_maintenance_fee_amount is null or renewal_maintenance_fee_amount >= 0);
 
 create index if not exists sales_customers_name_idx on public.sales_customers(name);
 create index if not exists sales_customers_phone_idx on public.sales_customers(phone);

@@ -430,6 +430,18 @@
         background: #d1d5db;
       }
 
+      tr.next-action-overdue td {
+        box-shadow: inset 4px 0 0 #dc2626;
+      }
+
+      tr.phone-unreachable td {
+        box-shadow: inset 4px 0 0 #7f1d1d;
+      }
+
+      tr.next-action-overdue.phone-unreachable td {
+        box-shadow: inset 4px 0 0 #dc2626, inset 8px 0 0 #7f1d1d;
+      }
+
       .muted {
         color: var(--muted);
       }
@@ -780,6 +792,49 @@
         color: #475467;
       }
 
+      .next-action-badge,
+      .call-count-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        padding: 3px 7px;
+        font-size: 12px;
+        font-weight: 800;
+        background: #f9fafb;
+        color: #344054;
+        white-space: nowrap;
+      }
+
+      .next-action-badge.red,
+      .call-count-badge.red {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: var(--red);
+      }
+
+      .next-action-badge.amber {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: var(--amber);
+      }
+
+      .next-action-badge.blue {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: var(--blue-dark);
+      }
+
+      .next-action-badge.gray {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        color: #64748b;
+      }
+
+      .call-count-badge.red {
+        font-size: 11px;
+      }
+
       .detail-action-bar {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -821,6 +876,55 @@
         color: #344054;
         font-size: 13px;
         font-weight: 800;
+      }
+
+      .memo-template-buttons,
+      .call-result-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 8px 0 10px;
+      }
+
+      .memo-template-buttons button,
+      .call-result-buttons button {
+        padding: 5px 8px;
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        color: var(--blue-dark);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .call-preview {
+        margin-top: 10px;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        background: #eff6ff;
+        padding: 9px;
+        color: #1e3a8a;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .history-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px 10px;
+      }
+
+      .history-grid label {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 2px;
+      }
+
+      .history-grid strong,
+      .history-grid div {
+        overflow-wrap: anywhere;
       }
 
       .field {
@@ -1557,6 +1661,16 @@
         { value: 'unrequested', label: '未依頼', tone: 'blue' },
         { value: 'marketMissing', label: '相場未取得', tone: 'amber' },
         { value: 'modelCheck', label: '車種名確認', tone: 'amber' }
+      ];
+      const CALL_RESULT_QUICK_OPTIONS = ['不在', '通話済み', '留守電', '折返し待ち', '電話番号不通'];
+      const MEMO_TEMPLATE_OPTIONS = [
+        '電話つながらず',
+        '折返し待ち',
+        '必要書類案内済み',
+        'プレミア審査中',
+        'アスト審査中',
+        '再連絡予定',
+        '対応不可案内済み'
       ];
       const PREMIUM_PRINT_CONFIG = {
         page: { dpi: 300, widthPx: 3508, heightPx: 2480, offsetX: 0, offsetY: 0 },
@@ -2831,6 +2945,8 @@
           else if (isPendingReview(customer)) rowClasses.push('result-pending');
           else if (isPremiumDeniedAstUnrequested(customer)) rowClasses.push('result-premium-denied-ast-unrequested');
           else if (isCustomerDeniedForDisplay(customer)) rowClasses.push('result-denied');
+          if (isNextActionOverdue(customer)) rowClasses.push('next-action-overdue');
+          if (isPhoneUnreachable(customer)) rowClasses.push('phone-unreachable');
           tr.className = rowClasses.join(' ');
           const showAstReview = isAstTargetPrefecture(customer.prefecture);
           tr.innerHTML = `
@@ -2845,7 +2961,7 @@
             <td>${escapeHtml(paymentEstimateValue(customer))}</td>
             <td>${marketBadge(customer.market)}</td>
             <td>${badge(customer.status)}</td>
-            <td>${escapeHtml(customer.callCount || 0)}回<br><span class="muted">${escapeHtml(customer.latestCallResult || '')}</span></td>
+            <td>${callSummaryCellHtml(customer)}</td>
             <td>${badge(customer.review1)}</td>
             <td>${showAstReview ? badge(customer.review2) : ''}</td>
             <td><button type="button" class="compact" data-contract-register="${escapeHtml(customer.rowKey)}">登録</button></td>
@@ -2872,6 +2988,7 @@
         els.detail.className = 'detail';
         const showAstReview = isAstTargetPrefecture(customer.prefecture);
         const registrationState = salesContractRegistrationState(customer);
+        const nextAction = nextActionInfo(customer);
         els.detail.innerHTML = `
           <section class="detail-hero ${registrationState.canRegister ? 'ready' : 'blocked'}">
             <div class="detail-hero-head">
@@ -2889,6 +3006,7 @@
               ${summaryItem('支払目安', paymentEstimateValue(customer))}
               ${summaryItem('相場ステータス', marketBadge(customer.market), true)}
               ${summaryItem('架電回数', `${customer.callCount || 0}回${customer.latestCallResult ? ` / ${customer.latestCallResult}` : ''}`)}
+              ${summaryItem('次回対応日', nextActionBadgeHtml(nextAction), true)}
               ${summaryItem('プレミア依頼状況', badge(customer.review1), true)}
               ${showAstReview ? summaryItem('アスト依頼状況', badge(customer.review2), true) : summaryItem('アスト依頼状況', '対象外')}
             </div>
@@ -2965,6 +3083,9 @@
               <button type="button" id="premiumDenialEmailButton" class="danger">プレミア否決メール送信</button>
             </div>
             <div class="detail-subtitle">メモ・備考</div>
+            ${inputField('次回対応日', 'nextActionDate', nextAction.inputValue, '例: 2026/06/25')}
+            <div class="muted">保存時に対応メモへ「次回対応日: yyyy/mm/dd」として残します。</div>
+            ${memoTemplateButtonsHtml()}
             ${textareaField('対応メモ', 'memo', customer.memo)}
             <div class="muted">最終更新: ${escapeHtml(customer.updatedAt || '-')} ${escapeHtml(customer.updatedBy || '')}</div>
             <div class="actions">
@@ -2976,9 +3097,12 @@
           <form id="callForm" class="detail-section">
             <h3>架電記録</h3>
             ${inputField('架電した日時', 'callAt', '', '例: 2026/06/01 14:30')}
+            ${callResultButtonsHtml()}
             ${selectField('結果', 'callResult', '不在', state.callResultOptions)}
             ${assigneeField('対応した従業員名', 'staffName', customer.assignee)}
+            ${inputField('次回対応日', 'callNextActionDate', nextAction.inputValue, '例: 2026/06/25')}
             ${textareaField('話した内容のメモ', 'callMemo', '')}
+            <div id="callPreview" class="call-preview">架電結果・対応者・メモを入力すると、追加前の内容を確認できます。</div>
             <div class="actions">
               <button type="button" id="addCallButton" class="primary">架電履歴を追加</button>
             </div>
@@ -3009,9 +3133,27 @@
           fetchInquiryButton.addEventListener('click', fetchInquiryContentForSelected);
         }
         document.getElementById('addCallButton').addEventListener('click', addCallForSelected);
+        bindMemoTemplateButtons();
+        bindCallFormHelpers();
         bindLoanPreviewEvents();
         bindAssigneeFields();
         bindCustomerRateFields();
+      }
+
+      function memoTemplateButtonsHtml() {
+        return `
+          <div class="memo-template-buttons" aria-label="対応メモ定型文">
+            ${MEMO_TEMPLATE_OPTIONS.map((text) => `<button type="button" data-memo-template="${escapeHtml(text)}">${escapeHtml(text)}</button>`).join('')}
+          </div>
+        `;
+      }
+
+      function callResultButtonsHtml() {
+        return `
+          <div class="call-result-buttons" aria-label="架電結果ショートカット">
+            ${CALL_RESULT_QUICK_OPTIONS.map((text) => `<button type="button" data-call-result-template="${escapeHtml(text)}">${escapeHtml(text)}</button>`).join('')}
+          </div>
+        `;
       }
 
       function summaryItem(label, value, isHtml) {
@@ -3059,6 +3201,131 @@
       function noAnswerCallLabel(customer) {
         const text = String(customer && customer.latestCallResult ? customer.latestCallResult : '');
         return /つながら|繋がら|不在|不通|留守|未接続/.test(text) ? '電話がつながらない' : '';
+      }
+
+      function callSummaryCellHtml(customer) {
+        const count = safeNumber(customer && customer.callCount) || 0;
+        const countHtml = count >= 3
+          ? `<span class="call-count-badge red">架電${escapeHtml(count)}回</span>`
+          : `${escapeHtml(count)}回`;
+        const latestResult = customer && customer.latestCallResult
+          ? `<br><span class="muted">${escapeHtml(customer.latestCallResult)}</span>`
+          : '';
+        const nextAction = nextActionInfo(customer);
+        const nextActionHtml = nextAction.date
+          ? `<br>${nextActionBadgeHtml(nextAction)}`
+          : '';
+        return `${countHtml}${latestResult}${nextActionHtml}`;
+      }
+
+      function nextActionInfo(customer) {
+        const sources = [];
+        if (customer && customer.memo) {
+          sources.push(customer.memo);
+        }
+        const history = customer && Array.isArray(customer.callHistory) ? customer.callHistory.slice().reverse() : [];
+        history.forEach((call) => {
+          if (call && call.memo) sources.push(call.memo);
+        });
+        for (const source of sources) {
+          const date = extractNextActionDate(source);
+          if (date) {
+            return buildNextActionInfo(date);
+          }
+        }
+        return buildNextActionInfo('');
+      }
+
+      function buildNextActionInfo(dateText) {
+        const normalized = normalizeNextActionDate(dateText);
+        if (!normalized) {
+          return {
+            date: '',
+            inputValue: '',
+            label: '未設定',
+            tone: 'gray',
+            urgency: '未設定'
+          };
+        }
+        const dueTime = parseDateOnly(normalized);
+        const todayTime = todayStartTime();
+        const dayDiff = Math.round((dueTime - todayTime) / 86400000);
+        if (dayDiff < 0) {
+          return { date: normalized, inputValue: normalized, label: `${normalized} 期限切れ`, tone: 'red', urgency: '期限切れ' };
+        }
+        if (dayDiff === 0) {
+          return { date: normalized, inputValue: normalized, label: `${normalized} 今日`, tone: 'amber', urgency: '今日' };
+        }
+        if (dayDiff <= 7) {
+          return { date: normalized, inputValue: normalized, label: `${normalized} 7日以内`, tone: 'blue', urgency: '7日以内' };
+        }
+        return { date: normalized, inputValue: normalized, label: normalized, tone: 'gray', urgency: '予定' };
+      }
+
+      function nextActionBadgeHtml(info) {
+        const data = info || buildNextActionInfo('');
+        return `<span class="next-action-badge ${escapeHtml(data.tone)}">${escapeHtml(data.label)}</span>`;
+      }
+
+      function isNextActionOverdue(customer) {
+        return nextActionInfo(customer).tone === 'red';
+      }
+
+      function isPhoneUnreachable(customer) {
+        const text = [
+          customer && customer.status,
+          customer && customer.latestCallResult,
+          customer && customer.memo
+        ].join(' ');
+        return text.indexOf('電話番号不通') !== -1 || text.indexOf('番号不通') !== -1;
+      }
+
+      function extractNextActionDate(text) {
+        const normalized = normalizeFullWidthAlnum(String(text || ''));
+        const match = normalized.match(/次回(?:対応|連絡)(?:予定)?日?\s*[:：]\s*(\d{4})[\/.\-年](\d{1,2})[\/.\-月](\d{1,2})/);
+        if (!match) return '';
+        return normalizeNextActionDate(`${match[1]}/${match[2]}/${match[3]}`);
+      }
+
+      function applyNextActionDateToMemo(memo, dateText) {
+        const cleaned = String(memo || '')
+          .split(/\r?\n/)
+          .filter((line) => !/^\s*次回(?:対応|連絡)(?:予定)?日?\s*[:：]/.test(normalizeFullWidthAlnum(line)))
+          .join('\n')
+          .trim();
+        const normalized = normalizeNextActionDate(dateText);
+        if (!normalized) {
+          return cleaned;
+        }
+        return cleaned ? `${cleaned}\n次回対応日: ${normalized}` : `次回対応日: ${normalized}`;
+      }
+
+      function normalizeNextActionDate(value) {
+        const text = normalizeFullWidthAlnum(String(value || '')).trim();
+        if (!text) return '';
+        const match = text.match(/^(\d{4})[\/.\-年](\d{1,2})[\/.\-月](\d{1,2})/);
+        if (!match) return '';
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        if (!year || month < 1 || month > 12 || day < 1 || day > 31) return '';
+        return `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+      }
+
+      function parseDateOnly(value) {
+        const normalized = normalizeNextActionDate(value);
+        const match = normalized.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+        if (!match) return 0;
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime();
+      }
+
+      function todayStartTime() {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      }
+
+      function normalizeFullWidthAlnum(value) {
+        return String(value || '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
       }
 
       function salesContractRegistrationState(customer) {
@@ -3679,7 +3946,7 @@
           assignee: getAssigneeFieldValue(form, 'assignee'),
           review1: form.elements.review1.value,
           review2: form.elements.review2.value,
-          memo: form.elements.memo.value,
+          memo: applyNextActionDateToMemo(form.elements.memo.value, form.elements.nextActionDate.value),
           applicationFields: collectApplicationFieldValues()
         };
 
@@ -4231,14 +4498,10 @@
         }
 
         const form = document.getElementById('callForm');
-        const payload = {
-          rowNumber: state.selected.rowNumber,
-          rowKey: state.selected.rowKey,
-          callAt: form.elements.callAt.value,
-          callResult: form.elements.callResult.value,
-          staffName: getAssigneeFieldValue(form, 'staffName'),
-          callMemo: form.elements.callMemo.value
-        };
+        const payload = collectCallPayload(form);
+        if (!window.confirm(`以下の内容で架電履歴を追加します。\n\n${buildCallPreviewText(payload)}`)) {
+          return;
+        }
 
         state.saving = true;
         setBusy(true);
@@ -4254,6 +4517,26 @@
             showToast(error.message || String(error));
           })
           .addCallHistory(payload);
+      }
+
+      function collectCallPayload(form) {
+        return {
+          rowNumber: state.selected.rowNumber,
+          rowKey: state.selected.rowKey,
+          callAt: form.elements.callAt.value,
+          callResult: form.elements.callResult.value,
+          staffName: getAssigneeFieldValue(form, 'staffName'),
+          callMemo: applyNextActionDateToMemo(form.elements.callMemo.value, form.elements.callNextActionDate.value)
+        };
+      }
+
+      function buildCallPreviewText(payload) {
+        return [
+          `日時: ${payload.callAt || '現在時刻'}`,
+          `結果: ${payload.callResult || '-'}`,
+          `対応者: ${payload.staffName || '-'}`,
+          `内容: ${payload.callMemo || '-'}`
+        ].join('\n');
       }
 
       function readonlyField(label, value) {
@@ -4360,6 +4643,67 @@
         });
       }
 
+      function bindMemoTemplateButtons() {
+        document.querySelectorAll('[data-memo-template]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const form = document.getElementById('managementForm');
+            if (!form || !form.elements.memo) return;
+            appendLineToTextarea(form.elements.memo, button.dataset.memoTemplate || '');
+          });
+        });
+      }
+
+      function bindCallFormHelpers() {
+        const form = document.getElementById('callForm');
+        if (!form) return;
+        document.querySelectorAll('[data-call-result-template]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const value = button.dataset.callResultTemplate || '';
+            if (form.elements.callResult) {
+              setSelectValueIfOption(form.elements.callResult, value);
+            }
+            if (form.elements.callMemo) {
+              appendLineToTextarea(form.elements.callMemo, callResultMemoText(value));
+            }
+            updateCallPreview();
+          });
+        });
+        ['callAt', 'callResult', 'staffName', 'staffNameCustom', 'callNextActionDate', 'callMemo'].forEach((name) => {
+          const field = form.elements[name];
+          if (field) {
+            field.addEventListener('input', updateCallPreview);
+            field.addEventListener('change', updateCallPreview);
+          }
+        });
+        updateCallPreview();
+      }
+
+      function appendLineToTextarea(textarea, line) {
+        const text = String(line || '').trim();
+        if (!textarea || !text) return;
+        const current = String(textarea.value || '').trimEnd();
+        textarea.value = current ? `${current}\n${text}` : text;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      function callResultMemoText(result) {
+        return {
+          '不在': '架電：不在。再架電予定。',
+          '通話済み': '架電：通話済み。',
+          '留守電': '架電：留守電を残しました。',
+          '折返し待ち': '架電：折返し待ち。',
+          '電話番号不通': '架電：電話番号不通。番号確認が必要。'
+        }[result] || `架電：${result}`;
+      }
+
+      function updateCallPreview() {
+        const form = document.getElementById('callForm');
+        const preview = document.getElementById('callPreview');
+        if (!form || !preview) return;
+        const payload = collectCallPayload(form);
+        preview.textContent = buildCallPreviewText(payload);
+      }
+
       function getAssigneeFieldValue(form, name) {
         const value = form.elements[name].value;
         if (value !== '直接入力') {
@@ -4381,16 +4725,26 @@
           return '<div class="muted">架電履歴はまだありません。</div>';
         }
 
-        return `<div class="history-list">${history.slice().reverse().map((call) => `
-          <div class="history-item">
-            <div class="history-head">
-              <strong>${escapeHtml(call.callNumber)}回目 / ${escapeHtml(call.result)}</strong>
-              <span class="muted">${escapeHtml(call.callAt)}</span>
+        return `<div class="history-list">${history.slice().reverse().map((call) => {
+          const nextAction = buildNextActionInfo(extractNextActionDate(call.memo || ''));
+          return `
+            <div class="history-item">
+              <div class="history-head">
+                <strong>${escapeHtml(call.callNumber)}回目</strong>
+                <span class="muted">記録: ${escapeHtml(call.recordedAt || '-')}</span>
+              </div>
+              <div class="history-grid">
+                <div><label>日時</label><strong>${escapeHtml(call.callAt || '-')}</strong></div>
+                <div><label>対応者</label><strong>${escapeHtml(call.staffName || '-')}</strong></div>
+                <div><label>対応方法</label><strong>電話</strong></div>
+                <div><label>ステータス</label><strong>${badge(call.result)}</strong></div>
+                <div><label>次回対応日</label><strong>${nextActionBadgeHtml(nextAction)}</strong></div>
+                <div><label>記録者</label><strong>${escapeHtml(call.recordedBy || '-')}</strong></div>
+                <div style="grid-column:1 / -1;"><label>内容</label><div>${escapeHtml(call.memo || '-')}</div></div>
+              </div>
             </div>
-            <div>${escapeHtml(call.memo || '-')}</div>
-            <div class="muted">担当: ${escapeHtml(call.staffName || '-')} / 記録: ${escapeHtml(call.recordedBy || '-')}</div>
-          </div>
-        `).join('')}</div>`;
+          `;
+        }).join('')}</div>`;
       }
 
       function badge(value) {

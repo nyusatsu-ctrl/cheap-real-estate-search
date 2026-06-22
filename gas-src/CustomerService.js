@@ -72,7 +72,7 @@ var WEBAPP_STATUS_OPTIONS = [
   '納車完了'
 ];
 var WEBAPP_REVIEW_OPTIONS = ['未依頼', '審査中', '審査中（要保証人）', '可決', '否決'];
-var WEBAPP_CALL_RESULT_OPTIONS = ['出た', '不在', '留守電', '折返し待ち', 'その他'];
+var WEBAPP_CALL_RESULT_OPTIONS = ['通話済み', '不在', '留守電', '折返し待ち', '電話番号不通', 'その他'];
 var WEBAPP_LOAN_INPUT_COLUMNS = [
   '審査申込金額',
   '支払い回数',
@@ -6974,7 +6974,7 @@ function deleteCallHistoryByRowKey_(rowKey) {
 function updateLatestCallSummary_(sheet, rowNumber, payload, headerMap, result, staffName, callAt, memo, recorder) {
   var managementMap = getManagementColumnMap_(headerMap);
   var updates = {
-    '対応状況': result === '出た' ? '電話がつながりプレミア審査前' : '架電中（不在・再架電待ち）',
+    '対応状況': result === '通話済み' || result === '出た' ? '電話がつながりプレミア審査前' : '架電中（不在・再架電待ち）',
     '担当者': staffName,
     '対応メモ': memo,
     '最終更新日時': Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'),

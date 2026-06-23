@@ -8,11 +8,15 @@ type PropertyQuery<T> = {
   gte: (column: string, value: number) => T;
   lte: (column: string, value: number) => T;
   in: (column: string, values: readonly string[]) => T;
+  or: (filters: string) => T;
   order: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => T;
 };
 
 export type PublishedPropertiesResult = {
   properties: Property[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
   errorMessage: string | null;
 };
 
@@ -21,35 +25,41 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
   return result.properties;
 }
 
-export async function getPublishedPropertiesResult(filters: PropertyFilters = {}): Promise<PublishedPropertiesResult> {
+export async function getPublishedPropertiesResult(filters: PropertyFilters = {}, pagination: { page?: number; pageSize?: number } = {}): Promise<PublishedPropertiesResult> {
+  const page = normalizePage(pagination.page);
+  const pageSize = normalizePageSize(pagination.pageSize);
   const supabase = await createPropertyReadClient();
 
   if (!supabase) {
     if (shouldUseSampleFallback()) {
-      return { properties: getFallbackPublishedProperties(filters), errorMessage: null };
+      return getFallbackPublishedPropertiesResult(filters, page, pageSize);
     }
-    return { properties: [], errorMessage: "物件情報を取得できませんでした。時間をおいて再度お試しください。" };
+    return getFailedPublishedPropertiesResult(page, pageSize);
   }
 
   let query = supabase
     .from("properties")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("status", "published");
 
   query = applyServerFilters(query, filters);
   query = applyServerSort(query, filters.sort);
+  query = query.range((page - 1) * pageSize, page * pageSize - 1);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) {
     logPropertyQueryError("published properties", error);
     if (shouldUseSampleFallback()) {
-      return { properties: getFallbackPublishedProperties(filters), errorMessage: null };
+      return getFallbackPublishedPropertiesResult(filters, page, pageSize);
     }
-    return { properties: [], errorMessage: "物件情報を取得できませんでした。時間をおいて再度お試しください。" };
+    return getFailedPublishedPropertiesResult(page, pageSize);
   }
 
   return {
     properties: sanitizePublicListProperties(sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort)),
+    totalCount: count ?? 0,
+    page,
+    pageSize,
     errorMessage: null
   };
 }
@@ -71,8 +81,13 @@ async function getPropertyLocations({ publishedOnly }: { publishedOnly: boolean 
       : [];
   }
 
-  let query = supabase.from("properties").select("prefecture, city").order("prefecture", { ascending: true }).order("city", { ascending: true });
+  let query = supabase.from("properties").select("prefecture, city");
   if (publishedOnly) query = query.eq("status", "published");
+
+  query = query
+    .order("prefecture", { ascending: true })
+    .order("city", { ascending: true })
+    .range(0, 9999);
 
   const { data, error } = await query;
   if (error) {
@@ -94,6 +109,23 @@ function applyServerFilters<T extends PropertyQuery<T>>(query: T, filters: Prope
   if (filters.city) filtered = filtered.eq("city", filters.city);
   if (filters.minPrice !== undefined) filtered = filtered.gte("price_yen", filters.minPrice);
   if (filters.maxPrice !== undefined) filtered = filtered.lte("price_yen", filters.maxPrice);
+  if (filters.propertyType) {
+    filtered = filtered.or(`property_category.eq.${filters.propertyType},property_type.eq.${filters.propertyType}`);
+  }
+  const keyword = normalizeServerKeyword(filters.keyword);
+  if (keyword) {
+    const likePattern = `%${keyword}%`;
+    filtered = filtered.or(
+      [
+        `title.ilike.${likePattern}`,
+        `prefecture.ilike.${likePattern}`,
+        `city.ilike.${likePattern}`,
+        `address_display.ilike.${likePattern}`,
+        `property_type.ilike.${likePattern}`,
+        `property_category.ilike.${likePattern}`
+      ].join(",")
+    );
+  }
   return filtered;
 }
 
@@ -196,6 +228,27 @@ function getFallbackPublishedProperties(filters: PropertyFilters) {
   return sanitizePublicListProperties(sortProperties(filterProperties(sampleProperties.filter((property) => property.status === "published"), filters), filters.sort));
 }
 
+function getFallbackPublishedPropertiesResult(filters: PropertyFilters, page: number, pageSize: number): PublishedPropertiesResult {
+  const properties = getFallbackPublishedProperties(filters);
+  return {
+    properties: properties.slice((page - 1) * pageSize, page * pageSize),
+    totalCount: properties.length,
+    page,
+    pageSize,
+    errorMessage: null
+  };
+}
+
+function getFailedPublishedPropertiesResult(page: number, pageSize: number): PublishedPropertiesResult {
+  return {
+    properties: [],
+    totalCount: 0,
+    page,
+    pageSize,
+    errorMessage: "物件情報を取得できませんでした。時間をおいて再度お試しください。"
+  };
+}
+
 function getFallbackPropertyLocations(publishedOnly: boolean) {
   return uniqueLocations(publishedOnly ? sampleProperties.filter((property) => property.status === "published") : sampleProperties);
 }
@@ -206,6 +259,22 @@ function logPropertyQueryError(scope: string, error: { message?: string }) {
 
 function shouldUseSampleFallback() {
   return process.env.NODE_ENV !== "production";
+}
+
+function normalizePage(value?: number) {
+  return Number.isInteger(value) && value && value > 0 ? value : 1;
+}
+
+function normalizePageSize(value?: number) {
+  if (!Number.isInteger(value) || !value || value < 1) return 100;
+  return Math.min(value, 100);
+}
+
+function normalizeServerKeyword(value?: string) {
+  return value
+    ?.replace(/[%,()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getPropertyCategory(property: Property) {

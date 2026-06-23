@@ -16,6 +16,7 @@ export type PropertySearchParams = {
   priceRange?: SearchParamValue;
   sort?: SearchParamValue;
   keyword?: SearchParamValue;
+  page?: SearchParamValue;
   minPrice?: SearchParamValue;
   maxPrice?: SearchParamValue;
 };

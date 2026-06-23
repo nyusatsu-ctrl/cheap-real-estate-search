@@ -11,11 +11,24 @@ type PropertyQuery<T> = {
   order: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => T;
 };
 
+export type PublishedPropertiesResult = {
+  properties: Property[];
+  errorMessage: string | null;
+};
+
 export async function getPublishedProperties(filters: PropertyFilters = {}) {
+  const result = await getPublishedPropertiesResult(filters);
+  return result.properties;
+}
+
+export async function getPublishedPropertiesResult(filters: PropertyFilters = {}): Promise<PublishedPropertiesResult> {
   const supabase = await createPropertyReadClient();
 
   if (!supabase) {
-    return getFallbackPublishedProperties(filters);
+    if (shouldUseSampleFallback()) {
+      return { properties: getFallbackPublishedProperties(filters), errorMessage: null };
+    }
+    return { properties: [], errorMessage: "物件情報を取得できませんでした。時間をおいて再度お試しください。" };
   }
 
   let query = supabase
@@ -29,10 +42,16 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
   const { data, error } = await query;
   if (error) {
     logPropertyQueryError("published properties", error);
-    return getFallbackPublishedProperties(filters);
+    if (shouldUseSampleFallback()) {
+      return { properties: getFallbackPublishedProperties(filters), errorMessage: null };
+    }
+    return { properties: [], errorMessage: "物件情報を取得できませんでした。時間をおいて再度お試しください。" };
   }
 
-  return sanitizePublicListProperties(sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort));
+  return {
+    properties: sanitizePublicListProperties(sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort)),
+    errorMessage: null
+  };
 }
 
 export async function getPublishedPropertyLocations() {
@@ -47,7 +66,9 @@ async function getPropertyLocations({ publishedOnly }: { publishedOnly: boolean 
   const supabase = await createPropertyReadClient();
 
   if (!supabase) {
-    return uniqueLocations(publishedOnly ? sampleProperties.filter((property) => property.status === "published") : sampleProperties);
+    return shouldUseSampleFallback()
+      ? uniqueLocations(publishedOnly ? sampleProperties.filter((property) => property.status === "published") : sampleProperties)
+      : [];
   }
 
   let query = supabase.from("properties").select("prefecture, city").order("prefecture", { ascending: true }).order("city", { ascending: true });
@@ -56,7 +77,7 @@ async function getPropertyLocations({ publishedOnly }: { publishedOnly: boolean 
   const { data, error } = await query;
   if (error) {
     logPropertyQueryError("property locations", error);
-    return getFallbackPropertyLocations(publishedOnly);
+    return shouldUseSampleFallback() ? getFallbackPropertyLocations(publishedOnly) : [];
   }
 
   return uniqueLocations((data ?? []) as Pick<Property, "prefecture" | "city">[]);
@@ -80,6 +101,7 @@ export async function getPublishedProperty(id: string) {
   const supabase = await createPropertyReadClient();
 
   if (!supabase) {
+    if (!shouldUseSampleFallback()) return null;
     const property = sampleProperties.find((candidate) => candidate.id === id && candidate.status === "published");
     return property ? sanitizePublicDetailProperty(property) : null;
   }
@@ -97,7 +119,7 @@ export async function getPublishedProperty(id: string) {
 
 export async function getAdminProperties(filters: PropertyFilters = {}) {
   const supabase = await createPropertyReadClient();
-  if (!supabase) return sortProperties(filterProperties(sampleProperties, filters), filters.sort);
+  if (!supabase) return shouldUseSampleFallback() ? sortProperties(filterProperties(sampleProperties, filters), filters.sort) : [];
 
   let { data, error } = await fetchAdminProperties(supabase, filters, { includeSources: true });
   if (error && isOptionalSourceRelationError(error)) {
@@ -105,14 +127,14 @@ export async function getAdminProperties(filters: PropertyFilters = {}) {
   }
   if (error) {
     logPropertyQueryError("admin properties", error);
-    return sortProperties(filterProperties(sampleProperties, filters), filters.sort);
+    return shouldUseSampleFallback() ? sortProperties(filterProperties(sampleProperties, filters), filters.sort) : [];
   }
   return sortProperties(filterProperties((data ?? []) as unknown as Property[], filters), filters.sort);
 }
 
 export async function getAdminProperty(id: string) {
   const supabase = await createPropertyReadClient();
-  if (!supabase) return sampleProperties.find((property) => property.id === id) ?? null;
+  if (!supabase) return shouldUseSampleFallback() ? sampleProperties.find((property) => property.id === id) ?? null : null;
 
   let { data, error } = await supabase
     .from("properties")
@@ -180,6 +202,10 @@ function getFallbackPropertyLocations(publishedOnly: boolean) {
 
 function logPropertyQueryError(scope: string, error: { message?: string }) {
   console.error(`[properties] Failed to load ${scope}: ${error.message ?? "unknown error"}`);
+}
+
+function shouldUseSampleFallback() {
+  return process.env.NODE_ENV !== "production";
 }
 
 function getPropertyCategory(property: Property) {

@@ -22,6 +22,7 @@ export default async function AdminSystemCheckPage() {
             <CheckRow label="NEXT_PUBLIC_SUPABASE_URL" ok={check.env.nextPublicSupabaseUrl} />
             <CheckRow label="NEXT_PUBLIC_SUPABASE_ANON_KEY" ok={check.env.nextPublicSupabaseAnonKey} />
             <CheckRow label="SUPABASE_SERVICE_ROLE_KEY" ok={check.env.serviceRoleKey} />
+            <MaskedValueRow label="Supabase Project Ref" value={check.env.projectRefMasked} />
           </dl>
         </div>
 
@@ -55,6 +56,15 @@ export default async function AdminSystemCheckPage() {
         </section>
       ) : null}
     </AdminShell>
+  );
+}
+
+function MaskedValueRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2">
+      <dt className="font-mono text-xs font-bold text-slate-600">{label}</dt>
+      <dd className="text-sm font-black text-slate-700">{value ?? "-"}</dd>
+    </div>
   );
 }
 

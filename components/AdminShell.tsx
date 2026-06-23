@@ -6,8 +6,7 @@ const defaultAdminMenuItems = [
   { href: "/admin/properties", label: "物件管理" },
   { href: "/admin/crawler-candidates", label: "取込候補" },
   { href: "/admin/estimates", label: "問い合わせ管理" },
-  { href: "/admin/system-check", label: "システム確認" },
-  { href: "/admin/sales-contracts", label: "契約台帳" }
+  { href: "/admin/system-check", label: "システム確認" }
 ];
 
 const salesAdminMenuItems = [

@@ -7,6 +7,7 @@ export type AdminSystemCheck = {
     nextPublicSupabaseUrl: boolean;
     nextPublicSupabaseAnonKey: boolean;
     serviceRoleKey: boolean;
+    projectRefMasked: string | null;
   };
   connection: {
     ok: boolean;
@@ -27,7 +28,8 @@ export async function getAdminSystemCheck(): Promise<AdminSystemCheck> {
     env: {
       nextPublicSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
       nextPublicSupabaseAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-      serviceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+      serviceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      projectRefMasked: maskProjectRef(extractProjectRef(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL))
     },
     connection: {
       ok: false,
@@ -77,6 +79,25 @@ export async function getAdminSystemCheck(): Promise<AdminSystemCheck> {
   result.connection.ok = result.counts.properties !== null && result.errors.length === 0;
   result.connection.message = result.connection.ok ? "Supabaseに接続できています。" : "Supabase接続または件数取得でエラーがあります。";
   return result;
+}
+
+function extractProjectRef(value?: string) {
+  if (!value) return null;
+  try {
+    const host = new URL(value).hostname;
+    const suffix = ".supabase.co";
+    if (!host.endsWith(suffix)) return null;
+    const projectRef = host.slice(0, -suffix.length);
+    return projectRef || null;
+  } catch {
+    return null;
+  }
+}
+
+function maskProjectRef(projectRef: string | null) {
+  if (!projectRef) return null;
+  if (projectRef.length <= 8) return `${projectRef.slice(0, 2)}...${projectRef.slice(-2)}`;
+  return `${projectRef.slice(0, 4)}...${projectRef.slice(-4)}`;
 }
 
 async function countRows(

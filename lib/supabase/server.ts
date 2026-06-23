@@ -5,26 +5,29 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
 export function hasSupabaseEnv() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return Boolean(getSupabaseUrl() && getSupabaseAnonKey());
 }
 
 export function createSupabaseServiceRoleClient() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const supabaseUrl = getSupabaseUrl();
+  if (!supabaseUrl || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } }
   );
 }
 
 export async function createSupabaseServerClient() {
-  if (!hasSupabaseEnv()) return null;
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseAnonKey = getSupabaseAnonKey();
+  if (!supabaseUrl || !supabaseAnonKey) return null;
 
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -42,4 +45,12 @@ export async function createSupabaseServerClient() {
       }
     }
   );
+}
+
+function getSupabaseUrl() {
+  return process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+}
+
+function getSupabaseAnonKey() {
+  return process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }

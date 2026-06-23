@@ -50,6 +50,9 @@ var WEBAPP_PREMIUM_DENIAL_EMAIL_SUBJECT = '仮審査結果のご連絡';
 var WEBAPP_PREMIUM_DENIAL_EMAIL_FROM = 'info@ecoloop-loan.net';
 var WEBAPP_PREMIUM_DENIAL_EMAIL_FROM_NAME = '株式会社エコループ';
 var WEBAPP_PREMIUM_DENIAL_EMAIL_ALIAS_ERROR = 'info@ecoloop-loan.net がGmailの送信元エイリアスに登録されていないため、送信できません。Gmail設定で送信元アドレスを追加してください。';
+var WEBAPP_SALES_CONTRACT_STATUS_API_URL = 'https://cheap-real-estate-search.vercel.app/api/sales-contracts/loan-review-status';
+var WEBAPP_LOAN_REVIEW_API_SECRET_PROPERTY_KEY = 'LOAN_REVIEW_API_SECRET';
+var WEBAPP_SALES_CONTRACT_STATUS_BATCH_SIZE = 100;
 
 var WEBAPP_APPLICATION_TYPE_OPTIONS = ['仮審査申込', 'お問い合わせ'];
 var WEBAPP_ASSIGNEE_OPTIONS = ['高山', '中武', '嶋本', '直接入力'];
@@ -458,6 +461,7 @@ function getDashboardData() {
     }
     return b.rowNumber - a.rowNumber;
   });
+  attachSalesContractStatuses_(customers);
 
   return {
     customers: customers,
@@ -470,6 +474,112 @@ function getDashboardData() {
     marketFilterOptions: WEBAPP_BIKE_MARKET_FILTER_OPTIONS,
     needsSetup: hasMissingManagementColumns_(managementMap)
   };
+}
+
+function attachSalesContractStatuses_(customers) {
+  if (!customers || customers.length === 0) {
+    return;
+  }
+
+  var sourceRowKeys = uniqueCustomerRowKeys_(customers);
+  if (sourceRowKeys.length === 0) {
+    markSalesContractStatusesUnchecked_(customers, 'source_row_key_missing');
+    return;
+  }
+
+  var secret = String(PropertiesService.getScriptProperties().getProperty(WEBAPP_LOAN_REVIEW_API_SECRET_PROPERTY_KEY) || '').trim();
+  if (!secret) {
+    markSalesContractStatusesUnchecked_(customers, 'api_secret_not_configured');
+    return;
+  }
+
+  try {
+    var statusMap = fetchSalesContractStatusMap_(sourceRowKeys, secret);
+    customers.forEach(function(customer) {
+      var key = String(customer.rowKey || '').trim();
+      customer.salesContractStatus = buildSalesContractStatus_(statusMap[key] || null);
+    });
+  } catch (error) {
+    console.warn('Sales contract status lookup failed: ' + (error && error.message ? error.message : String(error)));
+    markSalesContractStatusesUnchecked_(customers, 'api_lookup_failed');
+  }
+}
+
+function uniqueCustomerRowKeys_(customers) {
+  var seen = {};
+  var keys = [];
+  customers.forEach(function(customer) {
+    var key = String(customer.rowKey || '').trim();
+    if (!key || seen[key]) {
+      return;
+    }
+    seen[key] = true;
+    keys.push(key);
+  });
+  return keys;
+}
+
+function fetchSalesContractStatusMap_(sourceRowKeys, secret) {
+  var statusMap = {};
+  for (var start = 0; start < sourceRowKeys.length; start += WEBAPP_SALES_CONTRACT_STATUS_BATCH_SIZE) {
+    var batch = sourceRowKeys.slice(start, start + WEBAPP_SALES_CONTRACT_STATUS_BATCH_SIZE);
+    var response = UrlFetchApp.fetch(WEBAPP_SALES_CONTRACT_STATUS_API_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'x-loan-review-secret': secret
+      },
+      payload: JSON.stringify({ sourceRowKeys: batch }),
+      muteHttpExceptions: true
+    });
+    var statusCode = Number(response.getResponseCode());
+    if (statusCode < 200 || statusCode >= 300) {
+      throw new Error('status API returned ' + statusCode);
+    }
+    var parsed = JSON.parse(response.getContentText() || '{}');
+    (parsed.items || []).forEach(function(item) {
+      var key = String(item.source_row_key || '').trim();
+      if (key) {
+        statusMap[key] = item;
+      }
+    });
+  }
+  return statusMap;
+}
+
+function buildSalesContractStatus_(item) {
+  if (!item) {
+    return {
+      state: 'unregistered',
+      registered: false,
+      label: '未登録',
+      status: '',
+      contractId: '',
+      url: ''
+    };
+  }
+  return {
+    state: 'registered',
+    registered: true,
+    label: String(item.label || '登録済'),
+    status: String(item.status || ''),
+    contractId: String(item.contract_id || ''),
+    url: String(item.url || '')
+  };
+}
+
+function markSalesContractStatusesUnchecked_(customers, reason) {
+  customers.forEach(function(customer) {
+    customer.salesContractStatus = {
+      state: 'unchecked',
+      registered: false,
+      label: '未確認',
+      status: '',
+      contractId: '',
+      url: '',
+      reason: reason || ''
+    };
+  });
 }
 
 function buildDisplayDuplicateKey_(customer) {

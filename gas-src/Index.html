@@ -139,6 +139,46 @@
         background: #dbeafe;
       }
 
+      .contract-status-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+        min-width: 94px;
+      }
+
+      .contract-status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid #d0d5dd;
+        background: #f9fafb;
+        color: #475467;
+        padding: 3px 7px;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .contract-status-badge.registered {
+        border-color: #abefc6;
+        background: #ecfdf3;
+        color: var(--green);
+      }
+
+      .contract-status-badge.unchecked {
+        border-color: #fedf89;
+        background: #fffaeb;
+        color: var(--amber);
+      }
+
+      .contract-status-badge.unregistered {
+        border-color: #d0d5dd;
+        background: #f9fafb;
+        color: #475467;
+      }
+
       button:disabled {
         cursor: wait;
         opacity: 0.65;
@@ -1648,7 +1688,8 @@
         initialLoanReviewApplied: false,
         saving: false
       };
-      const SALES_CONTRACT_REGISTRATION_URL = 'https://cheap-real-estate-search.vercel.app/admin/sales-contracts/new';
+      const SALES_CONTRACT_APP_URL = 'https://cheap-real-estate-search.vercel.app';
+      const SALES_CONTRACT_REGISTRATION_URL = `${SALES_CONTRACT_APP_URL}/admin/sales-contracts/new`;
       const QUICK_FILTERS = [
         { value: '', label: 'すべて', tone: 'blue' },
         { value: 'new', label: '新規受付', tone: 'blue' },
@@ -3004,7 +3045,7 @@
             <td>${callSummaryCellHtml(customer)}</td>
             <td>${badge(customer.review1)}</td>
             <td>${showAstReview ? badge(customer.review2) : ''}</td>
-            <td><button type="button" class="compact" data-contract-register="${escapeHtml(customer.rowKey)}">登録</button></td>
+            <td>${contractStatusCellHtml(customer)}</td>
           `;
           const registerButton = tr.querySelector('[data-contract-register]');
           if (registerButton) {
@@ -3049,10 +3090,11 @@
               ${summaryItem('次回対応日', nextActionBadgeHtml(nextAction), true)}
               ${summaryItem('プレミア依頼状況', badge(customer.review1), true)}
               ${showAstReview ? summaryItem('アスト依頼状況', badge(customer.review2), true) : summaryItem('アスト依頼状況', '対象外')}
+              ${summaryItem('契約管理', contractManagementSummaryHtml(customer), true)}
             </div>
             ${detailStatusBadgesHtml(customer, showAstReview)}
             <div class="detail-action-bar">
-              <button type="button" id="contractRegisterButton" class="${registrationState.canRegister ? 'contract-ready' : 'danger'}" ${registrationState.canRegister ? '' : 'disabled'}>契約管理へ登録</button>
+              <button type="button" id="contractRegisterButton" class="${registrationState.canRegister ? 'contract-ready' : 'danger'}" ${registrationState.canRegister ? '' : 'disabled'}>${escapeHtml(registrationState.buttonLabel || '契約管理へ登録')}</button>
               <button type="button" id="topMarketSearchButton" class="primary">相場取得</button>
               <button type="button" id="premiumRequestButton">プレミア審査依頼</button>
               <button type="button" id="astRequestButton" ${showAstReview ? '' : 'disabled'}>${showAstReview ? 'アスト審査依頼' : 'アスト対象外'}</button>
@@ -3369,25 +3411,83 @@
       }
 
       function salesContractRegistrationState(customer) {
+        const contractStatus = salesContractStatusInfo(customer);
+        if (contractStatus.registered) {
+          return {
+            canRegister: true,
+            registered: true,
+            buttonLabel: '契約管理を開く',
+            note: ''
+          };
+        }
         if (isResponseUnavailable(customer)) {
           return {
             canRegister: false,
+            registered: false,
+            buttonLabel: '契約管理へ登録',
             note: '対応不可または相談終了のため、契約管理へ登録できません。'
           };
         }
         if (isContractDeniedStatus(customer)) {
           return {
             canRegister: false,
+            registered: false,
+            buttonLabel: '契約管理へ登録',
             note: '否決ステータスのため、契約管理へ登録する前に対応状況を確認してください。'
           };
         }
         if (isSalesContractReady(customer)) {
-          return { canRegister: true, note: '' };
+          return {
+            canRegister: true,
+            registered: false,
+            buttonLabel: '契約管理へ登録',
+            note: contractStatus.state === 'unchecked' ? '登録済み確認は未実施です。重複登録に注意して契約管理システム側で確認してください。' : ''
+          };
         }
         return {
           canRegister: true,
-          note: '契約管理へ登録しても自動保存はされません。契約管理システム側で内容を確認してから保存してください。'
+          registered: false,
+          buttonLabel: '契約管理へ登録',
+          note: contractStatus.state === 'unchecked'
+            ? '登録済み確認は未実施です。重複登録に注意してください。契約管理へ登録しても自動保存はされません。'
+            : '契約管理へ登録しても自動保存はされません。契約管理システム側で内容を確認してから保存してください。'
         };
+      }
+
+      function salesContractStatusInfo(customer) {
+        const status = customer && customer.salesContractStatus ? customer.salesContractStatus : null;
+        const state = String(status && status.state ? status.state : 'unchecked');
+        return {
+          state,
+          registered: Boolean(status && status.registered),
+          label: String(status && status.label ? status.label : '未確認'),
+          status: String(status && status.status ? status.status : ''),
+          contractId: String(status && status.contractId ? status.contractId : ''),
+          url: String(status && status.url ? status.url : '')
+        };
+      }
+
+      function contractStatusCellHtml(customer) {
+        const status = salesContractStatusInfo(customer);
+        const registrationState = salesContractRegistrationState(customer);
+        const disabled = registrationState.canRegister ? '' : ' disabled';
+        const buttonLabel = status.registered ? '開く' : '登録';
+        return `
+          <div class="contract-status-cell">
+            ${contractStatusBadgeHtml(status)}
+            <button type="button" class="compact" data-contract-register="${escapeHtml(customer.rowKey)}"${disabled}>${buttonLabel}</button>
+          </div>
+        `;
+      }
+
+      function contractManagementSummaryHtml(customer) {
+        return contractStatusBadgeHtml(salesContractStatusInfo(customer));
+      }
+
+      function contractStatusBadgeHtml(status) {
+        const state = status && status.state ? status.state : 'unchecked';
+        const className = state === 'registered' ? 'registered' : state === 'unregistered' ? 'unregistered' : 'unchecked';
+        return `<span class="contract-status-badge ${className}">${escapeHtml(status && status.label ? status.label : '未確認')}</span>`;
       }
 
       function isContractDeniedStatus(customer) {
@@ -3445,11 +3545,34 @@
           showToast(registrationState.note || 'この顧客は契約管理へ登録できません。');
           return;
         }
+        if (registrationState.registered) {
+          openSalesContractDetail(customer);
+          return;
+        }
         const url = buildSalesContractRegistrationUrl(customer);
         const opened = window.open(url, '_blank', 'noopener');
         if (!opened) {
           showToast('契約管理システムを開けませんでした。ポップアップ許可を確認してください。');
         }
+      }
+
+      function openSalesContractDetail(customer) {
+        const url = salesContractDetailUrl(customer);
+        const opened = window.open(url, '_blank', 'noopener');
+        if (!opened) {
+          showToast('契約管理システムを開けませんでした。ポップアップ許可を確認してください。');
+        }
+      }
+
+      function salesContractDetailUrl(customer) {
+        const status = salesContractStatusInfo(customer);
+        if (status.url) {
+          return status.url.indexOf('http') === 0 ? status.url : `${SALES_CONTRACT_APP_URL}${status.url}`;
+        }
+        if (status.contractId) {
+          return `${SALES_CONTRACT_APP_URL}/admin/sales-contracts/${encodeURIComponent(status.contractId)}`;
+        }
+        return SALES_CONTRACT_APP_URL + '/admin/sales-contracts';
       }
 
       function buildSalesContractRegistrationUrl(customer) {

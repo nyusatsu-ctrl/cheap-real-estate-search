@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { sampleProperties } from "@/lib/sample-data";
 import { getRegionPrefectures } from "@/lib/property-filters";
 import type { Property, PropertyFilters, PropertyLocationOption, PropertySort } from "@/lib/types";
@@ -12,7 +12,7 @@ type PropertyQuery<T> = {
 };
 
 export async function getPublishedProperties(filters: PropertyFilters = {}) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createPropertyReadClient();
 
   if (!supabase) {
     return getFallbackPublishedProperties(filters);
@@ -44,7 +44,7 @@ export async function getAdminPropertyLocations() {
 }
 
 async function getPropertyLocations({ publishedOnly }: { publishedOnly: boolean }): Promise<PropertyLocationOption[]> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createPropertyReadClient();
 
   if (!supabase) {
     return uniqueLocations(publishedOnly ? sampleProperties.filter((property) => property.status === "published") : sampleProperties);
@@ -77,7 +77,7 @@ function applyServerFilters<T extends PropertyQuery<T>>(query: T, filters: Prope
 }
 
 export async function getPublishedProperty(id: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createPropertyReadClient();
 
   if (!supabase) {
     const property = sampleProperties.find((candidate) => candidate.id === id && candidate.status === "published");
@@ -96,36 +96,63 @@ export async function getPublishedProperty(id: string) {
 }
 
 export async function getAdminProperties(filters: PropertyFilters = {}) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createPropertyReadClient();
   if (!supabase) return sortProperties(filterProperties(sampleProperties, filters), filters.sort);
 
-  let query = supabase
-    .from("properties")
-    .select("*, property_sources(name, website_url)");
-
-  query = applyServerFilters(query, filters);
-  query = applyServerSort(query, filters.sort);
-
-  const { data, error } = await query;
+  let { data, error } = await fetchAdminProperties(supabase, filters, { includeSources: true });
+  if (error && isOptionalSourceRelationError(error)) {
+    ({ data, error } = await fetchAdminProperties(supabase, filters, { includeSources: false }));
+  }
   if (error) {
     logPropertyQueryError("admin properties", error);
     return sortProperties(filterProperties(sampleProperties, filters), filters.sort);
   }
-  return sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort);
+  return sortProperties(filterProperties((data ?? []) as unknown as Property[], filters), filters.sort);
 }
 
 export async function getAdminProperty(id: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createPropertyReadClient();
   if (!supabase) return sampleProperties.find((property) => property.id === id) ?? null;
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("properties")
     .select("*, property_sources(name, website_url)")
     .eq("id", id)
     .single();
 
+  if (error && isOptionalSourceRelationError(error)) {
+    ({ data, error } = await supabase
+      .from("properties")
+      .select("*")
+      .eq("id", id)
+      .single());
+  }
+
   if (error) return null;
   return data as Property;
+}
+
+async function createPropertyReadClient() {
+  return createSupabaseServiceRoleClient() ?? await createSupabaseServerClient();
+}
+
+async function fetchAdminProperties(
+  supabase: NonNullable<Awaited<ReturnType<typeof createPropertyReadClient>>>,
+  filters: PropertyFilters,
+  { includeSources }: { includeSources: boolean }
+) {
+  let query = supabase
+    .from("properties")
+    .select(includeSources ? "*, property_sources(name, website_url)" : "*");
+
+  query = applyServerFilters(query, filters);
+  query = applyServerSort(query, filters.sort);
+
+  return query;
+}
+
+function isOptionalSourceRelationError(error: { message?: string }) {
+  return /property_sources|relationship|schema cache/i.test(error.message ?? "");
 }
 
 function filterProperties(properties: Property[], filters: PropertyFilters) {

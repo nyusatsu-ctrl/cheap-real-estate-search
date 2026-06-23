@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { CrawlerCandidateActions } from "@/components/CrawlerCandidateActions";
+import { PropertyAdminSummaryCards } from "@/components/PropertyAdminSummaryCards";
 import { PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_TYPE_LABELS, STATUS_LABELS } from "@/lib/constants";
 import {
   getCrawlerCandidateLocations,
@@ -10,6 +11,7 @@ import {
   type CrawlerCandidateSearchParams
 } from "@/lib/crawler-candidates";
 import { formatArea, formatPrice } from "@/lib/format";
+import { getPropertyAdminSummary } from "@/lib/property-admin-summary";
 import { getCityOptions, getRegionPrefectures } from "@/lib/property-filters";
 import { requireAdmin } from "@/lib/admin";
 
@@ -44,7 +46,11 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
   const admin = await requireAdmin();
   const resolvedSearchParams = await searchParams;
   const filters = normalizeCrawlerCandidateFilters(resolvedSearchParams);
-  const [candidates, locations] = await Promise.all([getCrawlerCandidates({ ...filters, source: undefined }), getCrawlerCandidateLocations()]);
+  const [candidates, locations, summary] = await Promise.all([
+    getCrawlerCandidates({ ...filters, source: undefined }),
+    getCrawlerCandidateLocations(),
+    getPropertyAdminSummary()
+  ]);
   const prefectures = getRegionPrefectures(filters.region);
   const cities = getCityOptions(locations, filters.region, filters.prefecture);
   const returnTo = buildReturnTo(resolvedSearchParams);
@@ -57,6 +63,8 @@ export default async function CrawlerCandidatesPage({ searchParams }: { searchPa
           取込済みの候補物件を確認し、管理者判断で公開・非公開維持・却下を行います。自動公開はしません。
         </p>
       </div>
+
+      <PropertyAdminSummaryCards summary={summary} />
 
       <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <form action="/admin/crawler-candidates">
@@ -254,7 +262,7 @@ function crawlStatusLabel(value?: string | null) {
 }
 
 function sourceName(candidate: CrawlerCandidate) {
-  return candidate.property_crawl_sources?.name ?? candidate.property_sources?.name ?? "-";
+  return candidate.property_crawl_sources?.name ?? "-";
 }
 
 function formatList(value?: string[] | null) {

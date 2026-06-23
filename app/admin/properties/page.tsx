@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
+import { PropertyAdminSummaryCards } from "@/components/PropertyAdminSummaryCards";
 import { SearchFilters } from "@/components/SearchFilters";
 import { STATUS_LABELS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatDate, formatPrice } from "@/lib/format";
 import { getCurrentAdmin } from "@/lib/admin";
+import { getPropertyAdminSummary } from "@/lib/property-admin-summary";
 import { normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
 import { getAdminProperties, getAdminPropertyLocations } from "@/lib/properties";
 
@@ -26,10 +28,11 @@ export default async function AdminPropertiesPage({ searchParams }: { searchPara
   }
 
   const filters = normalizePropertyFilters(resolvedSearchParams);
-  const [properties, locations] = await Promise.all([getAdminProperties(filters), getAdminPropertyLocations()]);
+  const [properties, locations, summary] = await Promise.all([getAdminProperties(filters), getAdminPropertyLocations(), getPropertyAdminSummary()]);
 
   return (
     <AdminShell email={admin.email}>
+      <PropertyAdminSummaryCards summary={summary} />
       <div className="mb-4">
         <SearchFilters
           action="/admin/properties"

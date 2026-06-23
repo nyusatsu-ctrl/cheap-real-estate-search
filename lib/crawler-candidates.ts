@@ -166,8 +166,7 @@ async function getRawCrawlerCandidates(): Promise<CrawlerCandidate[]> {
         "remarks",
         "created_at",
         "updated_at",
-        "property_crawl_sources(source_key, name)",
-        "property_sources(name, website_url)"
+        "property_crawl_sources(source_key, name)"
       ].join(",")
     )
     .order("updated_at", { ascending: false })

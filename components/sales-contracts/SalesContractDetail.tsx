@@ -46,7 +46,9 @@ export function SalesContractDetail({
   const nextAction = getNextAction(item.contactHistories);
   const hasSourceInfo = Boolean(item.contract.source_system || item.contract.source_row_key || item.contract.source_row_number || item.contract.source_received_at);
   const isLoanReviewSource = item.contract.source_system === "gas_loan_review";
-  const missingContractTerms = isLoanReviewSource ? getMissingContractTerms(item) : [];
+  const missingContractTerms = getMissingContractTerms(item);
+  const shouldShowFormalContractCard =
+    isFormalPendingStatus(item.contract.status) && (missingContractTerms.length > 0 || isLoanReviewSource);
 
   return (
     <div className="space-y-5">
@@ -81,7 +83,7 @@ export function SalesContractDetail({
 
       {item.contract.contract_type === "lease" ? <LeaseMaturityNavigationCard item={item} /> : null}
 
-      {missingContractTerms.length > 0 ? <ContractTermsWarning fields={missingContractTerms} /> : null}
+      {shouldShowFormalContractCard ? <FormalContractProgressCard item={item} fields={missingContractTerms} /> : null}
 
       {isLoanReviewSource ? <LoanReviewSourceCard item={item} /> : null}
 
@@ -299,19 +301,55 @@ function ContractCreatedActions({
   );
 }
 
-function ContractTermsWarning({ fields }: { fields: Array<{ key: string; message: string }> }) {
+function FormalContractProgressCard({
+  item,
+  fields
+}: {
+  item: SalesContractDetailType;
+  fields: Array<{ key: string; message: string }>;
+}) {
   return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
-      <p className="text-sm font-black text-amber-800">契約条件未確定</p>
-      <h3 className="mt-1 text-xl font-black text-amber-950">契約条件を確定してください</h3>
-      <p className="mt-2 text-sm font-semibold text-amber-900">
-        自社ローン審査管理から契約候補として保存されています。正式契約前に下記項目を確認してください。
-      </p>
-      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-bold text-amber-900">
-        {fields.map((field) => <li key={field.key}>{field.message}</li>)}
-      </ul>
+    <section className="rounded-lg border border-violet-200 bg-violet-50 p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-black text-violet-800">正式契約へ進める</p>
+          <h3 className="mt-1 text-xl font-black text-violet-950">この契約はまだ契約候補です</h3>
+          <p className="mt-2 text-sm font-semibold text-violet-900">
+            車種、契約金額、支払回数、月額、支払開始日などを確定してください。
+          </p>
+        </div>
+        <Badge className={getStatusClass(item.contract.status)}>
+          {CONTRACT_STATUS_LABELS[item.contract.status]}
+        </Badge>
+      </div>
+      <div className="mt-4 rounded border border-violet-100 bg-white px-4 py-3">
+        <p className="text-sm font-black text-slate-950">未入力項目</p>
+        {fields.length > 0 ? (
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-bold text-violet-900">
+            {fields.map((field) => <li key={field.key}>{field.message}</li>)}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            必須項目は入力済みです。契約内容を確認し、契約ステータスを正式な状態へ変更してください。
+          </p>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="#contract-edit" className="rounded bg-violet-700 px-4 py-2 text-sm font-bold text-white shadow-sm focus-ring">
+          契約情報を編集して正式契約へ進める
+        </Link>
+        {item.contract.source_system === "gas_loan_review" ? (
+          <Link href={buildLoanReviewReturnUrl(item)} target="_blank" rel="noopener noreferrer" className="rounded border border-violet-300 bg-white px-4 py-2 text-sm font-bold text-violet-800 focus-ring">
+            自社ローン審査管理へ戻る
+          </Link>
+        ) : null}
+      </div>
     </section>
   );
+}
+
+function isFormalPendingStatus(value: SalesContractStatus) {
+  return value === "contract_candidate" || value === "terms_pending";
 }
 
 function getMissingContractTerms(item: SalesContractDetailType) {

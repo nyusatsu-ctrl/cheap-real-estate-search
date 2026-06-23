@@ -70,7 +70,7 @@ export default async function SalesContractDetailPage({
         {result.data.contract.contract_type === "lease" ? (
           <LeaseMaturityCard detail={result.data} action={upsertLeaseMaturityAction} historyAction={addLeaseMaturityHistoryAction} />
         ) : null}
-        <section>
+        <section id="contract-edit">
           <h2 className="mb-3 text-xl font-black text-slate-950">編集</h2>
           <SalesContractForm mode="edit" action={updateSalesContractAction} detail={result.data} />
         </section>

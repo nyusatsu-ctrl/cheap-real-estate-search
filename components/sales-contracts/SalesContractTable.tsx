@@ -96,6 +96,9 @@ export function SalesContractTable({
                     <Badge className={getStatusClass(item.contract.status)}>
                       {CONTRACT_STATUS_LABELS[item.contract.status]}
                     </Badge>
+                    {isUnconfirmedContractStatus(item.contract.status) ? (
+                      <p className="mt-1 text-xs font-bold text-violet-700">未確定</p>
+                    ) : null}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
                     <NextActionDate value={nextActionDate} />
@@ -201,6 +204,10 @@ function getStatusClass(value: SalesContractListItem["contract"]["status"]) {
   if (value === "waiting_delivery" || value === "payoff_scheduled") return "bg-amber-50 text-amber-800";
   if (value === "paid_off" || value === "lease_ended" || value === "delivered" || value === "completed") return "bg-slate-100 text-slate-700";
   return "bg-teal-50 text-teal-800";
+}
+
+function isUnconfirmedContractStatus(value: SalesContractListItem["contract"]["status"]) {
+  return value === "contract_candidate" || value === "terms_pending";
 }
 
 function getNextActionClass(value: string) {

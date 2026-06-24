@@ -5,8 +5,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "契約管理システム 管理者ログイン",
-  description: "契約台帳、顧客、車両、ローン、リース、満期管理を管理するためのログイン画面です。"
+  title: "管理者ログイン｜建設業売上アップ診断｜株式会社エコループ",
+  description: "建設業売上アップ診断の診断者一覧、リード対応状況、診断詳細を管理するためのログイン画面です。"
 };
 
 type AdminLoginSearchParams = {
@@ -19,7 +19,7 @@ type AdminLoginSearchParams = {
 
 function safeLoginRedirectPath(value: string | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/admin/login")) {
-    return "/admin/sales-contracts";
+    return "/admin/diagnoses";
   }
   return value;
 }
@@ -30,10 +30,18 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <EcoloopAdminBrand showSystemName={false} logoClassName="h-10" textClassName="text-base" priority />
-        <p className="mt-4 text-sm font-bold text-brand-700">契約管理システム</p>
+        <EcoloopAdminBrand
+          showSystemName={false}
+          logoSrc="/images/ecoloop-sales-diagnosis-logo.png"
+          logoWidth={1914}
+          logoHeight={822}
+          logoClassName="h-12"
+          textClassName="text-base"
+          priority
+        />
+        <p className="mt-4 text-sm font-bold text-brand-700">建設業売上アップ診断</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
-        <p className="mt-2 text-sm text-slate-600">契約台帳、顧客、車両、ローン、リース、満期管理を管理するアカウントでログインしてください。</p>
+        <p className="mt-2 text-sm text-slate-600">診断者一覧、リード対応状況、診断詳細を管理するアカウントでログインしてください。</p>
         {!hasSupabaseEnv() ? (
           <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Supabase 環境変数が未設定です。.env.local を設定するとログインできます。

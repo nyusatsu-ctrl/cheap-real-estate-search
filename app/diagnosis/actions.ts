@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import {
   DIAGNOSIS_QUESTIONS,
   SUPPLEMENTAL_ANSWER_FIELDS,
+  type DiagnosisAnswerMap,
   getDiagnosisClient,
+  getAnswerString,
   normalizeLeadSource,
   normalizeSeminarInterest,
   scoreDiagnosis
@@ -29,13 +31,39 @@ function requiredString(formData: FormData, key: string, label: string, fieldErr
   return value;
 }
 
+function getAllowedQuestionValues(question: (typeof DIAGNOSIS_QUESTIONS)[number]) {
+  return new Set(question.options?.map((option) => option.value) ?? []);
+}
+
+function answerHasTriggerValue(value: DiagnosisAnswerMap[string], triggerValues: string[] | undefined) {
+  if (!triggerValues || triggerValues.length === 0) return false;
+  const values = Array.isArray(value) ? value : [value];
+  return values.some((candidate) => triggerValues.includes(String(candidate ?? "")));
+}
+
 export async function submitConstructionDiagnosisAction(_previousState: DiagnosisFormState, formData: FormData): Promise<DiagnosisFormState> {
   const fieldErrors: Record<string, string> = {};
-  const answers: Record<string, string> = {};
+  const answers: DiagnosisAnswerMap = {};
 
   for (const question of DIAGNOSIS_QUESTIONS) {
+    const allowedValues = getAllowedQuestionValues(question);
+
+    if (question.type === "checkbox") {
+      const values = Array.from(new Set(
+        formData
+          .getAll(question.key)
+          .map((value) => String(value ?? "").trim())
+          .filter((value) => value && allowedValues.has(value))
+      ));
+      if (values.length === 0) fieldErrors[question.key] = `${question.label}を1つ以上選択してください`;
+      answers[question.key] = values;
+      continue;
+    }
+
     const value = getString(formData, question.key);
-    if (!value) fieldErrors[question.key] = `${question.label}を選択してください`;
+    if (!value || (allowedValues.size > 0 && !allowedValues.has(value))) {
+      fieldErrors[question.key] = `${question.label}を選択してください`;
+    }
     answers[question.key] = value;
   }
 
@@ -43,7 +71,7 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
     const value = getString(formData, field.key);
     const isTriggered = Boolean(
       field.triggerQuestion
-      && field.triggerValues?.includes(answers[field.triggerQuestion])
+      && answerHasTriggerValue(answers[field.triggerQuestion], field.triggerValues)
     );
     if (isTriggered && field.requiredWhenTriggered && !value) {
       setRequiredError(fieldErrors, field.key, field.label);
@@ -71,6 +99,7 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
 
   const supabase = await getDiagnosisClient();
   if (!supabase) {
+    console.error("Construction diagnosis submit failed: Supabase client is not configured.");
     return {
       formError: "診断結果を保存できませんでした。時間をおいて再度お試しください。",
       fieldErrors: {}
@@ -88,9 +117,9 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
       scores,
       main_type: mainType,
       sub_type: subType,
-      business_type: answers.business_type,
-      monthly_sales: answers.monthly_sales,
-      wants_consultation: answers.wants_consultation,
+      business_type: getAnswerString(answers.business_type),
+      monthly_sales: getAnswerString(answers.monthly_sales),
+      wants_consultation: getAnswerString(answers.wants_consultation),
       lead_source: leadSource,
       source_campaign: sourceCampaign,
       seminar_interest: seminarInterest,
@@ -100,6 +129,12 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
     .single();
 
   if (error || !data) {
+    console.error("Construction diagnosis insert failed.", {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint
+    });
     return {
       formError: "診断結果を保存できませんでした。時間をおいて再度お試しください。",
       fieldErrors: {}

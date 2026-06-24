@@ -2,7 +2,7 @@ import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/l
 
 export type DiagnosisTypeCode = "A" | "B" | "C" | "D" | "E" | "F" | "G";
 export type LeadSource = "aidma" | "meta" | "lp" | "referral" | "direct" | "other";
-export type SeminarInterest = "wants_to_join" | "wants_schedule" | "wants_materials" | "undecided" | "not_interested";
+export type SeminarInterest = "wants_to_join" | "wants_schedule" | "undecided" | "not_interested";
 export type LeadStatus =
   | "new"
   | "call_scheduled"
@@ -37,6 +37,8 @@ export type DiagnosisAnswerKey =
   | "increase_within_90_days"
   | "wants_consultation";
 
+export type DiagnosisAnswerValue = string | string[];
+export type DiagnosisAnswerMap = Record<string, DiagnosisAnswerValue>;
 export type ScoreMap = Partial<Record<DiagnosisTypeCode, number>>;
 
 export type DiagnosisOption = {
@@ -57,7 +59,7 @@ export type SupplementalAnswerField = {
 export type DiagnosisQuestion = {
   key: DiagnosisAnswerKey;
   label: string;
-  type: "radio" | "textarea";
+  type: "radio" | "checkbox" | "textarea";
   options?: DiagnosisOption[];
 };
 
@@ -67,7 +69,7 @@ export type ConstructionDiagnosis = {
   company_name: string | null;
   phone: string | null;
   email: string;
-  answers: Record<string, string>;
+  answers: DiagnosisAnswerMap;
   scores: Record<DiagnosisTypeCode, number>;
   main_type: DiagnosisTypeCode;
   sub_type: DiagnosisTypeCode;
@@ -107,7 +109,7 @@ export type PublicWorksRoutePlan = {
 };
 
 type PublicWorksRouteInput = {
-  answers: Record<string, string>;
+  answers: DiagnosisAnswerMap;
   main_type?: DiagnosisTypeCode;
   wants_consultation?: string | null;
   seminar_interest?: string | null;
@@ -206,7 +208,6 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
 export const SEMINAR_INTEREST_LABELS: Record<SeminarInterest, string> = {
   wants_to_join: "無料説明会に参加したい",
   wants_schedule: "日程が合えば参加したい",
-  wants_materials: "まずは資料だけ見たい",
   undecided: "未定",
   not_interested: "今は希望しない"
 };
@@ -444,7 +445,7 @@ export const DIAGNOSIS_QUESTIONS: DiagnosisQuestion[] = [
   {
     key: "biggest_problem",
     label: "今一番困っていること",
-    type: "radio",
+    type: "checkbox",
     options: [
       { value: "no_leads", label: "新規の仕事が増えない", scores: { E: 4 } },
       { value: "low_profit", label: "利益が残らない", scores: { D: 4 } },
@@ -606,7 +607,7 @@ const FALLBACK_ANSWER_LABELS: Record<string, Record<string, string>> = {
 
 const TYPE_ORDER: DiagnosisTypeCode[] = ["A", "B", "C", "D", "E", "F", "G"];
 const LEAD_SOURCE_VALUES = new Set<LeadSource>(["aidma", "meta", "lp", "referral", "direct", "other"]);
-const SEMINAR_INTEREST_VALUES = new Set<SeminarInterest>(["wants_to_join", "wants_schedule", "wants_materials", "undecided", "not_interested"]);
+const SEMINAR_INTEREST_VALUES = new Set<SeminarInterest>(["wants_to_join", "wants_schedule", "undecided", "not_interested"]);
 const LEAD_STATUS_VALUES = new Set<LeadStatus>([
   "new",
   "call_scheduled",
@@ -620,14 +621,17 @@ const LEAD_STATUS_VALUES = new Set<LeadStatus>([
   "unreachable"
 ]);
 
-export function scoreDiagnosis(answers: Record<string, string>) {
+export function scoreDiagnosis(answers: DiagnosisAnswerMap) {
   const scores = Object.fromEntries(TYPE_ORDER.map((type) => [type, 0])) as Record<DiagnosisTypeCode, number>;
 
   for (const question of DIAGNOSIS_QUESTIONS) {
-    const option = question.options?.find((candidate) => candidate.value === answers[question.key]);
-    if (!option) continue;
-    for (const [type, score] of Object.entries(option.scores) as [DiagnosisTypeCode, number][]) {
-      scores[type] += score;
+    const values = getAnswerValues(answers[question.key]);
+    for (const value of values) {
+      const option = question.options?.find((candidate) => candidate.value === value);
+      if (!option) continue;
+      for (const [type, score] of Object.entries(option.scores) as [DiagnosisTypeCode, number][]) {
+        scores[type] += score;
+      }
     }
   }
 
@@ -639,9 +643,11 @@ export function scoreDiagnosis(answers: Record<string, string>) {
   };
 }
 
-export function getAnswerLabel(key: string, value: string) {
+export function getAnswerLabel(key: string, value: DiagnosisAnswerValue | null | undefined): string {
+  if (Array.isArray(value)) return value.map((item) => getAnswerLabel(key, item)).join("、");
+  const normalizedValue = String(value ?? "");
   const question = DIAGNOSIS_QUESTIONS.find((candidate) => candidate.key === key);
-  return question?.options?.find((option) => option.value === value)?.label ?? FALLBACK_ANSWER_LABELS[key]?.[value] ?? value;
+  return question?.options?.find((option) => option.value === normalizedValue)?.label ?? FALLBACK_ANSWER_LABELS[key]?.[normalizedValue] ?? normalizedValue;
 }
 
 export function getQuestionLabel(key: string) {
@@ -654,14 +660,28 @@ export function getSupplementalFieldsForQuestion(key: DiagnosisAnswerKey) {
   return SUPPLEMENTAL_ANSWER_FIELDS.filter((field) => field.triggerQuestion === key);
 }
 
-export function getSupplementalAnswerEntries(answers: Record<string, string>) {
+export function getSupplementalAnswerEntries(answers: DiagnosisAnswerMap) {
   return SUPPLEMENTAL_ANSWER_FIELDS
     .map((field) => ({
       key: field.key,
       label: field.label,
-      value: answers[field.key]?.trim() ?? ""
+      value: formatAnswerValue(answers[field.key]).trim()
     }))
     .filter((entry) => entry.value);
+}
+
+export function getAnswerValues(value: DiagnosisAnswerValue | null | undefined) {
+  if (Array.isArray(value)) return value.map((item) => item.trim()).filter(Boolean);
+  const normalizedValue = String(value ?? "").trim();
+  return normalizedValue ? [normalizedValue] : [];
+}
+
+export function getAnswerString(value: DiagnosisAnswerValue | null | undefined) {
+  return getAnswerValues(value)[0] ?? "";
+}
+
+export function formatAnswerValue(value: DiagnosisAnswerValue | null | undefined) {
+  return getAnswerValues(value).join("、");
 }
 
 export function normalizeLeadSource(value: string | null | undefined): LeadSource {
@@ -694,25 +714,25 @@ export function getLeadStatusLabel(value: string | null | undefined) {
 
 export function getPublicWorksRoutePlan(diagnosis: PublicWorksRouteInput): PublicWorksRoutePlan {
   const answers = diagnosis.answers;
-  const licenseStatus = answers.license_status ?? "";
-  const publicWorksInterest = answers.public_works_interest ?? "";
-  const biggestProblem = answers.biggest_problem ?? "";
+  const licenseStatus = getAnswerString(answers.license_status);
+  const publicWorksInterest = getAnswerString(answers.public_works_interest);
+  const biggestProblems = getAnswerValues(answers.biggest_problem);
   const hasLicense = ["licensed", "yes"].includes(licenseStatus);
   const wantsLicense = ["preparing", "want"].includes(licenseStatus);
   const highPublicInterest = ["high", "conditional", "researching", "already", "medium"].includes(publicWorksInterest)
-    || biggestProblem === "want_public"
+    || biggestProblems.includes("want_public")
     || diagnosis.main_type === "C";
   const lowPublicInterest = publicWorksInterest === "low";
-  const hasSalesIssue = biggestProblem === "no_leads"
-    || ["none", "do_not_know", "sometimes"].includes(answers.sales_activity ?? "")
-    || ["none", "exists", "not_updated"].includes(answers.website_status ?? "")
-    || ["none", "not_used", "basic"].includes(answers.google_maps_status ?? "")
-    || ["one", "two_three"].includes(answers.client_count ?? "");
+  const hasSalesIssue = biggestProblems.includes("no_leads")
+    || ["none", "do_not_know", "sometimes"].includes(getAnswerString(answers.sales_activity))
+    || ["none", "exists", "not_updated"].includes(getAnswerString(answers.website_status))
+    || ["none", "not_used", "basic"].includes(getAnswerString(answers.google_maps_status))
+    || ["one", "two_three"].includes(getAnswerString(answers.client_count));
   const hasPermitBarrier = wantsLicense
     || (!hasLicense && licenseStatus !== "no_plan")
-    || ["sole_solo"].includes(answers.business_form ?? "")
-    || ["owner_small", "other", "none"].includes(answers.team_status ?? "")
-    || biggestProblem === "business_unclear";
+    || ["sole_solo"].includes(getAnswerString(answers.business_form))
+    || ["owner_small", "other", "none"].includes(getAnswerString(answers.team_status))
+    || biggestProblems.includes("business_unclear");
 
   let routeTitle: string;
   let routeSummary: string;
@@ -833,7 +853,7 @@ export function getPublicWorksRoutePlan(diagnosis: PublicWorksRouteInput): Publi
     highPublicInterest,
     lowPublicInterest,
     hasSalesIssue,
-    wantsConsultation: diagnosis.wants_consultation ?? answers.wants_consultation,
+    wantsConsultation: diagnosis.wants_consultation ?? getAnswerString(answers.wants_consultation),
     seminarInterest: diagnosis.seminar_interest
   });
 
@@ -883,7 +903,7 @@ function buildPlatformSuggestions({
   if (hasSalesIssue || lowPublicInterest) {
     add("見込み客管理platformで、問い合わせ・紹介・営業先の対応漏れを減らす");
   }
-  if (["yes", "maybe", "overview"].includes(wantsConsultation ?? "") || ["wants_to_join", "wants_schedule", "wants_materials"].includes(seminarInterest ?? "")) {
+  if (["yes", "maybe", "overview"].includes(wantsConsultation ?? "") || ["wants_to_join", "wants_schedule"].includes(seminarInterest ?? "")) {
     add("説明会参加者・個別相談者の管理で、次回連絡と提案状況を整理する");
   }
   add("ステータス管理、メモ、CSV出力、流入元分析で、営業リードと案件対応の状況を見える化する");

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import type { FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { submitConstructionDiagnosisAction, type DiagnosisFormState } from "@/app/diagnosis/actions";
 import { DiagnosisQuestionField } from "@/components/diagnoses/DiagnosisQuestionField";
@@ -22,7 +23,7 @@ type SupplementalAnswerField = {
 export type DiagnosisFormQuestion = {
   key: string;
   label: string;
-  type: "radio" | "textarea";
+  type: "radio" | "checkbox" | "textarea";
   options?: DiagnosisQuestionOption[];
   supplementalFields: SupplementalAnswerField[];
 };
@@ -40,22 +41,63 @@ const INITIAL_STATE: DiagnosisFormState = {
 const SEMINAR_INTEREST_CHOICES = [
   { value: "wants_to_join", label: "無料説明会に参加したい" },
   { value: "wants_schedule", label: "日程が合えば参加したい" },
-  { value: "wants_materials", label: "まずは資料だけ見たい" },
   { value: "not_interested", label: "今は希望しない" }
 ];
 
 export function DiagnosisForm({ leadSource, campaign, questions }: DiagnosisFormProps) {
   const [state, formAction] = useActionState(submitConstructionDiagnosisAction, INITIAL_STATE);
-  const fieldErrors = state.fieldErrors ?? {};
+  const [clientFormError, setClientFormError] = useState("");
+  const [clientFieldErrors, setClientFieldErrors] = useState<Record<string, string>>({});
+  const fieldErrors = { ...(state.fieldErrors ?? {}), ...clientFieldErrors };
+  const formError = clientFormError || state.formError;
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const formData = new FormData(event.currentTarget);
+    const nextFieldErrors: Record<string, string> = {};
+
+    for (const question of questions) {
+      if (question.type === "checkbox") {
+        const selectedValues = formData.getAll(question.key).map((value) => String(value).trim()).filter(Boolean);
+        if (selectedValues.length === 0) {
+          nextFieldErrors[question.key] = `${question.label}を1つ以上選択してください`;
+        }
+        for (const field of question.supplementalFields) {
+          const isTriggered = Boolean(field.triggerValues?.some((triggerValue) => selectedValues.includes(triggerValue)));
+          if (isTriggered && field.requiredWhenTriggered && !String(formData.get(field.key) ?? "").trim()) {
+            nextFieldErrors[field.key] = `${field.label}を入力してください`;
+          }
+        }
+        continue;
+      }
+
+      const selectedValue = String(formData.get(question.key) ?? "").trim();
+      for (const field of question.supplementalFields) {
+        const isTriggered = Boolean(field.triggerValues?.includes(selectedValue));
+        if (isTriggered && field.requiredWhenTriggered && !String(formData.get(field.key) ?? "").trim()) {
+          nextFieldErrors[field.key] = `${field.label}を入力してください`;
+        }
+      }
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      event.preventDefault();
+      setClientFormError("未入力の項目があります。赤字の項目を確認してください。");
+      setClientFieldErrors(nextFieldErrors);
+      return;
+    }
+
+    setClientFormError("");
+    setClientFieldErrors({});
+  };
 
   return (
-    <form action={formAction} className="mx-auto max-w-5xl px-4 py-8">
+    <form action={formAction} onSubmit={handleSubmit} className="mx-auto max-w-5xl px-4 py-8">
       <input type="hidden" name="lead_source" value={leadSource} />
       <input type="hidden" name="source_campaign" value={campaign} />
 
-      {state.formError ? (
+      {formError ? (
         <div className="mb-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800" role="alert" aria-live="polite">
-          {state.formError}
+          {formError}
         </div>
       ) : null}
 

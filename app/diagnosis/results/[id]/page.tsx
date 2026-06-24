@@ -70,7 +70,7 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
             診断結果をもとに、オープンカウンターから始めるべきか、建設業許可・経審・全省庁資格まで進めるべきかを整理できます。
           </p>
           <a
-            href={`mailto:${diagnosis.email}?subject=${encodeURIComponent("格安不動産サーチの個別相談")}`}
+            href={`mailto:${diagnosis.email}?subject=${encodeURIComponent("建設業売上アップ診断の個別相談")}`}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded bg-brand-700 px-4 py-3 text-sm font-black text-white focus-ring"
           >
             メールで相談する

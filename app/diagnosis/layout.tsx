@@ -1,8 +1,21 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "格安不動産サーチ",
-  description: "現在の受注状況、集客、利益管理、組織体制などから、売上アップに向けた優先課題と改善タイプを自動判定します。"
+  title: "建設業売上アップ診断｜株式会社エコループ",
+  description: "建設会社の現状を診断し、売上アップ・公共工事参入・経営改善に向けた優先課題とサポート内容を提案します。",
+  openGraph: {
+    title: "建設業売上アップ診断｜株式会社エコループ",
+    description: "建設会社の現状を診断し、売上アップ・公共工事参入・経営改善に向けた優先課題とサポート内容を提案します。",
+    siteName: "株式会社エコループ",
+    images: [
+      {
+        url: "/images/ecoloop-sales-diagnosis-logo.png",
+        width: 1914,
+        height: 822,
+        alt: "株式会社エコループ 建設業売上アップ診断"
+      }
+    ]
+  }
 };
 
 export default function DiagnosisLayout({ children }: { children: React.ReactNode }) {

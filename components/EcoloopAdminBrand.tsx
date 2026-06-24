@@ -2,6 +2,11 @@ import Image from "next/image";
 
 type EcoloopAdminBrandProps = {
   showSystemName?: boolean;
+  systemName?: string;
+  logoSrc?: string;
+  logoAlt?: string;
+  logoWidth?: number;
+  logoHeight?: number;
   className?: string;
   logoClassName?: string;
   textClassName?: string;
@@ -10,6 +15,11 @@ type EcoloopAdminBrandProps = {
 
 export function EcoloopAdminBrand({
   showSystemName = true,
+  systemName = "契約管理システム",
+  logoSrc = "/brand/ecoloop-logo.png",
+  logoAlt = "株式会社エコループ ロゴ",
+  logoWidth = 134,
+  logoHeight = 80,
   className = "",
   logoClassName = "h-9",
   textClassName = "text-sm sm:text-base",
@@ -18,10 +28,10 @@ export function EcoloopAdminBrand({
   return (
     <div className={`flex min-w-0 items-center gap-3 ${className}`}>
       <Image
-        src="/brand/ecoloop-logo.png"
-        alt="株式会社エコループ ロゴ"
-        width={134}
-        height={80}
+        src={logoSrc}
+        alt={logoAlt}
+        width={logoWidth}
+        height={logoHeight}
         priority={priority}
         className={`w-auto shrink-0 object-contain ${logoClassName}`}
       />
@@ -31,7 +41,7 @@ export function EcoloopAdminBrand({
           {showSystemName ? (
             <>
               <span className="font-bold text-slate-400" aria-hidden="true">｜</span>
-              <span className="font-bold text-slate-700">契約管理システム</span>
+              <span className="font-bold text-slate-700">{systemName}</span>
             </>
           ) : null}
         </div>

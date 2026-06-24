@@ -22,7 +22,7 @@ type AdminShellProps = {
   systemName?: string;
 };
 
-export function AdminShell({ children, email, systemName = "格安不動産サーチ" }: AdminShellProps) {
+export function AdminShell({ children, email, systemName = "建設業売上アップ診断" }: AdminShellProps) {
   const isSalesAdmin = systemName === "契約管理システム";
   const menuItems = isSalesAdmin ? salesAdminMenuItems : defaultAdminMenuItems;
 

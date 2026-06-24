@@ -19,13 +19,16 @@ begin
       check (lead_source in ('aidma', 'meta', 'lp', 'referral', 'direct', 'other'));
   end if;
 
-  if not exists (
-    select 1 from pg_constraint where conname = 'construction_diagnoses_seminar_interest_check'
-  ) then
-    alter table public.construction_diagnoses
-      add constraint construction_diagnoses_seminar_interest_check
-      check (seminar_interest in ('wants_to_join', 'wants_schedule', 'wants_materials', 'undecided', 'not_interested'));
-  end if;
+  update public.construction_diagnoses
+    set seminar_interest = 'undecided'
+    where seminar_interest = 'wants_materials';
+
+  alter table public.construction_diagnoses
+    drop constraint if exists construction_diagnoses_seminar_interest_check;
+
+  alter table public.construction_diagnoses
+    add constraint construction_diagnoses_seminar_interest_check
+    check (seminar_interest in ('wants_to_join', 'wants_schedule', 'undecided', 'not_interested'));
 
   if not exists (
     select 1 from pg_constraint where conname = 'construction_diagnoses_lead_status_check'

@@ -10,7 +10,7 @@ type DiagnosisQuestionOption = {
 type DiagnosisQuestion = {
   key: string;
   label: string;
-  type: "radio" | "textarea";
+  type: "radio" | "checkbox" | "textarea";
   options?: DiagnosisQuestionOption[];
 };
 
@@ -33,10 +33,10 @@ export function DiagnosisQuestionField({
   supplementalFields: SupplementalAnswerField[];
   fieldErrors?: Record<string, string>;
 }) {
-  const [selectedValue, setSelectedValue] = useState("");
+  const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const activeFields = useMemo(
-    () => supplementalFields.filter((field) => field.triggerValues?.includes(selectedValue)),
-    [selectedValue, supplementalFields]
+    () => supplementalFields.filter((field) => field.triggerValues?.some((value) => selectedValues.includes(value))),
+    [selectedValues, supplementalFields]
   );
   const questionError = fieldErrors[question.key];
 
@@ -59,10 +59,18 @@ export function DiagnosisQuestionField({
             <label key={option.value} className="flex min-h-12 cursor-pointer items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-800">
               <input
                 name={question.key}
-                type="radio"
+                type={question.type}
                 value={option.value}
-                required
-                onChange={() => setSelectedValue(option.value)}
+                required={question.type === "radio"}
+                onChange={(event) => {
+                  if (question.type === "checkbox") {
+                    setSelectedValues((current) => event.target.checked
+                      ? [...current, option.value]
+                      : current.filter((value) => value !== option.value));
+                    return;
+                  }
+                  setSelectedValues([option.value]);
+                }}
                 aria-invalid={Boolean(questionError)}
                 className="h-4 w-4 accent-brand-700"
               />

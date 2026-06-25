@@ -7,6 +7,8 @@ const OUTPUT_PATH = path.join(APP_ROOT, "data", "tender-imports.json");
 const PORTAL_ORIGIN = "https://www.p-portal.go.jp";
 const SEARCH_PATH = "/pps-web-biz/UAA01/OAA0101";
 const POST_PATH = "/pps-web-biz/UAA01/OAA0100";
+const PORTAL_FETCH_TIMEOUT_MS = numberEnv("TENDER_PORTAL_FETCH_TIMEOUT_MS", 15000);
+const PORTAL_MAX_PAGES = numberEnv("TENDER_PORTAL_MAX_PAGES", 3);
 
 const DEFAULT_KEYWORDS = [
   "清掃",
@@ -123,6 +125,11 @@ const PREFECTURE_HINTS = {
   沖縄県: ["沖縄", "那覇"]
 };
 
+function numberEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function decodeHtml(value = "") {
   return value
     .replace(/&amp;/g, "&")
@@ -185,16 +192,39 @@ function extractCookies(response) {
 }
 
 async function portalFetch(pathname, options = {}) {
-  const response = await fetch(`${PORTAL_ORIGIN}${pathname}`, {
-    ...options,
-    headers: {
-      "User-Agent": "loan-system-tender-crawler/0.1 (+metadata-only; contact: admin)",
-      "Accept": "text/html,application/xhtml+xml",
-      ...options.headers
+  const targetUrl = new URL(pathname, PORTAL_ORIGIN).toString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PORTAL_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(targetUrl, {
+      ...options,
+      headers: {
+        "User-Agent": "loan-system-tender-crawler/0.1 (+metadata-only; contact: admin)",
+        "Accept": "text/html,application/xhtml+xml",
+        ...options.headers
+      },
+      signal: controller.signal
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new PortalCrawlError(`HTTP ${response.status}: ${targetUrl}`, {
+        errorType: "http_error",
+        statusCode: response.status,
+        sourceUrl: targetUrl
+      });
     }
-  });
-  const text = await response.text();
-  return { response, text };
+    return { response, text };
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new PortalCrawlError(`Timed out after ${PORTAL_FETCH_TIMEOUT_MS}ms: ${targetUrl}`, {
+        errorType: "fetch_timeout",
+        sourceUrl: targetUrl
+      });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function searchPortal(keyword) {
@@ -237,14 +267,18 @@ async function searchPortal(keyword) {
   }
 
   const pages = [result.text];
-  for (const pagePath of extractPagerPaths(result.text)) {
-    const page = await portalFetch(pagePath, {
-      headers: {
-        "Cookie": cookie,
-        "Referer": `${PORTAL_ORIGIN}${POST_PATH}`
-      }
-    });
-    pages.push(page.text);
+  for (const pagePath of extractPagerPaths(result.text).slice(0, PORTAL_MAX_PAGES)) {
+    try {
+      const page = await portalFetch(pagePath, {
+        headers: {
+          "Cookie": cookie,
+          "Referer": `${PORTAL_ORIGIN}${POST_PATH}`
+        }
+      });
+      pages.push(page.text);
+    } catch (error) {
+      console.error(`Procurement portal pager fetch failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
 
@@ -524,6 +558,14 @@ function formatCrawlIssue(issue) {
   return `${label}: ${issue.message}`;
 }
 
+function isAbortError(error) {
+  return error?.name === "AbortError" || error?.code === "ABORT_ERR";
+}
+
+function isTimeoutIssue(issue) {
+  return issue?.errorType === "fetch_timeout" || /timeout|timed out|abort/i.test(issue?.message ?? "");
+}
+
 async function insertSourceErrors(supabase, sourceId, crawlLogId, issues) {
   if (!issues.length) return;
   const rows = issues.map((issue) => ({
@@ -607,7 +649,15 @@ async function saveSupabase(tenders, crawlIssues = []) {
     last_error_message: issues.length ? issues.slice(0, 3).map(formatCrawlIssue).join(" / ") : null
   }).eq("id", source.id);
 
-  return { saved, created, updated, errors: issues.length, skipped: false };
+  return {
+    saved,
+    created,
+    updated,
+    errors: issues.length,
+    skipped_count: issues.length,
+    timeout_count: issues.filter(isTimeoutIssue).length,
+    skipped: false
+  };
 }
 
 async function loadEnv() {
@@ -626,6 +676,7 @@ async function loadEnv() {
 }
 
 async function main() {
+  const startedAt = new Date().toISOString();
   const args = new Set(process.argv.slice(2));
   const allPortal = args.has("--all-portal");
   const keywords = allPortal
@@ -633,12 +684,35 @@ async function main() {
     : process.argv.find((arg) => arg.startsWith("--keywords="))?.split("=")[1]?.split(",").filter(Boolean) ?? DEFAULT_KEYWORDS;
   const limit = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? "80");
 
+  console.log(JSON.stringify({
+    event: "portal_crawl_start",
+    started_at: startedAt,
+    target_source: "調達ポータル",
+    keyword_count: keywords.length,
+    limit,
+    fetch_timeout_ms: PORTAL_FETCH_TIMEOUT_MS,
+    max_pages_per_keyword: PORTAL_MAX_PAGES
+  }));
+
   const collected = [];
   const crawlIssues = [];
   for (const keyword of keywords) {
+    const keywordStartedAt = Date.now();
+    console.log(JSON.stringify({
+      event: "portal_keyword_start",
+      target_source: "調達ポータル",
+      keyword: keyword || "(all)"
+    }));
     try {
       const tenders = await searchPortal(keyword);
       collected.push(...tenders);
+      console.log(JSON.stringify({
+        event: "portal_keyword_finish",
+        target_source: "調達ポータル",
+        keyword: keyword || "(all)",
+        fetched_count: tenders.length,
+        duration_ms: Date.now() - keywordStartedAt
+      }));
     } catch (error) {
       const issue = {
         keyword: keyword || null,
@@ -649,6 +723,14 @@ async function main() {
       };
       crawlIssues.push(issue);
       console.error(`Procurement portal crawl failed: ${formatCrawlIssue(issue)}`);
+      console.log(JSON.stringify({
+        event: "portal_keyword_error",
+        target_source: "調達ポータル",
+        keyword: keyword || "(all)",
+        error_type: issue.errorType,
+        timeout: isTimeoutIssue(issue),
+        duration_ms: Date.now() - keywordStartedAt
+      }));
     }
     await new Promise((resolve) => setTimeout(resolve, 700));
   }
@@ -670,9 +752,24 @@ async function main() {
     }
   }
 
+  const timeoutCount = crawlIssues.filter(isTimeoutIssue).length;
+  console.log(JSON.stringify({
+    event: "portal_crawl_summary",
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    target_source: "調達ポータル",
+    fetched_count: tenders.length,
+    registered_count: supabaseResult.created ?? 0,
+    updated_count: supabaseResult.updated ?? 0,
+    skipped_count: supabaseResult.errors ?? crawlIssues.length,
+    error_count: supabaseResult.errors ?? crawlIssues.length,
+    timeout_count: timeoutCount
+  }));
+
   console.log(JSON.stringify({
     collected: tenders.length,
     crawl_errors: crawlIssues.length,
+    timeout_count: timeoutCount,
     output: OUTPUT_PATH,
     supabase: supabaseResult,
     titles: tenders.slice(0, 10).map((tender) => tender.title)

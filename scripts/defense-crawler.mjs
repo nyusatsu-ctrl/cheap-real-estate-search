@@ -8,14 +8,17 @@ const requireFromApp = createRequire(import.meta.url);
 const SOURCES_PATH = path.join(APP_ROOT, "data", "defense-sources.json");
 const CANDIDATES_PATH = path.join(APP_ROOT, "data", "defense-candidates.json");
 const CRAWL_SUMMARY_PATH = path.join(APP_ROOT, "data", "defense-crawl-summary.json");
-const FETCH_TIMEOUT_MS = 8000;
-const PLAYWRIGHT_TIMEOUT_MS = Number(process.env.DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS ?? 30000);
-const PLAYWRIGHT_WAIT_INTERVAL_MS = Number(process.env.DEFENSE_CRAWLER_PLAYWRIGHT_WAIT_INTERVAL_MS ?? 3000);
-const PLAYWRIGHT_MAX_WAIT_MS = Number(process.env.DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS ?? 45000);
-const CHILD_LINK_LIMIT = 5;
+const FETCH_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_FETCH_TIMEOUT_MS", 8000);
+const PLAYWRIGHT_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS", 10000);
+const PLAYWRIGHT_WAIT_INTERVAL_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_WAIT_INTERVAL_MS", 2000);
+const PLAYWRIGHT_MAX_WAIT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS", 10000);
+const PLAYWRIGHT_TASK_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS", 25000);
+const SOURCE_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS", 45000);
+const CRAWL_TIME_BUDGET_MS = numberEnv("DEFENSE_CRAWLER_TIME_BUDGET_MS", 540000);
+const CHILD_LINK_LIMIT = numberEnv("DEFENSE_CRAWLER_CHILD_LINK_LIMIT", 3);
 const REQUEST_DELAY_MS = 100;
 const CHILD_REQUEST_DELAY_MS = 50;
-const CRAWL_CONCURRENCY = 6;
+const CRAWL_CONCURRENCY = numberEnv("DEFENSE_CRAWLER_CONCURRENCY", 6);
 const PLAYWRIGHT_FALLBACK_ENABLED = process.env.DEFENSE_CRAWLER_DISABLE_PLAYWRIGHT !== "1";
 const PLAYWRIGHT_HEADLESS = process.env.DEFENSE_CRAWLER_PLAYWRIGHT_HEADLESS !== "0";
 const BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
@@ -23,6 +26,11 @@ const BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Appl
 let playwrightBrowser = null;
 let playwrightContext = null;
 let playwrightFallbackChain = Promise.resolve();
+
+function numberEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 const OFFICIAL_HOSTS = [
   "mod.go.jp",
@@ -267,43 +275,72 @@ async function fetchTextDirect(url) {
   assertOfficialUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "loan-system-defense-crawler/0.1 (+official-sites-only; metadata-only)",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-    },
-    signal: controller.signal
-  }).finally(() => clearTimeout(timeout));
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const contentType = response.headers.get("content-type") ?? "";
-  const html = decodeBuffer(buffer, contentType);
-  if (!response.ok) {
-    throw fetchError(`HTTP ${response.status}: ${response.url}`, {
-      code: response.status === 403 ? "HTTP_403" : "HTTP_ERROR",
-      status: response.status,
-      url: response.url
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "loan-system-defense-crawler/0.1 (+official-sites-only; metadata-only)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      },
+      signal: controller.signal
     });
-  }
-  if (isChallengeHtml(html) || response.headers.get("cf-mitigated") === "challenge") {
-    throw fetchError(`Blocked by anti-bot challenge: ${response.url}`, {
-      code: "ANTI_BOT_CHALLENGE",
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get("content-type") ?? "";
+    const html = decodeBuffer(buffer, contentType);
+    if (!response.ok) {
+      throw fetchError(`HTTP ${response.status}: ${response.url}`, {
+        code: response.status === 403 ? "HTTP_403" : "HTTP_ERROR",
+        status: response.status,
+        url: response.url
+      });
+    }
+    if (isChallengeHtml(html) || response.headers.get("cf-mitigated") === "challenge") {
+      throw fetchError(`Blocked by anti-bot challenge: ${response.url}`, {
+        code: "ANTI_BOT_CHALLENGE",
+        status: response.status,
+        url: response.url
+      });
+    }
+    return {
+      url: response.url,
       status: response.status,
-      url: response.url
-    });
+      contentType,
+      html,
+      mojibake: false
+    };
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw fetchError(`Fetch timeout after ${FETCH_TIMEOUT_MS}ms: ${url}`, {
+        code: "FETCH_TIMEOUT",
+        timeout: true,
+        url
+      });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return {
-    url: response.url,
-    status: response.status,
-    contentType,
-    html,
-    mojibake: false
-  };
 }
 
 function fetchError(message, details = {}) {
   const error = new Error(message);
   Object.assign(error, details);
   return error;
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError" || error?.code === "ABORT_ERR";
+}
+
+function isTimeoutError(error) {
+  return Boolean(error?.timeout)
+    || error?.code === "FETCH_TIMEOUT"
+    || error?.code === "PLAYWRIGHT_TIMEOUT"
+    || /timeout|timed out|abort/i.test(error?.message ?? "");
+}
+
+function errorType(error) {
+  if (error?.code) return String(error.code).toLowerCase();
+  return isTimeoutError(error) ? "timeout" : "crawl_error";
 }
 
 function isChallengeHtml(html) {
@@ -328,7 +365,13 @@ async function fetchTextWithPlaywright(url, sourceInfo, originalError) {
   assertOfficialUrl(url);
   const context = await getPlaywrightContext();
   const page = await context.newPage();
+  const startedAt = Date.now();
+  const timeout = setTimeout(() => {
+    page.close().catch(() => {});
+  }, PLAYWRIGHT_TASK_TIMEOUT_MS);
   try {
+    page.setDefaultTimeout(PLAYWRIGHT_TIMEOUT_MS);
+    page.setDefaultNavigationTimeout(PLAYWRIGHT_TIMEOUT_MS);
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: PLAYWRIGHT_TIMEOUT_MS });
     const html = await waitForPlaywrightContent(page);
     if (isChallengeHtml(html)) {
@@ -349,7 +392,17 @@ async function fetchTextWithPlaywright(url, sourceInfo, originalError) {
       fallback_from: originalError?.message ?? null,
       source_name: sourceInfo?.source_name ?? null
     };
+  } catch (error) {
+    if (Date.now() - startedAt >= PLAYWRIGHT_TASK_TIMEOUT_MS || /Target page, context or browser has been closed/i.test(error?.message ?? "")) {
+      throw fetchError(`Playwright timeout after ${PLAYWRIGHT_TASK_TIMEOUT_MS}ms: ${url}`, {
+        code: "PLAYWRIGHT_TIMEOUT",
+        timeout: true,
+        url
+      });
+    }
+    throw error;
   } finally {
+    clearTimeout(timeout);
     await page.close().catch(() => {});
   }
 }
@@ -964,16 +1017,42 @@ async function discover(group) {
 
 async function crawl(group) {
   const startedAt = new Date().toISOString();
+  const deadlineMs = Date.now() + CRAWL_TIME_BUDGET_MS;
   let sources = await readJson(SOURCES_PATH, []);
   if (!sources.length) sources = (await discover(group)).sources;
   sources = filterSources(sources, group);
   const maxSources = Number(process.argv.find((arg) => arg.startsWith("--max-sources="))?.split("=")[1] ?? 0);
   if (maxSources > 0) sources = sources.slice(0, maxSources);
+  console.log(JSON.stringify({
+    event: "defense_crawl_start",
+    started_at: startedAt,
+    target_source: "防衛省・自衛隊",
+    group,
+    source_count: sources.length,
+    fetch_timeout_ms: FETCH_TIMEOUT_MS,
+    source_timeout_ms: SOURCE_TIMEOUT_MS,
+    time_budget_ms: CRAWL_TIME_BUDGET_MS,
+    concurrency: CRAWL_CONCURRENCY
+  }));
   const candidates = [];
   const errors = [];
 
   try {
-    const results = await mapLimit(sources, CRAWL_CONCURRENCY, crawlSource);
+    const results = await mapLimit(sources, CRAWL_CONCURRENCY, (sourceInfo) => {
+      if (Date.now() >= deadlineMs) {
+        return {
+          candidates: [],
+          errors: [{
+            url: sourceInfo.tender_list_url,
+            source_name: sourceInfo.source_name,
+            error: "Defense crawl time budget exceeded before source start.",
+            error_type: "crawl_timeout",
+            timeout: true
+          }]
+        };
+      }
+      return crawlSource(sourceInfo, deadlineMs);
+    });
     for (const result of results) {
       candidates.push(...result.candidates);
       errors.push(...result.errors);
@@ -985,36 +1064,76 @@ async function crawl(group) {
   const uniqueCandidates = uniqueBy(candidates, (item) => `${item.source_url}-${item.title}`);
   await writeJson(CANDIDATES_PATH, uniqueCandidates);
   const supabase = await saveCandidatesToSupabase(uniqueCandidates);
+  const dbErrors = (supabase.errors ?? []).map((message) => ({
+    url: null,
+    source_name: "Supabase",
+    error: message,
+    error_type: "db_error",
+    timeout: false
+  }));
+  const allErrors = [...errors, ...dbErrors];
   await saveCrawlLogToSupabase({
     startedAt,
     group,
     fetchedCount: uniqueCandidates.length,
     createdCount: supabase.saved ?? 0,
     duplicateCount: supabase.duplicates ?? 0,
-    skippedCount: errors.length,
-    errors: [...errors.map((error) => `${error.source_name}: ${error.error}`), ...(supabase.errors ?? [])],
+    skippedCount: errors.length + (supabase.duplicates ?? 0),
+    errors: allErrors,
     skipped: supabase.skipped
   });
+  const timeoutCount = allErrors.filter((error) => error.timeout).length;
+  console.log(JSON.stringify({
+    event: "defense_crawl_summary",
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    target_source: "防衛省・自衛隊",
+    group,
+    fetched_count: uniqueCandidates.length,
+    registered_count: supabase.saved ?? 0,
+    updated_count: 0,
+    skipped_count: errors.length + (supabase.duplicates ?? 0),
+    error_count: allErrors.length,
+    timeout_count: timeoutCount
+  }));
   await writeJson(CRAWL_SUMMARY_PATH, {
     command: "crawl",
     group,
     finished_at: new Date().toISOString(),
     candidate_count: uniqueCandidates.length,
     error_count: errors.length,
+    timeout_count: timeoutCount,
     errors,
     supabase
   });
   return { candidates: uniqueCandidates, errors, supabase };
 }
 
-async function crawlSource(sourceInfo) {
+async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINITY) {
+  const sourceStartedAt = Date.now();
+  const sourceDeadlineMs = Math.min(crawlDeadlineMs, sourceStartedAt + SOURCE_TIMEOUT_MS);
   const candidates = [];
   const errors = [];
+  console.log(JSON.stringify({
+    event: "defense_source_start",
+    target_source: sourceInfo.source_name,
+    url: sourceInfo.tender_list_url
+  }));
   try {
     const page = await fetchText(sourceInfo.tender_list_url, { sourceInfo });
     candidates.push(...extractFrameRowCandidates(page.frameRows, page.url, sourceInfo));
     candidates.push(...extractCandidates(page.html, page.url, sourceInfo));
     for (const link of traversalLinks(page.html, page.url).slice(0, CHILD_LINK_LIMIT)) {
+      if (Date.now() >= sourceDeadlineMs) {
+        errors.push({
+          url: link.url,
+          source_name: sourceInfo.source_name,
+          error: `Source time budget exceeded after ${SOURCE_TIMEOUT_MS}ms.`,
+          error_type: "source_timeout",
+          timeout: true
+        });
+        break;
+      }
       try {
         const childSourceInfo = {
           ...sourceInfo,
@@ -1024,14 +1143,35 @@ async function crawlSource(sourceInfo) {
         candidates.push(...extractFrameRowCandidates(childPage.frameRows, childPage.url, childSourceInfo));
         candidates.push(...extractCandidates(childPage.html, childPage.url, childSourceInfo));
         await delay(CHILD_REQUEST_DELAY_MS);
-      } catch {
-        // Child pages are opportunistic. The parent source error is kept clear if the main page succeeded.
+      } catch (error) {
+        errors.push({
+          url: link.url,
+          source_name: sourceInfo.source_name,
+          error: error.message,
+          error_type: errorType(error),
+          timeout: isTimeoutError(error)
+        });
       }
     }
     await delay(REQUEST_DELAY_MS);
   } catch (error) {
-    errors.push({ url: sourceInfo.tender_list_url, source_name: sourceInfo.source_name, error: error.message });
+    errors.push({
+      url: sourceInfo.tender_list_url,
+      source_name: sourceInfo.source_name,
+      error: error.message,
+      error_type: errorType(error),
+      timeout: isTimeoutError(error)
+    });
   }
+  console.log(JSON.stringify({
+    event: "defense_source_finish",
+    target_source: sourceInfo.source_name,
+    url: sourceInfo.tender_list_url,
+    fetched_count: candidates.length,
+    error_count: errors.length,
+    timeout_count: errors.filter((error) => error.timeout).length,
+    duration_ms: Date.now() - sourceStartedAt
+  }));
   return { candidates, errors };
 }
 
@@ -1181,6 +1321,25 @@ async function saveCandidatesToSupabase(candidates) {
   return { skipped: false, saved, duplicates, errors };
 }
 
+function formatDefenseCrawlError(error) {
+  const sourceName = error.source_name ?? "unknown source";
+  return `${sourceName}: ${error.error}`;
+}
+
+async function insertDefenseSourceErrors(supabase, crawlLogId, errors) {
+  if (!errors.length) return;
+  const rows = errors.map((error) => ({
+    source_id: null,
+    crawl_log_id: crawlLogId,
+    source_url: error.url,
+    error_type: error.error_type ?? "crawl_error",
+    error_message: formatDefenseCrawlError(error),
+    status_code: error.status ?? null
+  }));
+  const { error } = await supabase.from("tender_source_errors").insert(rows);
+  if (error) console.error(`Failed to record defense tender_source_errors: ${error.message}`);
+}
+
 async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdCount, duplicateCount, skippedCount, errors, skipped }) {
   if (process.argv.includes("--no-db") || skipped) return;
   const supabase = await supabaseClient();
@@ -1188,7 +1347,7 @@ async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdC
   const status = errors.length
     ? createdCount > 0 ? "partial_success" : "failed"
     : "success";
-  await supabase.from("tender_crawl_logs").insert({
+  const logResult = await supabase.from("tender_crawl_logs").insert({
     source_id: null,
     started_at: startedAt,
     finished_at: new Date().toISOString(),
@@ -1197,8 +1356,14 @@ async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdC
     created_count: createdCount,
     duplicate_count: duplicateCount,
     skipped_count: skippedCount,
-    error_message: errors.length ? `防衛系クロール(${group}): ${errors.slice(0, 5).join(" / ")}` : null
-  });
+    error_count: errors.length,
+    error_message: errors.length ? `防衛系クロール(${group}): ${errors.slice(0, 5).map(formatDefenseCrawlError).join(" / ")}` : null
+  }).select("id").single();
+  if (logResult.error) {
+    console.error(`Failed to record defense tender_crawl_logs: ${logResult.error.message}`);
+    return;
+  }
+  await insertDefenseSourceErrors(supabase, logResult.data?.id ?? null, errors);
 }
 
 async function supabaseClient() {

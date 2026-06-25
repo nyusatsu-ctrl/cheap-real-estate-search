@@ -13,12 +13,20 @@ concurrency:
 jobs:
   crawl-tenders:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 20
 
     env:
       TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
       TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
       TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+      TENDER_PORTAL_FETCH_TIMEOUT_MS: "15000"
+      TENDER_PORTAL_MAX_PAGES: "3"
+      DEFENSE_CRAWLER_FETCH_TIMEOUT_MS: "8000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS: "10000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS: "10000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS: "25000"
+      DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS: "45000"
+      DEFENSE_CRAWLER_TIME_BUDGET_MS: "540000"
 
     steps:
       - name: Check out repository
@@ -42,8 +50,10 @@ jobs:
 
       - name: Crawl procurement portal tenders
         continue-on-error: true
+        timeout-minutes: 5
         run: npm run crawl:tenders -- --limit=300
 
       - name: Crawl defense tender candidates
         if: always()
+        timeout-minutes: 10
         run: npm run crawl:defense

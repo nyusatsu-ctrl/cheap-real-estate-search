@@ -5,7 +5,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
 import type { PastAwardResult, PastAwardReviewStatus } from "@/lib/types";
 
 const pastAwardPath = path.join(process.cwd(), "data", "past-award-results.json");
@@ -20,7 +20,7 @@ export async function importPastAwardCsvAction(formData: FormData) {
   const payloads = rows.map((row) => rowToPastAward(row, defaultStatus)).filter(Boolean) as PastAwardImportPayload[];
   if (!payloads.length) throw new Error("Importable rows were not found.");
 
-  const supabase = admin ? await createSupabaseServerClient() : null;
+  const supabase = admin ? await createTenderSupabaseServerClient() : null;
   if (supabase) {
     const result = await saveToSupabase(supabase, payloads);
     if (!result.failed) {
@@ -52,7 +52,7 @@ async function csvFromFormData(formData: FormData) {
   throw new Error("CSV file or pasted CSV text is required.");
 }
 
-async function saveToSupabase(supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, payloads: PastAwardImportPayload[]) {
+async function saveToSupabase(supabase: NonNullable<Awaited<ReturnType<typeof createTenderSupabaseServerClient>>>, payloads: PastAwardImportPayload[]) {
   let imported = 0;
   let updated = 0;
   const chunks = chunk(payloads, 1000);

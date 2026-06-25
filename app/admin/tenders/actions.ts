@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -17,7 +17,7 @@ function optionalString(formData: FormData, key: string) {
 
 export async function saveTenderAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const id = optionalString(formData, "id");
@@ -85,7 +85,7 @@ export async function saveTenderAction(formData: FormData) {
 export async function deleteTenderAction(formData: FormData) {
   await requireAdmin();
   const id = requiredString(formData, "id");
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const { error } = await supabase.from("tenders").delete().eq("id", id);
@@ -98,7 +98,7 @@ export async function deleteTenderAction(formData: FormData) {
 
 export async function saveTenderSourceAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const { error } = await supabase.from("tender_sources").insert({

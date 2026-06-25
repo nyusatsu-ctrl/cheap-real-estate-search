@@ -5,7 +5,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import type { Tender, TenderCandidate, TenderCandidateReviewStatus, TenderCandidateType, TenderType } from "@/lib/types";
 
@@ -69,7 +69,7 @@ export async function approveTenderCandidateAction(formData: FormData) {
     fetched_at: localCandidate?.fetched_at ?? new Date().toISOString()
   } satisfies LocalTenderPayload);
 
-  const supabase = admin ? await createSupabaseServerClient() : null;
+  const supabase = admin ? await createTenderSupabaseServerClient() : null;
   if (supabase) {
     const { data: existing, error: findError } = await supabase.from("tenders").select("id").eq("source_url", sourceUrl).maybeSingle();
     if (!findError) {
@@ -101,7 +101,7 @@ export async function updateTenderCandidateReviewAction(formData: FormData) {
   if (!["pending", "rejected", "duplicate"].includes(status)) throw new Error("Invalid review status");
   const id = requiredString(formData, "id");
 
-  const supabase = admin ? await createSupabaseServerClient() : null;
+  const supabase = admin ? await createTenderSupabaseServerClient() : null;
   if (supabase) {
     const { error } = await supabase.from("tender_candidates").update({
       review_status: status,

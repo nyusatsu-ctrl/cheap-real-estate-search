@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
 import { canUseMemberFeatures, normalizeFavoriteStatus } from "@/lib/tenders";
 import { requireMember } from "@/lib/user";
 
@@ -17,7 +17,7 @@ export async function saveFavoriteTenderAction(formData: FormData) {
   const tenderId = String(formData.get("tender_id") ?? "").trim();
   if (!tenderId) throw new Error("tender_id is required");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) {
     revalidatePath("/favorites");
     redirect("/favorites");
@@ -44,7 +44,7 @@ export async function saveNotificationAction(formData: FormData) {
   const member = await requireMember();
   if (!canUseMemberFeatures(member)) redirect("/billing?trial=expired");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) {
     revalidatePath("/notifications");
     redirect("/notifications?saved=1");

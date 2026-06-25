@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_SEEDS, type TenderSourceSeed } from "@/lib/tender-source-seeds";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
 import type { Tender, TenderCandidateType } from "@/lib/types";
 
 const sourceFields = [
@@ -112,7 +112,7 @@ function seedPayload(seed: TenderSourceSeed) {
 
 export async function saveTenderSourceAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const id = nullableString(formData, "id");
@@ -129,7 +129,7 @@ export async function saveTenderSourceAction(formData: FormData) {
 export async function deleteTenderSourceAction(formData: FormData) {
   await requireAdmin();
   const id = stringValue(formData, "id");
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const { error } = await supabase.from("tender_sources").delete().eq("id", id);
@@ -140,7 +140,7 @@ export async function deleteTenderSourceAction(formData: FormData) {
 
 export async function seedTenderSourcesAction() {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   for (const seed of TENDER_SOURCE_SEEDS) {
@@ -164,7 +164,7 @@ export async function seedTenderSourcesAction() {
 
 export async function importTenderSourcesCsvAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const file = formData.get("csv_file");
@@ -195,7 +195,7 @@ export async function importTenderSourcesCsvAction(formData: FormData) {
 export async function runTenderSourceCrawlAction(formData: FormData) {
   await requireAdmin();
   const sourceId = stringValue(formData, "id");
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const startedAt = new Date().toISOString();

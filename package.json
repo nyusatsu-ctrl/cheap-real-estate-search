@@ -30,6 +30,7 @@
     "crawl:msdf": "node scripts/defense-crawler.mjs crawl --group=msdf",
     "crawl:asdf": "node scripts/defense-crawler.mjs crawl --group=asdf",
     "crawl:defense-bureaus": "node scripts/defense-crawler.mjs crawl --group=defense-bureaus",
+    "cleanup:tender-guidance": "node scripts/cleanup-guidance-tenders.mjs",
     "normalize:defense-tenders": "node scripts/normalize-defense-tenders.mjs",
     "gps:tcp": "node server/mv930g/tcp-server.mjs",
     "gps:test-send": "node server/mv930g/send-test.mjs"

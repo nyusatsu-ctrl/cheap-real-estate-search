@@ -1,0 +1,56 @@
+name: Clean guidance tender pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_cleanup:
+        description: "Set true to archive guidance pages and reject matching candidates."
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  cleanup-guidance-tenders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tender Supabase secrets
+        run: |
+          if [ -z "$TENDER_SUPABASE_URL" ] || [ -z "$TENDER_SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::TENDER_SUPABASE_URL and TENDER_SUPABASE_SERVICE_ROLE_KEY repository secrets are required."
+            exit 1
+          fi
+
+      - name: Clean guidance tender pages
+        run: |
+          args=""
+          if [ "${{ inputs.commit_cleanup }}" = "true" ]; then
+            args="--commit"
+          fi
+          npm run cleanup:tender-guidance -- $args
+
+      - name: Summarize tender database
+        if: always()
+        timeout-minutes: 2
+        run: node scripts/tender-db-summary.mjs

@@ -203,6 +203,17 @@ const CLASSIFICATION_ONLY_TITLES = new Set([
   "EXCEL",
   "WORD"
 ]);
+const GUIDANCE_TITLE_PATTERNS = [
+  /^オープンカウンター方式(?:とは|による見積依頼)?$/,
+  /^入札[・･]落札情報はこちら$/,
+  /入札情報のページに掲載/,
+  /標準契約条項|標準契約書|契約書式|契約様式/,
+  /物品売買請書条項/,
+  /契約条項/,
+  /情報の公開|情報の公表|公共調達の適正化/,
+  /^(?:公表|掲載|案内|一覧)$/,
+  /(?:はこちら|こちらをクリック|詳細はこちら|ページに掲載)$/
+];
 
 const DEFENSE_PARENT_SOURCES = [
   source("防衛省・自衛隊 公告・公示・公募", "defense_ministry", "全国", null, "https://www.mod.go.jp/j/budget/chotatsu/index.html", "defense_mod", "A"),
@@ -917,6 +928,7 @@ function isQualityTenderTitle(titleValue, rawText = "") {
   if (isMonthOnlyCandidateTitle(compact)) return false;
   if (isDateOnlyCandidateTitle(compact)) return false;
   if (/^[\d０-９A-Za-zＡ-Ｚａ-ｚ\-_.\/第号]+$/.test(compact)) return false;
+  if (isGuidanceCandidateTitle(title, compact)) return false;
   if (isClassificationOnlyCandidateTitle(compact)) return false;
   if (compact.length <= 3) return false;
   if (compact.length <= 5 && !hasStrongCandidateTitleWord(title)) return false;
@@ -954,6 +966,10 @@ function isClassificationOnlyCandidateTitle(value) {
   const upper = value.toUpperCase();
   if (CLASSIFICATION_ONLY_TITLES.has(value) || CLASSIFICATION_ONLY_TITLES.has(upper)) return true;
   return /^(?:令和\d{1,2}年度|R\d{1,2}年度|20\d{2}年度)?(?:入札公告|公告|公示|公募|調達情報|契約情報|入札情報|見積依頼|オープンカウンター|オープンカウンタ|物品|役務|工事)(?:一覧)?$/i.test(value);
+}
+
+function isGuidanceCandidateTitle(title, compact) {
+  return GUIDANCE_TITLE_PATTERNS.some((pattern) => pattern.test(title) || pattern.test(compact));
 }
 
 function hasStrongCandidateTitleWord(value) {

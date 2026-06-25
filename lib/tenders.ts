@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
-import { isReviewableTenderCandidate } from "@/lib/tender-candidate-quality";
+import { isPublishableTenderRecord, isReviewableTenderCandidate } from "@/lib/tender-candidate-quality";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
 import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
@@ -94,7 +94,7 @@ export async function getPublishedTenders(filters: TenderFilters = {}) {
 
   const { data, error } = await query;
   if (error) return fallbackTenders;
-  return filterTenders(((data ?? []) as Tender[]).map(normalizeDefenseTender), filters);
+  return filterTenders(((data ?? []) as Tender[]).map(normalizeDefenseTender).filter(isPublishableTenderRecord), filters);
 }
 
 export async function getPublishedTender(id: string) {
@@ -109,7 +109,8 @@ export async function getPublishedTender(id: string) {
     .single();
 
   if (error) return getFallbackTenders().find((tender) => tender.id === id && tender.status === "published") ?? null;
-  return data as Tender;
+  const tender = normalizeDefenseTender(data as Tender);
+  return isPublishableTenderRecord(tender) ? tender : null;
 }
 
 export async function getAdminTenders() {
@@ -725,7 +726,7 @@ export function normalizeFavoriteStatus(value: FormDataEntryValue | null): Favor
 function getFallbackTenders(filters: TenderFilters = {}) {
   const importedTenders = readImportedTenders();
   const tenders = importedTenders.length > 0 ? importedTenders : sampleTenders;
-  return filterTenders(tenders.map(normalizeDefenseTender).filter((tender) => tender.status === "published"), filters);
+  return filterTenders(tenders.map(normalizeDefenseTender).filter((tender) => tender.status === "published" && isPublishableTenderRecord(tender)), filters);
 }
 
 function getFallbackTenderSources() {

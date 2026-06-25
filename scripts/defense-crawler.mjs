@@ -168,6 +168,41 @@ const SERVICE_WORDS = ["業務", "委託", "清掃", "草刈", "除草", "点検
 const OPEN_COUNTER_WORDS = ["オープンカウンター", "オープンカウンタ", "公開見積", "公募型見積", "定例見積", "見積依頼", "見積合わせ", "見積書提出", "少額"];
 const SALE_WORDS = ["売払", "売払い", "不用品", "廃品", "古物", "不用物品"];
 const CONSTRUCTION_WORDS = ["工事", "建設", "土木", "建築", "電気工事", "管工事", "舗装", "解体", "改修工事", "建築一式", "とび", "しゅんせつ"];
+const STRONG_TITLE_WORDS = [...GOODS_WORDS, ...SERVICE_WORDS, ...OPEN_COUNTER_WORDS, ...SALE_WORDS, "調達", "借上", "借上げ", "交換", "処分", "洗濯", "賃貸借", "自動車", "車両", "電気", "空調", "給排水", "検査", "製造"];
+const CLASSIFICATION_ONLY_TITLES = new Set([
+  "公告",
+  "入札公告",
+  "一般競争入札",
+  "一般競争入札公告",
+  "公告情報",
+  "公告一覧",
+  "公示",
+  "公募",
+  "調達",
+  "調達情報",
+  "調達情報一覧",
+  "入札",
+  "入札情報",
+  "契約",
+  "契約情報",
+  "見積",
+  "見積依頼",
+  "見積合わせ",
+  "オープンカウンター",
+  "オープンカウンタ",
+  "公開見積",
+  "定例見積",
+  "物品",
+  "役務",
+  "工事",
+  "新着情報",
+  "お知らせ",
+  "一覧",
+  "詳細",
+  "PDF",
+  "EXCEL",
+  "WORD"
+]);
 
 const DEFENSE_PARENT_SOURCES = [
   source("防衛省・自衛隊 公告・公示・公募", "defense_ministry", "全国", null, "https://www.mod.go.jp/j/budget/chotatsu/index.html", "defense_mod", "A"),
@@ -651,7 +686,7 @@ function extractWesternAreaCandidates(html, pageUrl, sourceInfo, yearContext) {
     if (!noticeLinks.length || /公告中の案件はありません|該当.*ありません/.test(rowText)) continue;
 
     const title = pickWesternAreaTitle(cells, noticeLinks, rowText);
-    if (!title || isExcluded(title)) continue;
+    if (!isQualityTenderTitle(title, rowText) || isExcluded(title)) continue;
 
     const location = westernAreaLocation(rowText);
     const dates = parseDates(rowText, yearContext);
@@ -713,7 +748,7 @@ function extractFrameRowCandidates(frameRows, pageUrl, sourceInfo) {
     if (!noticeLinks.length || !rowText || /公告中の案件はありません|該当.*ありません/.test(rowText)) continue;
 
     const title = pickFrameRowTitle(row.cells ?? [], noticeLinks, rowText);
-    if (!title || isExcluded(title)) continue;
+    if (!isQualityTenderTitle(title, rowText) || isExcluded(title)) continue;
 
     const dates = pickFrameRowDates(row.cells ?? [], rowText, yearContext);
     const location = westernAreaLocation(rowText);
@@ -794,7 +829,7 @@ function pickFrameRowDates(cells, rowText, yearContext) {
 
 function candidateFromText(text, links, sourceInfo, pageUrl, yearContext) {
   const title = pickTitle(text, links);
-  if (!title || isExcluded(title)) return null;
+  if (!isQualityTenderTitle(title, text) || isExcluded(title)) return null;
   const classification = classify(title + " " + text);
   const dates = parseDates(text, yearContext);
   const primaryLink = links.find((link) => link.file_type !== "unknown") ?? links[0] ?? { url: pageUrl, file_type: "html", text: title, source_text: text };
@@ -869,6 +904,65 @@ function isExcluded(text) {
   const procurementRelated = /契約|調達|入札|公告|公募|公示|見積/.test(text);
   if (procurementRelated) return false;
   return EXCLUDE_KEYWORDS.some((keyword) => text.includes(keyword)) || /privacy|sitemap|access|contact|recruit/i.test(text);
+}
+
+function isQualityTenderCandidate(candidate) {
+  return isQualityTenderTitle(candidate?.title, candidate?.raw_text ?? "");
+}
+
+function isQualityTenderTitle(titleValue, rawText = "") {
+  const title = normalizeCandidateTitle(titleValue);
+  const compact = compactCandidateTitle(title);
+  if (!compact) return false;
+  if (isMonthOnlyCandidateTitle(compact)) return false;
+  if (isDateOnlyCandidateTitle(compact)) return false;
+  if (/^[\d０-９A-Za-zＡ-Ｚａ-ｚ\-_.\/第号]+$/.test(compact)) return false;
+  if (isClassificationOnlyCandidateTitle(compact)) return false;
+  if (compact.length <= 3) return false;
+  if (compact.length <= 5 && !hasStrongCandidateTitleWord(title)) return false;
+  if (looksLikeNavigationCandidateTitle(title)) return false;
+  if (!hasStrongCandidateTitleWord(`${title} ${rawText}`) && !/契約|調達|入札|公告|公募|公示|見積/.test(`${title} ${rawText}`)) return false;
+  return true;
+}
+
+function normalizeCandidateTitle(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactCandidateTitle(value) {
+  return value
+    .replace(/[\s　]/g, "")
+    .replace(/[()（）［］\[\]【】「」『』]/g, "")
+    .replace(/[：:;；,，、。]/g, "")
+    .trim();
+}
+
+function isMonthOnlyCandidateTitle(value) {
+  return /^(?:令和\d{1,2}年|R\d{1,2}[.\/年]?|20\d{2}年?)?\d{1,2}月(?:分|度)?$/i.test(value);
+}
+
+function isDateOnlyCandidateTitle(value) {
+  return /^(?:令和\d{1,2}年|R\d{1,2}[.\/年]?|20\d{2}年?)?\d{1,2}月\d{1,2}日?$/.test(value)
+    || /^(?:20\d{2}|R\d{1,2})[.\/-]\d{1,2}[.\/-]\d{1,2}$/i.test(value)
+    || /^\d{1,2}[.\/-]\d{1,2}(?:[.\/-]\d{1,2})?$/.test(value);
+}
+
+function isClassificationOnlyCandidateTitle(value) {
+  const upper = value.toUpperCase();
+  if (CLASSIFICATION_ONLY_TITLES.has(value) || CLASSIFICATION_ONLY_TITLES.has(upper)) return true;
+  return /^(?:令和\d{1,2}年度|R\d{1,2}年度|20\d{2}年度)?(?:入札公告|公告|公示|公募|調達情報|契約情報|入札情報|見積依頼|オープンカウンター|オープンカウンタ|物品|役務|工事)(?:一覧)?$/i.test(value);
+}
+
+function hasStrongCandidateTitleWord(value) {
+  return STRONG_TITLE_WORDS.some((word) => value.includes(word));
+}
+
+function looksLikeNavigationCandidateTitle(value) {
+  if (/^(?:トップ|ホーム|一覧|詳細|戻る|次へ|前へ|こちら|クリック|ダウンロード|PDF|Excel|Word)$/i.test(value)) return true;
+  return /(?:トップページ|サイトマップ|お問い合わせ|アクセス|入札結果|契約実績|調達実績|様式|各種様式|ガイドライン|入札説明書等)$/.test(value);
 }
 
 function pickTitle(text, links) {
@@ -1072,7 +1166,9 @@ async function crawl(group) {
     await closePlaywrightBrowser();
   }
 
-  const uniqueCandidates = uniqueBy(candidates, (item) => `${item.source_url}-${item.title}`);
+  const rawUniqueCandidates = uniqueBy(candidates, (item) => `${item.source_url}-${item.title}`);
+  const uniqueCandidates = rawUniqueCandidates.filter(isQualityTenderCandidate);
+  const qualityRejectedCount = rawUniqueCandidates.length - uniqueCandidates.length;
   await writeJson(CANDIDATES_PATH, uniqueCandidates);
   const supabase = await saveCandidatesToSupabase(uniqueCandidates);
   const dbErrors = (supabase.errors ?? []).map((message) => ({
@@ -1089,7 +1185,7 @@ async function crawl(group) {
     fetchedCount: uniqueCandidates.length,
     createdCount: supabase.saved ?? 0,
     duplicateCount: supabase.duplicates ?? 0,
-    skippedCount: errors.length + (supabase.duplicates ?? 0) + cappedSkipCount + timeBudgetSkippedCount,
+    skippedCount: errors.length + (supabase.duplicates ?? 0) + (supabase.qualityRejected ?? 0) + cappedSkipCount + timeBudgetSkippedCount + qualityRejectedCount,
     errors: allErrors,
     skipped: supabase.skipped
   });
@@ -1102,10 +1198,12 @@ async function crawl(group) {
     group,
     target_source_count: sources.length,
     processed_source_count: processedSourceCount,
+    raw_candidate_count: rawUniqueCandidates.length,
     fetched_count: uniqueCandidates.length,
     registered_count: supabase.saved ?? 0,
     updated_count: 0,
-    skipped_count: errors.length + (supabase.duplicates ?? 0) + cappedSkipCount + timeBudgetSkippedCount,
+    skipped_count: errors.length + (supabase.duplicates ?? 0) + (supabase.qualityRejected ?? 0) + cappedSkipCount + timeBudgetSkippedCount + qualityRejectedCount,
+    quality_rejected_count: qualityRejectedCount,
     capped_skip_count: cappedSkipCount,
     time_budget_skipped_count: timeBudgetSkippedCount,
     error_count: allErrors.length,
@@ -1116,6 +1214,8 @@ async function crawl(group) {
     group,
     finished_at: new Date().toISOString(),
     candidate_count: uniqueCandidates.length,
+    raw_candidate_count: rawUniqueCandidates.length,
+    quality_rejected_count: qualityRejectedCount,
     error_count: errors.length,
     timeout_count: timeoutCount,
     target_source_count: sources.length,
@@ -1362,8 +1462,13 @@ async function saveCandidatesToSupabase(candidates) {
   if (!supabase) return { skipped: true, reason: "Supabase env vars are missing." };
   let saved = 0;
   let duplicates = 0;
+  let qualityRejected = 0;
   const errors = [];
   for (const item of candidates) {
+    if (!isQualityTenderCandidate(item)) {
+      qualityRejected += 1;
+      continue;
+    }
     const { data: sourceRow } = await supabase.from("tender_sources").select("id").eq("url", item.source_url).maybeSingle();
     const { data: existingTender } = await supabase.from("tenders").select("id").eq("source_url", item.source_url).maybeSingle();
     const { data: existingCandidate } = await supabase.from("tender_candidates").select("id").eq("source_url", item.source_url).maybeSingle();
@@ -1375,7 +1480,7 @@ async function saveCandidatesToSupabase(candidates) {
     if (result.error) errors.push(result.error.message);
     else saved += 1;
   }
-  return { skipped: false, saved, duplicates, errors };
+  return { skipped: false, saved, duplicates, qualityRejected, errors };
 }
 
 function formatDefenseCrawlError(error) {

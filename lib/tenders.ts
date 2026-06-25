@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
+import { isReviewableTenderCandidate } from "@/lib/tender-candidate-quality";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
 import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
@@ -471,6 +472,7 @@ function isBulkApprovableCandidate(candidate: TenderCandidate) {
   if (!candidate.agency_name.trim()) return false;
   if (candidate.review_status !== "pending") return false;
   if (candidate.duplicate_candidate_id) return false;
+  if (!isReviewableTenderCandidate(candidate)) return false;
   return candidate.tender_type !== "unknown" && candidate.tender_type !== "construction";
 }
 

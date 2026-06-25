@@ -1,13 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
-import { approveTenderCandidateAction, bulkApproveTenderCandidatesAction, updateTenderCandidateReviewAction } from "@/app/admin/tender-candidates/actions";
+import { approveTenderCandidateAction, bulkApproveTenderCandidatesAction, rejectWeakTenderCandidatesAction, updateTenderCandidateReviewAction } from "@/app/admin/tender-candidates/actions";
 import { BulkApproveForm } from "@/app/admin/tender-candidates/BulkApproveForm";
 import { AdminShell } from "@/components/AdminShell";
 import { TENDER_CANDIDATE_REVIEW_STATUS_LABELS, TENDER_CANDIDATE_TYPE_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { getCurrentAdmin } from "@/lib/admin";
 import { getTenderCandidateBulkCounts, getTenderCandidateMetrics, getTenderCandidatesPage, type TenderCandidateBulkCounts, type TenderCandidateMetrics, type TenderCandidatePageResult } from "@/lib/tenders";
+import { assessTenderCandidateQuality } from "@/lib/tender-candidate-quality";
 import type { TenderAttachment, TenderCandidate } from "@/lib/types";
 
 type SearchParams = {
@@ -17,6 +18,8 @@ type SearchParams = {
   bulkApproved?: string;
   bulkSkipped?: string;
   bulkScope?: string;
+  qualityRejected?: string;
+  qualityDuplicated?: string;
 };
 
 const PAGE_SIZE = 50;
@@ -95,6 +98,12 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
         </div>
       ) : null}
 
+      {params.qualityRejected || params.qualityDuplicated ? (
+        <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
+          品質整理: {params.qualityRejected ?? 0}件を却下、{params.qualityDuplicated ?? 0}件を重複に変更しました。
+        </div>
+      ) : null}
+
       {loadError ? (
         <div className="mb-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold leading-6 text-rose-900">
           案件候補の一部取得に失敗しました。ページを再読み込みしてください。詳細: {loadError}
@@ -114,6 +123,30 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
         <Metric label="rejected 件数" value={metrics.rejected} />
         <Metric label="duplicate 件数" value={metrics.duplicate} />
       </div>
+
+      {metrics.pending > 0 ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-black">候補品質チェック</h3>
+              <p className="mt-1">
+                月だけ、日付だけ、分類名だけ、短すぎる案件名、一覧・案内リンクに見える候補は承認対象から外します。既存公開URLや重複候補IDがあるものは duplicate に回してください。
+              </p>
+            </div>
+            <form action={rejectWeakTenderCandidatesAction}>
+              <input type="hidden" name="status" value={status} />
+              <input type="hidden" name="page" value={currentPage} />
+              <input type="hidden" name="perPage" value={pageResult.perPage} />
+              <button className="rounded border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-900 focus-ring hover:border-amber-500">
+                品質NG・重複候補を整理
+              </button>
+            </form>
+          </div>
+          <p className="mt-2 text-xs font-semibold text-amber-800">
+            rejected: 「10月」「入札公告」「公告一覧」など公告タイトルとして弱い候補。duplicate: 重複候補IDがある候補、または一括承認時に既存公開URLと一致した候補。
+          </p>
+        </div>
+      ) : null}
 
       {metrics.pending > 0 ? (
         <div className="mb-4">
@@ -166,6 +199,7 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
 }
 
 function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
+  const quality = assessTenderCandidateQuality(candidate);
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -174,6 +208,8 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
             <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{TENDER_CANDIDATE_REVIEW_STATUS_LABELS[candidate.review_status]}</span>
             <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">{TENDER_CANDIDATE_TYPE_LABELS[candidate.tender_type]}</span>
             {candidate.duplicate_candidate_id ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">重複候補あり</span> : null}
+            {quality.status === "reject" ? <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">品質NG: {quality.reason}</span> : null}
+            {quality.status === "duplicate" ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">duplicate推奨</span> : null}
           </div>
           <h3 className="mt-2 text-lg font-black leading-7 text-slate-950">{candidate.title}</h3>
           <p className="mt-1 text-sm text-slate-600">

@@ -35,7 +35,7 @@ export function BulkApproveForm({ action, candidateIds, counts, status, page, pe
         const scope = submitter?.value ?? "visible";
         const count = Number(counts[scope] ?? 0);
         const target = scope === "visible" ? `この画面に表示中の${count}件だけ` : `現在の確認待ち候補から条件一致する最大${count}件`;
-        if (!window.confirm(`${target}を公開案件に登録します。自動除外・重複はスキップされます。よろしいですか？`)) {
+        if (!window.confirm(`${target}を公開案件に登録します。品質NG・重複・既存公開URLはスキップされます。よろしいですか？`)) {
           event.preventDefault();
         }
       }}
@@ -48,7 +48,7 @@ export function BulkApproveForm({ action, candidateIds, counts, status, page, pe
       ))}
       <h3 className="font-black text-slate-950">一括承認</h3>
       <p className="mt-1 text-xs text-slate-500">
-        「表示中」はこのページの候補だけを対象にします。「全件」は現在の確認待ち候補全体から条件一致分を対象にします。空タイトル、重複、unknown、採用・広報・イベント系は自動的に除外します。
+        「表示中」はこのページの候補だけを対象にします。「全件」は現在の確認待ち候補全体から条件一致分を対象にします。月だけ、日付だけ、分類名だけ、短すぎる案件名、重複、unknown、採用・広報・イベント系は自動的に除外します。
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {buttons.map(({ scope, label, scopeLabel }) => (

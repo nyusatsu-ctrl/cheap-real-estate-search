@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
+import { assessTenderCandidateQuality, isReviewableTenderCandidate } from "@/lib/tender-candidate-quality";
 import type { Tender, TenderCandidate, TenderCandidateReviewStatus, TenderCandidateType, TenderType } from "@/lib/types";
 
 const candidatePath = path.join(process.cwd(), "data", "defense-candidates.json");
@@ -164,6 +165,49 @@ export async function bulkApproveTenderCandidatesAction(formData: FormData) {
   redirect(bulkResultPath(returnStatus, returnPage, returnPerPage, scope, approved, skipped));
 }
 
+export async function rejectWeakTenderCandidatesAction(formData: FormData) {
+  const admin = await ensureAdminOrLocalFallback();
+  const returnStatus = optionalString(formData, "status") ?? "pending";
+  const returnPage = optionalString(formData, "page") ?? "1";
+  const returnPerPage = optionalString(formData, "perPage") ?? "50";
+  const supabase = admin ? createTenderSupabaseServiceRoleClient() : null;
+
+  if (supabase) {
+    const candidates = await readSupabaseQualityCandidates(supabase);
+    const rejectIds: string[] = [];
+    const duplicateIds: string[] = [];
+    for (const candidate of candidates.map(normalizeDefenseTender)) {
+      const quality = assessTenderCandidateQuality(candidate);
+      if (quality.status === "reject") rejectIds.push(candidate.id);
+      if (quality.status === "duplicate") duplicateIds.push(candidate.id);
+    }
+    await updateSupabaseCandidateStatuses(supabase, rejectIds, "rejected");
+    await updateSupabaseCandidateStatuses(supabase, duplicateIds, "duplicate");
+    revalidateTenderPaths();
+    redirect(qualityResultPath(returnStatus, returnPage, returnPerPage, rejectIds.length, duplicateIds.length));
+  }
+
+  const now = new Date().toISOString();
+  let rejected = 0;
+  let duplicated = 0;
+  const nextCandidates = readLocalCandidates().map((candidate) => {
+    if (candidate.review_status !== "pending") return candidate;
+    const quality = assessTenderCandidateQuality(candidate);
+    if (quality.status === "reject") {
+      rejected += 1;
+      return { ...candidate, review_status: "rejected" as const, updated_at: now };
+    }
+    if (quality.status === "duplicate") {
+      duplicated += 1;
+      return { ...candidate, review_status: "duplicate" as const, updated_at: now };
+    }
+    return candidate;
+  });
+  writeJson(candidatePath, nextCandidates);
+  revalidateTenderPaths();
+  redirect(qualityResultPath(returnStatus, returnPage, returnPerPage, rejected, duplicated));
+}
+
 function isDeadlineSoon(value: string | null) {
   if (!value) return false;
   const diff = new Date(value).getTime() - Date.now();
@@ -288,6 +332,18 @@ async function readSupabaseBulkCandidates(supabase: TenderSupabaseServiceClient,
   }
 
   const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as TenderCandidate[];
+}
+
+async function readSupabaseQualityCandidates(supabase: TenderSupabaseServiceClient) {
+  const { data, error } = await supabase
+    .from("tender_candidates")
+    .select("*, tender_sources(name, source_name, organization_type, base_url)")
+    .eq("review_status", "pending")
+    .order("fetched_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(5000);
   if (error) throw new Error(error.message);
   return (data ?? []) as TenderCandidate[];
 }
@@ -467,6 +523,7 @@ function isBulkApprovable(candidate: TenderCandidate) {
   if (!candidate.agency_name.trim()) return false;
   if (candidate.review_status !== "pending") return false;
   if (candidate.duplicate_candidate_id) return false;
+  if (!isReviewableTenderCandidate(candidate)) return false;
   if (candidate.tender_type === "unknown" || candidate.tender_type === "construction") return false;
   if (isClearlyExcludedCandidate(candidate)) return false;
   return true;
@@ -501,6 +558,17 @@ function bulkResultPath(status: string, page: string, perPage: string, scope: st
     bulkScope: scope,
     bulkApproved: String(approved),
     bulkSkipped: String(skipped)
+  });
+  return `/admin/tender-candidates?${params.toString()}`;
+}
+
+function qualityResultPath(status: string, page: string, perPage: string, rejected: number, duplicated: number) {
+  const params = new URLSearchParams({
+    status,
+    page,
+    perPage,
+    qualityRejected: String(rejected),
+    qualityDuplicated: String(duplicated)
   });
   return `/admin/tender-candidates?${params.toString()}`;
 }

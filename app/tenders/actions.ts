@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
+import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { canUseMemberFeatures, normalizeFavoriteStatus } from "@/lib/tenders";
 import { requireMember } from "@/lib/user";
 
@@ -17,13 +17,13 @@ export async function saveFavoriteTenderAction(formData: FormData) {
   const tenderId = String(formData.get("tender_id") ?? "").trim();
   if (!tenderId) throw new Error("tender_id is required");
 
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) {
     revalidatePath("/favorites");
     redirect("/favorites");
   }
 
-  const { error } = await supabase.from("user_favorites").upsert(
+  const { error } = await supabase.from("tender_favorites").upsert(
     {
       user_id: member.id,
       tender_id: tenderId,
@@ -44,13 +44,13 @@ export async function saveNotificationAction(formData: FormData) {
   const member = await requireMember();
   if (!canUseMemberFeatures(member)) redirect("/billing?trial=expired");
 
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) {
     revalidatePath("/notifications");
     redirect("/notifications?saved=1");
   }
 
-  const { error } = await supabase.from("user_notifications").insert({
+  const { error } = await supabase.from("tender_notifications").insert({
     user_id: member.id,
     region: optionalString(formData, "region"),
     prefecture: optionalString(formData, "prefecture"),

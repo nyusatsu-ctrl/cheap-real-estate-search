@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { canUseMemberFeatures } from "@/lib/tenders";
 import { requireMember } from "@/lib/user";
 
@@ -67,7 +67,7 @@ export async function submitScrivenerInquiryAction(formData: FormData) {
   const consentShare = formData.get("consent_share_to_scrivener") === "on";
   if (!consentPrivacy || !consentShare) throw new Error("Consent is required");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) redirect("/scrivener?sent=1");
 
   const { error } = await supabase.from("scrivener_inquiries").insert({

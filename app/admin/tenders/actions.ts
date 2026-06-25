@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
-import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
+import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -17,23 +17,25 @@ function optionalString(formData: FormData, key: string) {
 
 export async function saveTenderAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const id = optionalString(formData, "id");
   const sourceName = requiredString(formData, "source_name");
   const sourceUrl = requiredString(formData, "source_url");
+  const sourceType = optionalString(formData, "source_type") ?? "manual";
+  const crawlerType = sourceType === "manual" ? "manual_only" : sourceType;
 
   const { data: source, error: sourceError } = await supabase
     .from("tender_sources")
     .insert({
       name: sourceName,
       url: sourceUrl,
-      source_type: optionalString(formData, "source_type") ?? "manual",
+      source_type: sourceType,
       source_name: sourceName,
       base_url: sourceUrl,
       tender_list_url: sourceUrl,
-      crawler_type: optionalString(formData, "source_type") ?? "manual_only",
+      crawler_type: crawlerType,
       organization_type: "other",
       target_types: ["goods", "services", "open_counter", "qualification_required"],
       source_format: "html",
@@ -85,7 +87,7 @@ export async function saveTenderAction(formData: FormData) {
 export async function deleteTenderAction(formData: FormData) {
   await requireAdmin();
   const id = requiredString(formData, "id");
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
 
   const { error } = await supabase.from("tenders").delete().eq("id", id);
@@ -98,17 +100,18 @@ export async function deleteTenderAction(formData: FormData) {
 
 export async function saveTenderSourceAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) throw new Error("Supabase environment variables are not set.");
+  const sourceType = requiredString(formData, "source_type");
 
   const { error } = await supabase.from("tender_sources").insert({
     name: requiredString(formData, "name"),
     url: requiredString(formData, "url"),
-    source_type: requiredString(formData, "source_type"),
+    source_type: sourceType,
     source_name: requiredString(formData, "name"),
     base_url: requiredString(formData, "url"),
     tender_list_url: requiredString(formData, "url"),
-    crawler_type: requiredString(formData, "source_type"),
+    crawler_type: sourceType === "manual" ? "manual_only" : sourceType,
     organization_type: "other",
     target_types: ["goods", "services", "open_counter", "qualification_required"],
     source_format: "html",

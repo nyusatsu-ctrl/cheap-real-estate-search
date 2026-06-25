@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import type { PastAwardResult, PastAwardReviewStatus, PastAwardStats, SimilarPastAwardResult, Tender } from "@/lib/types";
 
 const pastAwardPath = path.join(process.cwd(), "data", "past-award-results.json");
@@ -38,6 +38,10 @@ export type AdminPastAwardPageResult = {
   statusCounts: Record<PastAwardReviewStatus | "all", number>;
 };
 
+type TenderSupabaseClient =
+  | NonNullable<ReturnType<typeof createTenderSupabaseServiceRoleClient>>
+  | NonNullable<Awaited<ReturnType<typeof createTenderSupabaseServerClient>>>;
+
 type FilterableQuery<T> = {
   eq(column: string, value: string): T;
   gte(column: string, value: string): T;
@@ -56,7 +60,7 @@ export async function getAdminPastAwardPage(input: AdminPastAwardPageInput = {})
   const requestedPage = positiveInt(input.page, 1);
   const perPage = normalizePerPage(input.perPage);
   const fallbackAwards = getFallbackPastAwardResults("all");
-  const supabase = createSupabaseServiceRoleClient() ?? await createSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient() ?? await createTenderSupabaseServerClient();
   if (!supabase) return pageLocalPastAwards(fallbackAwards, filters, requestedPage, perPage);
 
   let query = supabase
@@ -103,7 +107,7 @@ export async function getAdminPastAwardPage(input: AdminPastAwardPageInput = {})
 
 export async function getSimilarPastAwardResults(tender: Tender, limit = 10) {
   const fallbackAwards = scoreSimilarAwards(getFallbackPastAwardResults("approved"), tender).slice(0, limit);
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) return fallbackAwards;
 
   const { data, error } = await supabase
@@ -277,7 +281,7 @@ function applyAdminPastAwardFilters<T extends FilterableQuery<T>>(query: T, filt
   return filtered;
 }
 
-async function getSupabasePastAwardStatusCounts(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, filters: AdminPastAwardFilters) {
+async function getSupabasePastAwardStatusCounts(supabase: TenderSupabaseClient | null, filters: AdminPastAwardFilters) {
   if (!supabase) return { all: 0, approved: 0, pending: 0, rejected: 0 };
 
   const countFor = async (status: PastAwardReviewStatus | "all") => {

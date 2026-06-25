@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
+import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
@@ -51,7 +51,7 @@ export async function getPublishedTender(id: string) {
 }
 
 export async function getAdminTenders() {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return getFallbackTenders();
 
   const { data, error } = await supabase
@@ -64,7 +64,7 @@ export async function getAdminTenders() {
 }
 
 export async function getAdminTender(id: string) {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return getFallbackTenders().find((tender) => tender.id === id) ?? null;
 
   const { data, error } = await supabase
@@ -78,7 +78,7 @@ export async function getAdminTender(id: string) {
 }
 
 export async function getTenderSources() {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return getFallbackTenderSources();
 
   const { data, error } = await supabase.from("tender_sources").select("*").order("crawl_priority", { ascending: true }).order("updated_at", { ascending: false });
@@ -94,7 +94,7 @@ export async function getTenderSources() {
 }
 
 export async function getTenderCandidates(status: string = "pending") {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   const fallbackCandidates = getFallbackTenderCandidates(status);
   if (!supabase) return fallbackCandidates;
 
@@ -112,7 +112,7 @@ export async function getTenderCandidates(status: string = "pending") {
 }
 
 export async function getTenderCrawlLogs(limit: number = 20) {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return [] as TenderCrawlLog[];
 
   const { data, error } = await supabase
@@ -126,7 +126,7 @@ export async function getTenderCrawlLogs(limit: number = 20) {
 }
 
 export async function getTenderCandidate(id: string) {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
@@ -140,7 +140,7 @@ export async function getTenderCandidate(id: string) {
 }
 
 async function getTenderCountsBySource() {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   const counts = new Map<string, number>();
   if (!supabase) return counts;
 
@@ -153,7 +153,7 @@ async function getTenderCountsBySource() {
 }
 
 async function getLatestCrawlErrorsBySource() {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   const errors = new Map<string, string | null>();
   if (!supabase) return errors;
 
@@ -171,11 +171,11 @@ async function getLatestCrawlErrorsBySource() {
 }
 
 export async function getFavoriteTenders(userId: string) {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return sampleFavorites.filter((favorite) => favorite.user_id === userId);
 
   const { data, error } = await supabase
-    .from("user_favorites")
+    .from("tender_favorites")
     .select("*, tenders(*)")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
@@ -185,7 +185,7 @@ export async function getFavoriteTenders(userId: string) {
 }
 
 export async function getScrivenerInquiries() {
-  const supabase = await createTenderSupabaseServerClient();
+  const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return [] as ScrivenerInquiry[];
 
   const { data, error } = await supabase.from("scrivener_inquiries").select("*").order("created_at", { ascending: false });

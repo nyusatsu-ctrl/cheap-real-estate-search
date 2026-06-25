@@ -23,6 +23,8 @@ const DEFAULT_MAX_SOURCES = numberEnv("DEFENSE_CRAWLER_MAX_SOURCES", 0);
 const PLAYWRIGHT_FALLBACK_ENABLED = process.env.DEFENSE_CRAWLER_DISABLE_PLAYWRIGHT !== "1";
 const PLAYWRIGHT_HEADLESS = process.env.DEFENSE_CRAWLER_PLAYWRIGHT_HEADLESS !== "0";
 const BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
+const DRY_RUN = process.argv.includes("--dry-run");
+const NO_DB = process.argv.includes("--no-db") || DRY_RUN;
 
 let playwrightBrowser = null;
 let playwrightContext = null;
@@ -31,6 +33,19 @@ let playwrightFallbackChain = Promise.resolve();
 function numberEnv(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function argValue(name, fallback = null) {
+  const prefix = `${name}=`;
+  return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ?? fallback;
+}
+
+function shouldWriteOutputFiles() {
+  return !DRY_RUN;
+}
+
+function shouldUseDatabase() {
+  return !NO_DB;
 }
 
 const OFFICIAL_HOSTS = [
@@ -199,12 +214,19 @@ const CLASSIFICATION_ONLY_TITLES = new Set([
   "お知らせ",
   "一覧",
   "詳細",
+  "公募に関する公示",
   "PDF",
   "EXCEL",
   "WORD"
 ]);
 const GUIDANCE_TITLE_PATTERNS = [
   /オープンカウンター方式/,
+  /入札及び契約心得/,
+  /随意契約を前提とした見積依頼/,
+  /見積依頼公開日.*見積書提出期限/,
+  /入札公告[・･]公示等のページです/,
+  /が実施する入札公告[・･]公示等/,
+  /^公募に関する公示$/,
   /^入札[・･]落札情報はこちら$/,
   /入札情報のページに掲載/,
   /標準契約条項|標準契約書|契約書式|契約様式/,
@@ -233,14 +255,18 @@ const DEFENSE_PARENT_SOURCES = [
 const ASDF_BASE_SOURCES = [
   source("千歳基地", "air_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/asdf/chitose/acs/", "defense_unit", "A"),
   source("三沢基地", "air_self_defense_force", "東北", "青森県", "https://www.mod.go.jp/asdf/misawa/offer/public_offering/public_offering.html", "defense_unit", "A"),
+  source("三沢基地 オープンカウンター", "air_self_defense_force", "東北", "青森県", "https://www.mod.go.jp/asdf/misawa/offer/public_offering/opencounter.html", "defense_unit", "A"),
   source("秋田分屯基地", "air_self_defense_force", "東北", "秋田県", "https://www.mod.go.jp/asdf/akita/", "defense_unit", "A"),
   source("松島基地", "air_self_defense_force", "東北", "宮城県", "https://www.mod.go.jp/asdf/matsushima/", "defense_unit", "A"),
   source("新潟分屯基地", "air_self_defense_force", "中部", "新潟県", "https://www.mod.go.jp/asdf/niigata/", "defense_unit", "A"),
   source("百里基地", "air_self_defense_force", "関東", "茨城県", "https://www.mod.go.jp/asdf/hyakuri/", "defense_unit", "A"),
+  source("百里基地 調達情報", "air_self_defense_force", "関東", "茨城県", "https://www.mod.go.jp/asdf/hyakuri/acs/2-7_procurement/2-7_procurement.html", "defense_unit", "A"),
   source("木更津分屯基地", "air_self_defense_force", "関東", "千葉県", "https://www.mod.go.jp/asdf/kisarazu/", "defense_unit", "A"),
+  source("木更津分屯基地 調達情報", "air_self_defense_force", "関東", "千葉県", "https://www.mod.go.jp/asdf/kisarazu/acs/index.html", "defense_unit", "A"),
   source("十条基地", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/jujo/", "defense_unit", "A"),
   source("市ヶ谷基地", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/ichigaya/", "defense_unit", "A"),
   source("目黒基地", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/meguro/", "defense_unit", "A"),
+  source("目黒基地 調達情報", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/meguro/choutatsu/choutatsu.html", "defense_unit", "A"),
   source("府中基地", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/fuchu/", "defense_unit", "A"),
   source("横田基地", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/yokota/", "defense_unit", "A"),
   source("入間基地", "air_self_defense_force", "関東", "埼玉県", "https://www.mod.go.jp/asdf/iruma/bosyu/raising/index.html", "defense_unit", "A"),
@@ -249,7 +275,9 @@ const ASDF_BASE_SOURCES = [
   source("浜松基地", "air_self_defense_force", "中部", "静岡県", "https://www.mod.go.jp/asdf/hamamatsu/", "defense_unit", "A"),
   source("小牧基地", "air_self_defense_force", "中部", "愛知県", "https://www.mod.go.jp/asdf/komaki/", "defense_unit", "A"),
   source("岐阜基地", "air_self_defense_force", "中部", "岐阜県", "https://www.mod.go.jp/asdf/gifu/", "defense_unit", "A"),
+  source("岐阜基地 会計隊", "air_self_defense_force", "中部", "岐阜県", "https://www.mod.go.jp/asdf/gifu/acd/sub1.html", "defense_unit", "A"),
   source("小松基地", "air_self_defense_force", "中部", "石川県", "https://www.mod.go.jp/asdf/komatsu/", "defense_unit", "A"),
+  source("小松基地 調達情報", "air_self_defense_force", "中部", "石川県", "https://www.mod.go.jp/asdf/komatsu/6/third/62.html", "defense_unit", "A"),
   source("奈良基地", "air_self_defense_force", "近畿", "奈良県", "https://www.mod.go.jp/asdf/nara/", "defense_unit", "A"),
   source("美保基地", "air_self_defense_force", "中国", "鳥取県", "https://www.mod.go.jp/asdf/miho/", "defense_unit", "A"),
   source("防府北基地", "air_self_defense_force", "中国", "山口県", "https://www.mod.go.jp/asdf/hofukita/", "defense_unit", "A"),
@@ -258,23 +286,55 @@ const ASDF_BASE_SOURCES = [
   source("芦屋基地", "air_self_defense_force", "九州", "福岡県", "https://www.mod.go.jp/asdf/ashiya/choutatsu/", "defense_unit", "A"),
   source("春日基地", "air_self_defense_force", "九州", "福岡県", "https://www.mod.go.jp/asdf/kasuga/", "defense_unit", "A"),
   source("新田原基地", "air_self_defense_force", "九州", "宮崎県", "https://www.mod.go.jp/asdf/nyutabaru/08cyoutatsu/", "defense_unit", "A"),
-  source("那覇基地", "air_self_defense_force", "沖縄", "沖縄県", "https://www.mod.go.jp/asdf/naha/acs/", "defense_unit", "A")
+  source("那覇基地", "air_self_defense_force", "沖縄", "沖縄県", "https://www.mod.go.jp/asdf/naha/acs/", "defense_unit", "A"),
+  source("那覇基地 調達情報", "air_self_defense_force", "沖縄", "沖縄県", "https://www.mod.go.jp/asdf/naha/acs/custom1.html", "defense_unit", "A"),
+  source("宮古島分屯基地 調達情報", "air_self_defense_force", "沖縄", "沖縄県", "https://www.mod.go.jp/asdf/miyako/tyoutatu/index.html", "defense_unit", "A"),
+  source("航空自衛隊補給本部 入札情報等", "air_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/asdf/amc/choutatsu/nyuusatsu/index.html", "defense_unit", "A"),
+  source("航空自衛隊第3補給処 調達部", "air_self_defense_force", "中部", "埼玉県", "https://www.mod.go.jp/asdf/3dep/prd/menu/menu1.html", "defense_unit", "A")
 ];
 
-const DEFENSE_SEED_SOURCES = [
-  ...DEFENSE_PARENT_SOURCES,
+const GSDF_ACCOUNTING_SOURCES = [
   source("北部方面隊", "ground_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/gsdf/nae/fin/", "defense_unit", "A"),
+  source("北部方面会計隊", "ground_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/gsdf/nae/fin/nafin/kokoku-index.html", "defense_unit", "A"),
+  source("北部方面会計隊 令和7年度入札公告", "ground_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/gsdf/nae/fin/nafin/R7koukoku.html", "defense_unit", "A"),
+  source("北部方面会計隊 令和8年度オープンカウンター", "ground_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/gsdf/nae/fin/nafin/R8open.html", "defense_unit", "A"),
   source("東北方面隊", "ground_self_defense_force", "東北", null, "https://www.mod.go.jp/gsdf/neae/koukoku/fin/", "defense_unit", "A"),
+  source("東北方面会計隊", "ground_self_defense_force", "東北", null, "https://www.mod.go.jp/gsdf/neae/neahq/koukoku/finindex.htm", "defense_unit", "A"),
   source("東部方面隊", "ground_self_defense_force", "関東", null, "https://www.mod.go.jp/gsdf/eae/kaikei/eafin/index.html", "defense_unit", "A"),
+  source("東部方面会計隊 物品・役務入札", "ground_self_defense_force", "関東", null, "https://www.mod.go.jp/gsdf/eae/kaikei/eafin/nyusatsu_ekimu.html", "defense_unit", "A"),
   source("中部方面隊", "ground_self_defense_force", "中部", null, "https://www.mod.go.jp/gsdf/mae/mafin/", "defense_unit", "A"),
   source("西部方面隊", "ground_self_defense_force", "九州", null, "https://www.mod.go.jp/gsdf/wae/info/nyusatu/", "defense_unit", "A"),
+  source("西部方面会計隊", "ground_self_defense_force", "九州", null, "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/", "defense_unit", "A"),
   source("西部方面会計隊 物品・役務", "ground_self_defense_force", "九州", null, "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/kou/R8ippan.htm", "defense_unit", "A"),
   source("西部方面会計隊 物品・役務 Excel表", "ground_self_defense_force", "九州", null, "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/kou/R8ippan.files/sheet001.htm", "defense_unit", "A"),
   source("西部方面会計隊 オープンカウンター", "ground_self_defense_force", "九州", null, "https://www.mod.go.jp/gsdf/wae/info/nyusatu/wa-fin/open/", "defense_unit", "A"),
   source("中央会計隊", "ground_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/gsdf/dc/cfin/html/", "defense_unit", "A"),
+  source("中央会計隊 入札公告", "ground_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/gsdf/dc/cfin/html/fee.html", "defense_unit", "A")
+];
+
+const GSDF_DEPOT_SCHOOL_SOURCES = [
+  source("北海道補給処 調達情報", "ground_self_defense_force", "北海道", "北海道", "https://www.mod.go.jp/gsdf/nae/nadep/nyuusatujouhou/nyuusatujouhou.html", "defense_unit", "A"),
+  source("補給統制本部", "ground_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/gsdf/gmcc/", "defense_unit", "B"),
+  source("関東補給処 調達会計部", "ground_self_defense_force", "関東", "茨城県", "https://www.mod.go.jp/gsdf/eae/eadep/tyokai/honsyo/honsyo.index.html", "defense_unit", "A"),
   source("中央輸送隊", "ground_self_defense_force", "関東", "神奈川県", "https://www.mod.go.jp/gsdf/yokohama/", "defense_unit", "B"),
-  source("補給本部", "ground_self_defense_force", "関東", "東京都", "https://www.mod.go.jp/gsdf/gmcc/", "defense_unit", "B"),
-  ...ASDF_BASE_SOURCES,
+  source("久里浜駐屯地 入札情報", "ground_self_defense_force", "関東", "神奈川県", "https://www.mod.go.jp/gsdf/sigsch/fin/index.html", "defense_unit", "A"),
+  source("富士学校", "ground_self_defense_force", "中部", "静岡県", "https://www.mod.go.jp/gsdf/fsh/", "defense_unit", "B")
+];
+
+const MSDF_DISTRICT_SOURCES = [
+  source("海上自衛隊 横須賀地方総監部 入札公告", "maritime_self_defense_force", "関東", "神奈川県", "https://www.mod.go.jp/msdf/bukei/y0/nyusatsu_s.html", "defense_unit", "A"),
+  source("海上自衛隊 呉地方総監部 入札情報", "maritime_self_defense_force", "中国", "広島県", "https://www.mod.go.jp/msdf/kure/choutatu/link.htm", "defense_unit", "A"),
+  source("海上自衛隊 佐世保地方総監部 入札公告", "maritime_self_defense_force", "九州", "長崎県", "https://www.mod.go.jp/msdf/bukei/s0/nyusatsu_s.html", "defense_unit", "A"),
+  source("海上自衛隊 舞鶴地方総監部 入札公告", "maritime_self_defense_force", "近畿", "京都府", "https://www.mod.go.jp/msdf/bukei/m0/nyusatsu_s.html", "defense_unit", "A"),
+  source("海上自衛隊 大湊地方総監部 入札公告", "maritime_self_defense_force", "東北", "青森県", "https://www.mod.go.jp/msdf/bukei/o0/nyusatsu_s.html", "defense_unit", "A"),
+  source("海上自衛隊 横須賀地方総監部", "maritime_self_defense_force", "関東", "神奈川県", "https://www.mod.go.jp/msdf/yokosuka/", "defense_unit", "B"),
+  source("海上自衛隊 呉地方総監部", "maritime_self_defense_force", "中国", "広島県", "https://www.mod.go.jp/msdf/kure/", "defense_unit", "B"),
+  source("海上自衛隊 佐世保地方総監部", "maritime_self_defense_force", "九州", "長崎県", "https://www.mod.go.jp/msdf/sasebo/", "defense_unit", "B"),
+  source("海上自衛隊 舞鶴地方総監部", "maritime_self_defense_force", "近畿", "京都府", "https://www.mod.go.jp/msdf/maizuru/", "defense_unit", "B"),
+  source("海上自衛隊 大湊地方総監部", "maritime_self_defense_force", "東北", "青森県", "https://www.mod.go.jp/msdf/oominato/", "defense_unit", "B")
+];
+
+const DEFENSE_BUREAU_SOURCES = [
   source("北海道防衛局", "defense_bureau", "北海道", "北海道", "https://www.mod.go.jp/rdb/hokkaido/keiyaku/index.html", "defense_unit", "A"),
   source("東北防衛局", "defense_bureau", "東北", "宮城県", "https://www.mod.go.jp/rdb/tohoku/index.html", "defense_unit", "A"),
   source("北関東防衛局", "defense_bureau", "関東", "埼玉県", "https://www.mod.go.jp/rdb/n-kanto/nyusatsu-keiyaku/nyusatsu-keiyaku.html", "defense_unit", "A"),
@@ -284,6 +344,16 @@ const DEFENSE_SEED_SOURCES = [
   source("中国四国防衛局", "defense_bureau", "中国", "広島県", "https://www.mod.go.jp/rdb/chushi/contract/", "defense_unit", "A"),
   source("九州防衛局", "defense_bureau", "九州", "福岡県", "https://www.mod.go.jp/rdb/kyushu/contract/", "defense_unit", "A"),
   source("沖縄防衛局", "defense_bureau", "沖縄", "沖縄県", "https://www.mod.go.jp/rdb/okinawa/contract/", "defense_unit", "A")
+];
+
+const DEFENSE_SEED_SOURCES = [
+  ...DEFENSE_PARENT_SOURCES,
+  source("防衛省 内部部局", "defense_ministry", "全国", null, "https://www.mod.go.jp/j/budget/chotatsu/naikyoku/index.html", "defense_mod", "A"),
+  ...GSDF_ACCOUNTING_SOURCES,
+  ...GSDF_DEPOT_SCHOOL_SOURCES,
+  ...MSDF_DISTRICT_SOURCES,
+  ...ASDF_BASE_SOURCES,
+  ...DEFENSE_BUREAU_SOURCES
 ];
 
 function source(sourceName, organizationType, region, prefecture, url, crawlerType, priority) {
@@ -303,10 +373,10 @@ function source(sourceName, organizationType, region, prefecture, url, crawlerTy
     crawl_priority: priority,
     crawl_frequency: "daily",
     is_active: true,
-    robots_note: "未確認",
-    terms_note: "未確認",
-    admin_note: "防衛省・自衛隊公式ページ。robots.txt と利用規約確認後に本番自動クロール対象にする。",
-    crawl_ready: false
+    robots_note: "公式公開ページを対象にメタ情報のみ取得。問題があれば管理画面で無効化する。",
+    terms_note: "公式公告・調達情報ページを対象に日次取得する。",
+    admin_note: "防衛省・自衛隊公式ページ。案件らしい公告・公募・見積依頼リンクだけ候補化する。",
+    crawl_ready: true
   };
 }
 
@@ -400,7 +470,8 @@ function shouldUsePlaywrightFallback(error, url, sourceInfo) {
   if (!["HTTP_403", "ANTI_BOT_CHALLENGE"].includes(error.code)) return false;
 
   const target = `${url} ${sourceInfo?.source_name ?? ""}`;
-  return /西部方面|北部方面|東北方面|中央会計隊|中部方面|東部方面|\/gsdf\/wae\/|\/gsdf\/nae\/|\/gsdf\/neae\/|\/gsdf\/dc\/cfin\/|\/gsdf\/mae\/|\/gsdf\/eae\/kaikei\/eafin\//.test(target);
+  return /\/(?:gsdf|msdf|asdf|rdb)\//.test(target)
+    || /西部方面|北部方面|東北方面|中央会計隊|中部方面|東部方面|基地|地方総監部|防衛局|補給処/.test(target);
 }
 
 async function withPlaywrightFallback(task) {
@@ -715,6 +786,7 @@ function extractWesternAreaCandidates(html, pageUrl, sourceInfo, yearContext) {
     candidates.push({
       source_id: null,
       source_name: sourceInfo.source_name,
+      _source_list_url: sourceInfo.tender_list_url,
       organization_type: sourceInfo.organization_type,
       title,
       agency_name: sourceInfo.source_name,
@@ -777,6 +849,7 @@ function extractFrameRowCandidates(frameRows, pageUrl, sourceInfo) {
     candidates.push({
       source_id: null,
       source_name: sourceInfo.source_name,
+      _source_list_url: sourceInfo.tender_list_url,
       organization_type: sourceInfo.organization_type,
       title,
       agency_name: sourceInfo.source_name,
@@ -859,6 +932,7 @@ function candidateFromText(text, links, sourceInfo, pageUrl, yearContext) {
   return {
     source_id: null,
     source_name: sourceInfo.source_name,
+    _source_list_url: sourceInfo.tender_list_url,
     organization_type: sourceInfo.organization_type,
     title,
     agency_name: sourceInfo.source_name,
@@ -1104,8 +1178,11 @@ function toIso(year, month, day) {
 }
 
 async function discover(group) {
-  const parents = filterSources(DEFENSE_SEED_SOURCES, group);
-  const discovered = [...filterSources(DEFENSE_SEED_SOURCES, group)];
+  const seedSources = rankSourcesForCrawl(filterSources(DEFENSE_SEED_SOURCES, group));
+  const maxSources = Number(argValue("--max-sources", 0));
+  const parents = maxSources > 0 ? seedSources.slice(0, maxSources) : seedSources;
+  const discovered = [...seedSources];
+  const cappedSkipCount = Math.max(0, seedSources.length - parents.length);
 
   try {
     for (const parent of parents) {
@@ -1121,20 +1198,25 @@ async function discover(group) {
     await closePlaywrightBrowser();
   }
 
-  const sources = uniqueBy(discovered, (item) => item.tender_list_url);
-  await writeJson(SOURCES_PATH, sources);
+  const sources = rankSourcesForCrawl(uniqueBy(discovered, (item) => item.tender_list_url));
+  if (shouldWriteOutputFiles()) await writeJson(SOURCES_PATH, sources);
   const supabase = await saveSourcesToSupabase(sources);
-  return { sources, supabase };
+  return { sources, supabase, scanned: parents.length, cappedSkipCount };
 }
 
 async function crawl(group) {
   const startedAt = new Date().toISOString();
   const deadlineMs = Date.now() + CRAWL_TIME_BUDGET_MS;
-  let sources = await readJson(SOURCES_PATH, []);
+  let sources = mergeSourceLists(DEFENSE_SEED_SOURCES, await readJson(SOURCES_PATH, []));
   if (!sources.length) sources = (await discover(group)).sources;
   sources = filterSources(sources, group);
+  const sourceUrl = argValue("--source-url");
+  if (sourceUrl) {
+    sources = sources.filter((sourceInfo) => [sourceInfo.tender_list_url, sourceInfo.url, sourceInfo.base_url].filter(Boolean).some((url) => url.includes(sourceUrl)));
+  }
+  sources = rankSourcesForCrawl(sources);
   const availableSourceCount = sources.length;
-  const maxSources = Number(process.argv.find((arg) => arg.startsWith("--max-sources="))?.split("=")[1] ?? DEFAULT_MAX_SOURCES);
+  const maxSources = Number(argValue("--max-sources", DEFAULT_MAX_SOURCES));
   if (maxSources > 0) sources = sources.slice(0, maxSources);
   const cappedSkipCount = Math.max(0, availableSourceCount - sources.length);
   console.log(JSON.stringify({
@@ -1154,17 +1236,20 @@ async function crawl(group) {
   }));
   const candidates = [];
   const errors = [];
+  let results = [];
   let processedSourceCount = 0;
   let timeBudgetSkippedCount = 0;
 
   try {
-    const results = await mapLimit(sources, CRAWL_CONCURRENCY, (sourceInfo) => {
+    results = await mapLimit(sources, CRAWL_CONCURRENCY, (sourceInfo) => {
       if (Date.now() >= deadlineMs) {
         timeBudgetSkippedCount += 1;
         return {
+          sourceInfo,
           candidates: [],
           errors: [{
             url: sourceInfo.tender_list_url,
+            source_list_url: sourceInfo.tender_list_url,
             source_name: sourceInfo.source_name,
             error: "Defense crawl time budget exceeded before source start.",
             error_type: "crawl_timeout",
@@ -1186,8 +1271,9 @@ async function crawl(group) {
   const rawUniqueCandidates = uniqueBy(candidates, (item) => `${item.source_url}-${item.title}`);
   const uniqueCandidates = rawUniqueCandidates.filter(isQualityTenderCandidate);
   const qualityRejectedCount = rawUniqueCandidates.length - uniqueCandidates.length;
-  await writeJson(CANDIDATES_PATH, uniqueCandidates);
+  if (shouldWriteOutputFiles()) await writeJson(CANDIDATES_PATH, uniqueCandidates);
   const supabase = await saveCandidatesToSupabase(uniqueCandidates);
+  await updateSourceCrawlOutcomes(results);
   const dbErrors = (supabase.errors ?? []).map((message) => ({
     url: null,
     source_name: "Supabase",
@@ -1226,7 +1312,7 @@ async function crawl(group) {
     error_count: allErrors.length,
     timeout_count: timeoutCount
   }));
-  await writeJson(CRAWL_SUMMARY_PATH, {
+  const summary = {
     command: "crawl",
     group,
     finished_at: new Date().toISOString(),
@@ -1241,7 +1327,8 @@ async function crawl(group) {
     time_budget_skipped_count: timeBudgetSkippedCount,
     errors,
     supabase
-  });
+  };
+  if (shouldWriteOutputFiles()) await writeJson(CRAWL_SUMMARY_PATH, summary);
   return { candidates: uniqueCandidates, errors, supabase };
 }
 
@@ -1254,6 +1341,7 @@ async function crawlSourceWithTimeout(sourceInfo, crawlDeadlineMs = Number.POSIT
         candidates: [],
         errors: [{
           url: sourceInfo.tender_list_url,
+          source_list_url: sourceInfo.tender_list_url,
           source_name: sourceInfo.source_name,
           error: `Source timeout after ${SOURCE_TIMEOUT_MS}ms.`,
           error_type: "source_timeout",
@@ -1263,9 +1351,11 @@ async function crawlSourceWithTimeout(sourceInfo, crawlDeadlineMs = Number.POSIT
     );
   } catch (error) {
     return {
+      sourceInfo,
       candidates: [],
       errors: [{
         url: sourceInfo.tender_list_url,
+        source_list_url: sourceInfo.tender_list_url,
         source_name: sourceInfo.source_name,
         error: error.message,
         error_type: errorType(error),
@@ -1293,6 +1383,7 @@ async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINIT
       if (Date.now() >= sourceDeadlineMs) {
         errors.push({
           url: link.url,
+          source_list_url: sourceInfo.tender_list_url,
           source_name: sourceInfo.source_name,
           error: `Source time budget exceeded after ${SOURCE_TIMEOUT_MS}ms.`,
           error_type: "source_timeout",
@@ -1312,6 +1403,7 @@ async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINIT
       } catch (error) {
         errors.push({
           url: link.url,
+          source_list_url: sourceInfo.tender_list_url,
           source_name: sourceInfo.source_name,
           error: error.message,
           error_type: errorType(error),
@@ -1323,6 +1415,7 @@ async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINIT
   } catch (error) {
     errors.push({
       url: sourceInfo.tender_list_url,
+      source_list_url: sourceInfo.tender_list_url,
       source_name: sourceInfo.source_name,
       error: error.message,
       error_type: errorType(error),
@@ -1338,7 +1431,7 @@ async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINIT
     timeout_count: errors.filter((error) => error.timeout).length,
     duration_ms: Date.now() - sourceStartedAt
   }));
-  return { candidates, errors };
+  return { sourceInfo, candidates, errors };
 }
 
 function withTimeout(promise, timeoutMs, onTimeout) {
@@ -1446,8 +1539,52 @@ function filterSources(sources, group) {
   return sources.filter((sourceInfo) => allowed.includes(sourceInfo.organization_type));
 }
 
+function mergeSourceLists(...sourceGroups) {
+  return uniqueBy(
+    sourceGroups.flat().filter(Boolean),
+    (sourceInfo) => sourceInfo.tender_list_url ?? sourceInfo.url
+  );
+}
+
+function rankSourcesForCrawl(sources) {
+  return [...sources].sort((left, right) => {
+    const scoreDiff = sourceCrawlScore(left) - sourceCrawlScore(right);
+    if (scoreDiff !== 0) return scoreDiff;
+    return String(left.source_name ?? left.name ?? "").localeCompare(String(right.source_name ?? right.name ?? ""), "ja");
+  });
+}
+
+function sourceCrawlScore(sourceInfo) {
+  const target = `${sourceInfo.source_name ?? sourceInfo.name ?? ""} ${sourceInfo.tender_list_url ?? sourceInfo.url ?? ""}`;
+  const priorityScore = { A: 0, B: 25, C: 60, D: 90 }[sourceInfo.crawl_priority] ?? 50;
+  const organizationScore = {
+    ground_self_defense_force: 0,
+    maritime_self_defense_force: 8,
+    air_self_defense_force: 12,
+    defense_equipment_agency: 16,
+    defense_ministry: 18,
+    defense_bureau: 22,
+    defense_research: 24,
+    defense_hospital: 28
+  }[sourceInfo.organization_type] ?? 35;
+  const highValueBonus = [
+    /会計隊.*(?:物品|役務|入札|公告|オープンカウンタ|見積)/,
+    /(?:入札公告|入札情報|公告|公募|見積|オープンカウンタ)/,
+    /(?:築城基地|芦屋基地|那覇基地|航空自衛隊補給本部|第3補給処)/,
+    /(?:横須賀|呉|佐世保|舞鶴|大湊).*入札/,
+    /(?:防衛省・自衛隊 公告|防衛研究所)/
+  ].some((pattern) => pattern.test(target)) ? -35 : 0;
+  const lowValuePenalty = [
+    /(?:契約結果|入札結果|発注実績|工事発注予定|公共調達の適正化|調達実績)/,
+    /(?:各種様式|契約条項|心得|総合案内|オープンキャンパス)/,
+    /(?:契約情報)$/
+  ].some((pattern) => pattern.test(target)) ? 120 : 0;
+  const readinessPenalty = sourceInfo.is_active === false ? 250 : 0;
+  return priorityScore + organizationScore + highValueBonus + lowValuePenalty + readinessPenalty;
+}
+
 async function saveSourcesToSupabase(sources) {
-  if (process.argv.includes("--no-db")) return { skipped: true, reason: "--no-db was specified." };
+  if (!shouldUseDatabase()) return { skipped: true, reason: DRY_RUN ? "--dry-run was specified." : "--no-db was specified." };
   const supabase = await supabaseClient();
   if (!supabase) return { skipped: true, reason: "Supabase env vars are missing." };
   let saved = 0;
@@ -1474,30 +1611,121 @@ async function saveSourcesToSupabase(sources) {
 }
 
 async function saveCandidatesToSupabase(candidates) {
-  if (process.argv.includes("--no-db")) return { skipped: true, reason: "--no-db was specified." };
+  if (!shouldUseDatabase()) return { skipped: true, reason: DRY_RUN ? "--dry-run was specified." : "--no-db was specified." };
   const supabase = await supabaseClient();
   if (!supabase) return { skipped: true, reason: "Supabase env vars are missing." };
   let saved = 0;
   let duplicates = 0;
-  let qualityRejected = 0;
   const errors = [];
-  for (const item of candidates) {
-    if (!isQualityTenderCandidate(item)) {
-      qualityRejected += 1;
-      continue;
-    }
-    const { data: sourceRow } = await supabase.from("tender_sources").select("id").eq("url", item.source_url).maybeSingle();
-    const { data: existingTender } = await supabase.from("tenders").select("id").eq("source_url", item.source_url).maybeSingle();
-    const { data: existingCandidate } = await supabase.from("tender_candidates").select("id").eq("source_url", item.source_url).maybeSingle();
-    if (existingTender || existingCandidate) {
+
+  const qualityCandidates = candidates.filter(isQualityTenderCandidate);
+  const qualityRejected = candidates.length - qualityCandidates.length;
+  const candidateUrls = uniqueBy(qualityCandidates.map((item) => item.source_url).filter(Boolean), (url) => url);
+  const [existingTenderUrls, existingCandidateUrls, sourceIdsByUrl, sourceIdsByName] = await Promise.all([
+    readExistingSourceUrls(supabase, "tenders", candidateUrls),
+    readExistingSourceUrls(supabase, "tender_candidates", candidateUrls),
+    readTenderSourceIdsByUrl(supabase, qualityCandidates.map((item) => item._source_list_url ?? item.source_list_url).filter(Boolean)),
+    readTenderSourceIdsByName(supabase, qualityCandidates.map((item) => item.source_name).filter(Boolean))
+  ]);
+
+  const payloads = [];
+  for (const item of qualityCandidates) {
+    if (existingTenderUrls.has(item.source_url) || existingCandidateUrls.has(item.source_url)) {
       duplicates += 1;
       continue;
     }
-    const result = await supabase.from("tender_candidates").insert({ ...item, source_id: sourceRow?.id ?? null });
-    if (result.error) errors.push(result.error.message);
-    else saved += 1;
+    const sourceId = sourceIdsByUrl.get(item._source_list_url ?? item.source_list_url) ?? sourceIdsByName.get(item.source_name) ?? null;
+    payloads.push(candidatePayloadForDb(item, sourceId));
   }
+
+  for (const chunk of chunks(payloads, 100)) {
+    const result = await supabase.from("tender_candidates").insert(chunk);
+    if (result.error) errors.push(result.error.message);
+    else saved += chunk.length;
+  }
+
   return { skipped: false, saved, duplicates, qualityRejected, errors };
+}
+
+async function readExistingSourceUrls(supabase, table, urls) {
+  const existing = new Set();
+  for (const chunk of chunks(urls, 100)) {
+    const { data, error } = await supabase.from(table).select("source_url").in("source_url", chunk);
+    if (error) {
+      console.error(`Failed to read existing ${table}: ${error.message}`);
+      continue;
+    }
+    for (const row of data ?? []) existing.add(row.source_url);
+  }
+  return existing;
+}
+
+async function readTenderSourceIdsByName(supabase, names) {
+  const uniqueNames = [...new Set(names)].filter(Boolean);
+  const sourceIds = new Map();
+  for (const chunk of chunks(uniqueNames, 100)) {
+    const { data, error } = await supabase.from("tender_sources").select("id, source_name").in("source_name", chunk);
+    if (error) {
+      console.error(`Failed to map defense tender sources by name: ${error.message}`);
+      continue;
+    }
+    for (const sourceInfo of data ?? []) {
+      if (!sourceIds.has(sourceInfo.source_name)) sourceIds.set(sourceInfo.source_name, sourceInfo.id);
+    }
+  }
+  return sourceIds;
+}
+
+function candidatePayloadForDb(item, sourceId) {
+  const payload = { ...item, source_id: sourceId };
+  delete payload._source_list_url;
+  delete payload.source_list_url;
+  return payload;
+}
+
+async function updateSourceCrawlOutcomes(results) {
+  if (!shouldUseDatabase()) return { skipped: true };
+  const supabase = await supabaseClient();
+  if (!supabase) return { skipped: true };
+  const finishedAt = new Date().toISOString();
+  const outcomes = new Map();
+
+  for (const result of results) {
+    const sourceInfo = result.sourceInfo;
+    const sourceUrl = sourceInfo?.tender_list_url ?? sourceInfo?.url;
+    if (!sourceUrl) continue;
+    const existing = outcomes.get(sourceUrl) ?? {
+      sourceInfo,
+      candidateCount: 0,
+      errors: []
+    };
+    existing.candidateCount += result.candidates?.length ?? 0;
+    existing.errors.push(...(result.errors ?? []));
+    outcomes.set(sourceUrl, existing);
+  }
+
+  let updated = 0;
+  const errors = [];
+  for (const [sourceUrl, outcome] of outcomes) {
+    const sourceErrors = outcome.errors ?? [];
+    const payload = {
+      last_crawled_at: finishedAt,
+      last_success_at: sourceErrors.length ? null : finishedAt,
+      last_error_at: sourceErrors.length ? finishedAt : null,
+      last_error_message: sourceErrors.length ? sourceErrors.slice(0, 2).map(formatDefenseCrawlError).join(" / ") : null
+    };
+    const { error } = await supabase.from("tender_sources").update(payload).eq("url", sourceUrl);
+    if (error) errors.push(error.message);
+    else updated += 1;
+  }
+
+  console.log(JSON.stringify({
+    event: "defense_source_outcomes_saved",
+    updated_count: updated,
+    error_count: errors.length,
+    errors: errors.slice(0, 5)
+  }));
+  return { skipped: false, updated, errors };
 }
 
 function formatDefenseCrawlError(error) {
@@ -1507,8 +1735,9 @@ function formatDefenseCrawlError(error) {
 
 async function insertDefenseSourceErrors(supabase, crawlLogId, errors) {
   if (!errors.length) return { saved: 0, error: null };
+  const sourceIdsByUrl = await readTenderSourceIdsByUrl(supabase, errors.map((error) => error.source_list_url ?? error.url).filter(Boolean));
   const rows = errors.map((error) => ({
-    source_id: null,
+    source_id: sourceIdsByUrl.get(error.source_list_url ?? error.url) ?? null,
     crawl_log_id: crawlLogId,
     source_url: error.url,
     error_type: error.error_type ?? "crawl_error",
@@ -1528,8 +1757,19 @@ async function insertDefenseSourceErrors(supabase, crawlLogId, errors) {
   return { saved: rows.length, error: null };
 }
 
+async function readTenderSourceIdsByUrl(supabase, urls) {
+  const uniqueUrls = [...new Set(urls)].filter(Boolean);
+  if (!uniqueUrls.length) return new Map();
+  const { data, error } = await supabase.from("tender_sources").select("id, url").in("url", uniqueUrls);
+  if (error) {
+    console.error(`Failed to map defense tender source errors: ${error.message}`);
+    return new Map();
+  }
+  return new Map((data ?? []).map((sourceInfo) => [sourceInfo.url, sourceInfo.id]));
+}
+
 async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdCount, duplicateCount, skippedCount, errors, skipped }) {
-  if (process.argv.includes("--no-db") || skipped) return;
+  if (!shouldUseDatabase() || skipped) return;
   const supabase = await supabaseClient();
   if (!supabase) return;
   const status = errors.length
@@ -1711,6 +1951,14 @@ function uniqueBy(items, keyFn) {
   return [...map.values()];
 }
 
+function chunks(items, size) {
+  const result = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
 async function readJson(filePath, fallback) {
   try {
     return JSON.parse(await fs.readFile(filePath, "utf8"));
@@ -1738,9 +1986,30 @@ async function main() {
       command,
       group,
       source_count: result.sources.length,
-      output: SOURCES_PATH,
+      scanned_source_count: result.scanned,
+      capped_skip_count: result.cappedSkipCount,
+      dry_run: DRY_RUN,
+      output: shouldWriteOutputFiles() ? SOURCES_PATH : null,
       supabase: result.supabase,
       sample: result.sources.slice(0, 10).map((item) => ({ name: item.source_name, url: item.tender_list_url }))
+    }, null, 2));
+    return;
+  }
+
+  if (command === "sources") {
+    const sources = rankSourcesForCrawl(filterSources(mergeSourceLists(DEFENSE_SEED_SOURCES, await readJson(SOURCES_PATH, [])), group));
+    console.log(JSON.stringify({
+      command,
+      group,
+      source_count: sources.length,
+      sources: sources.map((item, index) => ({
+        index: index + 1,
+        name: item.source_name ?? item.name,
+        organization_type: item.organization_type,
+        priority: item.crawl_priority,
+        url: item.tender_list_url ?? item.url,
+        score: sourceCrawlScore(item)
+      }))
     }, null, 2));
     return;
   }
@@ -1752,7 +2021,8 @@ async function main() {
       group,
       candidate_count: result.candidates.length,
       error_count: result.errors.length,
-      output: CANDIDATES_PATH,
+      dry_run: DRY_RUN,
+      output: shouldWriteOutputFiles() ? CANDIDATES_PATH : null,
       supabase: result.supabase,
       errors: result.errors.slice(0, 10),
       sample: result.candidates.slice(0, 10).map((item) => ({ title: item.title, url: item.source_url }))
@@ -1763,7 +2033,10 @@ async function main() {
   throw new Error(`Unknown command: ${command}`);
 }
 
-main().catch((error) => {
+main().then(async () => {
+  await closePlaywrightBrowser();
+  if (process.env.DEFENSE_CRAWLER_FORCE_EXIT === "1") process.exit(0);
+}).catch((error) => {
   console.error(error);
   console.log(JSON.stringify({
     event: "defense_crawl_fatal",

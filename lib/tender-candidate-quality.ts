@@ -49,6 +49,7 @@ const CLASSIFICATION_ONLY_TITLES = new Set([
   "お知らせ",
   "一覧",
   "詳細",
+  "公募に関する公示",
   "PDF",
   "EXCEL",
   "WORD"
@@ -104,6 +105,11 @@ const STRONG_TITLE_WORDS = [
 
 const GUIDANCE_TITLE_PATTERNS = [
   { code: "open_counter_guidance", pattern: /オープンカウンター方式/ },
+  { code: "contract_handbook", pattern: /入札及び契約心得/ },
+  { code: "quote_notice_guidance", pattern: /随意契約を前提とした見積依頼/ },
+  { code: "table_header_title", pattern: /見積依頼公開日.*見積書提出期限/ },
+  { code: "procurement_page_description", pattern: /入札公告[・･]公示等のページです|が実施する入札公告[・･]公示等/ },
+  { code: "public_offer_index", pattern: /^公募に関する公示$/ },
   { code: "bid_info_link", pattern: /^入札[・･]落札情報はこちら$/ },
   { code: "listed_on_info_page", pattern: /入札情報のページに掲載/ },
   { code: "standard_contract_terms", pattern: /標準契約条項|標準契約書|契約書式|契約様式/ },

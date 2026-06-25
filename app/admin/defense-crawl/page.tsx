@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAction, runPortalTenderCrawlAction } from "@/app/admin/defense-crawl/actions";
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
+import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import type { Tender, TenderCandidate, TenderCrawlLog, TenderSource } from "@/lib/types";
@@ -180,21 +181,36 @@ export default async function DefenseCrawlPage() {
               <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
                 <tr>
                   <th className="px-3 py-3">取得元</th>
-                  <th className="px-3 py-3">組織</th>
-                  <th className="px-3 py-3">候補</th>
-                  <th className="px-3 py-3">robots</th>
+                  <th className="px-3 py-3">組織/状態</th>
+                  <th className="px-3 py-3">最終取得</th>
+                  <th className="px-3 py-3">件数</th>
+                  <th className="px-3 py-3">直近エラー</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {sources.slice(0, 80).map((source) => (
+                {sources.slice(0, 120).map((source) => (
                   <tr key={source.tender_list_url ?? source.url}>
                     <td className="px-3 py-3">
                       <a href={source.tender_list_url ?? source.url} target="_blank" rel="noreferrer" className="font-bold text-slate-950 hover:text-brand-700">{source.source_name ?? source.name}</a>
                       <p className="mt-1 break-all text-xs text-slate-500">{source.tender_list_url ?? source.url}</p>
                     </td>
-                    <td className="px-3 py-3 text-slate-700">{source.organization_type ?? "-"}</td>
-                    <td className="px-3 py-3 text-slate-700">{candidates.filter((candidate) => candidate.source_name === (source.source_name ?? source.name)).length}</td>
-                    <td className="px-3 py-3 text-slate-700">{source.crawl_ready ? "確認済み" : "未確認"}</td>
+                    <td className="px-3 py-3 text-slate-700">
+                      <p>{organizationLabel(source.organization_type)}</p>
+                      <div className="mt-2 flex flex-wrap gap-1 text-xs font-bold">
+                        <span className={source.is_active ? "rounded bg-sky-100 px-2 py-0.5 text-sky-700" : "rounded bg-slate-200 px-2 py-0.5 text-slate-600"}>
+                          {source.is_active ? "有効" : "無効"}
+                        </span>
+                        <span className={source.crawl_ready ? "rounded bg-emerald-100 px-2 py-0.5 text-emerald-700" : "rounded bg-amber-100 px-2 py-0.5 text-amber-800"}>
+                          {source.crawl_ready ? "自動取得対象" : "手動確認"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">{source.last_crawled_at ? formatDateTime(source.last_crawled_at) : "-"}</td>
+                    <td className="px-3 py-3 text-slate-700">
+                      <p>公開: {source.tender_count ?? 0}</p>
+                      <p className="text-xs text-slate-500">候補: {candidates.filter((candidate) => candidate.source_name === (source.source_name ?? source.name)).length}</p>
+                    </td>
+                    <td className="max-w-sm px-3 py-3 text-xs text-rose-700">{source.latest_error ?? source.last_error_message ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -382,6 +398,11 @@ function countDefenseMetrics(candidates: TenderCandidate[], tenders: Tender[]) {
     westernCandidates: candidates.filter(isWesternAreaAccounting).length,
     westernPublished: tenders.filter(isWesternAreaAccounting).length
   };
+}
+
+function organizationLabel(value: TenderSource["organization_type"]) {
+  if (!value) return "-";
+  return TENDER_SOURCE_ORGANIZATION_TYPE_LABELS[value] ?? value;
 }
 
 function crawlStatusLabel(status: TenderCrawlLog["status"]) {

@@ -45,6 +45,7 @@ export async function runDailyTenderCrawlAction() {
     timeout: 180000,
     maxBuffer: 1024 * 1024 * 10
   });
+  await runDefenseScript("discover", "all");
   await runDefenseScript("crawl", "all");
   revalidatePath("/tenders");
   revalidatePath("/admin/defense-crawl");
@@ -54,9 +55,12 @@ export async function runDailyTenderCrawlAction() {
 }
 
 async function runDefenseScript(command: string, group: string) {
-  await execFileAsync("node", ["scripts/defense-crawler.mjs", command, `--group=${group}`], {
+  const args = ["scripts/defense-crawler.mjs", command, `--group=${group}`];
+  if (command === "crawl") args.push("--max-sources=25");
+  if (command === "discover") args.push("--max-sources=25");
+  await execFileAsync("node", args, {
     cwd: process.cwd(),
-    timeout: 120000,
+    timeout: command === "crawl" ? 480000 : 180000,
     maxBuffer: 1024 * 1024 * 10
   });
 }

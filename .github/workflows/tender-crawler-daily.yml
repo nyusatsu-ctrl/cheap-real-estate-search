@@ -28,7 +28,8 @@ jobs:
       DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS: "15000"
       DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS: "30000"
       DEFENSE_CRAWLER_TIME_BUDGET_MS: "480000"
-      DEFENSE_CRAWLER_MAX_SOURCES: "10"
+      DEFENSE_CRAWLER_MAX_SOURCES: "25"
+      DEFENSE_CRAWLER_FORCE_EXIT: "1"
 
     steps:
       - name: Check out repository
@@ -55,11 +56,17 @@ jobs:
         timeout-minutes: 5
         run: npm run crawl:tenders -- --limit=300
 
+      - name: Sync defense tender sources
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        run: npm run discover:defense -- --max-sources=25
+
       - name: Crawl defense tender candidates
         if: always()
         continue-on-error: true
         timeout-minutes: 10
-        run: npm run crawl:defense -- --max-sources=10
+        run: npm run crawl:defense -- --max-sources=25
 
       - name: Summarize tender database
         if: always()

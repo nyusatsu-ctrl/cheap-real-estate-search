@@ -104,10 +104,8 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
   const now = new Date().toISOString();
 
   const serverClient = await createSupabaseServerClient();
-  const serviceRoleClient = serverClient ? null : createSupabaseServiceRoleClient();
-  const supabase = serverClient ?? serviceRoleClient;
-  const supabaseClientType = serverClient ? "server" : serviceRoleClient ? "service_role" : "missing";
-  if (!supabase) {
+  const serviceRoleClient = createSupabaseServiceRoleClient();
+  if (!serverClient && !serviceRoleClient) {
     console.error("Construction diagnosis submit failed: Supabase client is not configured.");
     return {
       formError: "診断結果を保存できませんでした。時間をおいて再度お試しください。",
@@ -134,17 +132,45 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
     preferred_contact_time: preferredContactTime
   };
 
-  const { error } = await supabase
+  const insertDiagnosis = (client: NonNullable<typeof serverClient> | NonNullable<typeof serviceRoleClient>) => client
     .from("construction_diagnoses")
     .insert(diagnosisPayload);
 
-  if (error) {
+  let insertError = null;
+  let insertedBy = "none";
+
+  if (serverClient) {
+    const { error } = await insertDiagnosis(serverClient);
+    if (!error) {
+      insertedBy = "server";
+    } else {
+      insertError = error;
+      console.error("Construction diagnosis insert failed with server client.", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+    }
+  }
+
+  if (insertedBy === "none" && serviceRoleClient) {
+    const { error } = await insertDiagnosis(serviceRoleClient);
+    if (!error) {
+      insertedBy = "service_role";
+      insertError = null;
+    } else {
+      insertError = error;
+    }
+  }
+
+  if (insertError || insertedBy === "none") {
     console.error("Construction diagnosis insert failed.", {
-      clientType: supabaseClientType,
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint
+      insertedBy,
+      code: insertError?.code,
+      message: insertError?.message,
+      details: insertError?.details,
+      hint: insertError?.hint
     });
     return {
       formError: "診断結果を保存できませんでした。時間をおいて再度お試しください。",

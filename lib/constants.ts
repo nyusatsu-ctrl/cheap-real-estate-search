@@ -163,16 +163,16 @@ export const PROPERTY_SORT_OPTIONS = [
 export const TENDER_TYPE_LABELS: Record<TenderType, string> = {
   goods: "物品",
   service: "役務",
-  open_counter: "0円物件",
-  unified_qualification: "エリア検索必要物件"
+  open_counter: "オープンカウンター",
+  unified_qualification: "全省庁統一資格対象"
 };
 
 export const TENDER_CANDIDATE_TYPE_LABELS: Record<TenderCandidateType, string> = {
   goods: "物品",
   services: "役務",
-  open_counter: "0円物件",
+  open_counter: "オープンカウンター",
   small_discretionary: "少額随意契約",
-  qualification_required: "エリア指定物件",
+  qualification_required: "参加条件あり",
   construction: "工事",
   unknown: "不明"
 };
@@ -187,11 +187,11 @@ export const TENDER_CANDIDATE_REVIEW_STATUS_LABELS: Record<TenderCandidateReview
 export const TENDER_SOURCE_ORGANIZATION_TYPE_LABELS: Record<TenderSourceOrganizationType, string> = {
   national_government: "国",
   ministry: "省庁",
-  defense_ministry: "空き家",
+  defense_ministry: "防衛省",
   defense_equipment_agency: "防衛装備庁",
-  ground_self_defense_force: "陸上古家",
-  maritime_self_defense_force: "海上古家",
-  air_self_defense_force: "航空古家",
+  ground_self_defense_force: "陸上自衛隊",
+  maritime_self_defense_force: "海上自衛隊",
+  air_self_defense_force: "航空自衛隊",
   defense_bureau: "地方防衛局",
   defense_school: "防衛学校",
   defense_hospital: "防衛医療機関",
@@ -222,8 +222,8 @@ export const TENDER_CRAWLER_TYPE_LABELS: Record<TenderCrawlerType, string> = {
   kkj_portal: "官公需情報ポータル",
   generic_html: "汎用HTML",
   generic_pdf_list: "PDF一覧",
-  defense_mod: "空き家",
-  defense_unit: "古家・防衛機関",
+  defense_mod: "防衛省",
+  defense_unit: "自衛隊・防衛機関",
   ministry_page: "省庁ページ",
   local_government: "自治体",
   e_procurement_system: "電子調達システム",
@@ -250,7 +250,7 @@ export const TENDER_CRAWL_FREQUENCY_LABELS: Record<TenderCrawlFrequency, string>
 };
 
 export const OPEN_COUNTER_LABELS = [
-  "0円物件",
+  "オープンカウンター",
   "オープンカウンタ",
   "公開見積",
   "公開見積合せ",
@@ -279,7 +279,7 @@ export const FAVORITE_TENDER_STATUS_LABELS: Record<FavoriteTenderStatus, string>
   preparing_quote: "見積準備中",
   planning: "参加予定",
   declined: "見送り",
-  bid_submitted: "物件済み",
+  bid_submitted: "見積提出済み",
   won: "落札",
   lost: "不落"
 };
@@ -296,5 +296,5 @@ export const SCRIVENER_REQUEST_LABELS = {
   self_apply_steps: "自分で申請したいので手順を知りたい",
   ask_scrivener: "行政書士に依頼したい",
   check_documents: "必要書類を確認したい",
-  after_acquisition: "取得後の物件参加方法を知りたい"
+  after_acquisition: "取得後の案件参加方法を知りたい"
 };

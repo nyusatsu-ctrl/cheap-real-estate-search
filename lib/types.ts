@@ -310,7 +310,7 @@ export type TenderFilters = {
   region?: string;
   prefecture?: string;
   tenderType?: TenderType;
-  qualification?: "required" | "not_required";
+  qualification?: "not_required" | "unified_qualification" | "area_specified" | "other_conditions";
   defenseOnly?: boolean;
   openCounterOnly?: boolean;
   keyword?: string;

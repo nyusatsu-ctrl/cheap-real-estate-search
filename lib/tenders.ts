@@ -185,7 +185,7 @@ export function parseTenderFilters(params: Record<string, string | undefined>): 
     region: params.region || undefined,
     prefecture: params.prefecture || undefined,
     tenderType: (tenderType || undefined) as TenderType | undefined,
-    qualification: params.qualification === "required" || params.qualification === "not_required" ? params.qualification : undefined,
+    qualification: normalizeParticipationCondition(params.qualification),
     defenseOnly: params.defenseOnly === "1",
     openCounterOnly: params.openCounterOnly === "1",
     keyword: params.keyword || undefined,
@@ -200,8 +200,7 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
     if (filters.region && filters.region !== "全国" && tenderRegion(normalized) !== filters.region) return false;
     if (filters.prefecture && tender.prefecture !== filters.prefecture) return false;
     if (filters.tenderType && tender.tender_type !== filters.tenderType) return false;
-    if (filters.qualification === "required" && !tender.qualification_required) return false;
-    if (filters.qualification === "not_required" && tender.qualification_required) return false;
+    if (filters.qualification && !matchesParticipationCondition(tender, filters.qualification)) return false;
     if (filters.defenseOnly && !isDefenseLike(normalized)) return false;
     if (filters.openCounterOnly && tender.tender_type !== "open_counter") return false;
     if (keyword) {
@@ -217,6 +216,30 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
     }
     return new Date(b.published_at ?? b.created_at).getTime() - new Date(a.published_at ?? a.created_at).getTime();
   });
+}
+
+function normalizeParticipationCondition(value: string | undefined): TenderFilters["qualification"] {
+  if (value === "required") return "area_specified";
+  if (value === "not_required" || value === "unified_qualification" || value === "area_specified" || value === "other_conditions") {
+    return value;
+  }
+  return undefined;
+}
+
+function matchesParticipationCondition(tender: Tender, condition: NonNullable<TenderFilters["qualification"]>) {
+  if (condition === "not_required") return tender.tender_type === "open_counter" || !tender.qualification_required;
+  if (condition === "unified_qualification") return isUnifiedQualificationTender(tender);
+  if (condition === "area_specified") return tender.qualification_required && isAreaSpecifiedTender(tender);
+  return tender.qualification_required && !isUnifiedQualificationTender(tender) && !isAreaSpecifiedTender(tender);
+}
+
+function isUnifiedQualificationTender(tender: Tender) {
+  const qualification = tender.required_qualification ?? "";
+  return tender.tender_type === "unified_qualification" || /全省庁|統一資格/.test(qualification);
+}
+
+function isAreaSpecifiedTender(tender: Tender) {
+  return /地域|エリア|参加地域/.test(tender.required_qualification ?? "");
 }
 
 export function normalizeFavoriteStatus(value: FormDataEntryValue | null): FavoriteTenderStatus {

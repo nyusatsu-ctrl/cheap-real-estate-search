@@ -11,13 +11,13 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
             <tr>
-              <th className="px-3 py-3">物件名</th>
+              <th className="px-3 py-3">案件名</th>
               <th className="px-3 py-3">発注機関</th>
-              <th className="px-3 py-3">種別</th>
+              <th className="px-3 py-3">案件区分</th>
               <th className="px-3 py-3">地域</th>
               <th className="px-3 py-3">公告日</th>
               <th className="px-3 py-3">締切</th>
-              <th className="px-3 py-3">資格</th>
+              <th className="px-3 py-3">参加条件</th>
               <th className="px-3 py-3">操作</th>
             </tr>
           </thead>
@@ -28,8 +28,8 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                   <div className="flex flex-wrap items-center gap-2">
                     {tender.is_new ? <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">新着</span> : null}
                     {tender.is_deadline_soon ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">新着</span> : null}
-                    {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">空き家・古家・土地・山林</span> : null}
-                    {tender.tender_type === "open_counter" ? <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">初心者向け</span> : null}
+                    {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">防衛省・自衛隊系</span> : null}
+                    {tender.tender_type === "open_counter" ? <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">オープンカウンター</span> : null}
                     {tender.is_admin_verified ? <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">管理者確認済み</span> : null}
                   </div>
                   <Link href={restricted ? "/billing?trial=expired" : `/tenders/${tender.id}`} className="mt-2 block font-black leading-6 text-slate-950 hover:text-brand-700">
@@ -49,7 +49,7 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                 <td className="px-3 py-3 font-bold text-slate-900">{formatDate(tender.deadline_at)}</td>
                 <td className="px-3 py-3">
                   <span className={`rounded px-2 py-1 text-xs font-bold ${tender.qualification_required ? "bg-violet-100 text-violet-700" : "bg-emerald-100 text-emerald-700"}`}>
-                    {tender.qualification_required ? "エリア指定" : "資格不要"}
+                    {participationConditionLabel(tender)}
                   </span>
                 </td>
                 <td className="px-3 py-3">
@@ -77,4 +77,12 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
 function organizationLabel(value?: string | null) {
   if (!value) return "-";
   return TENDER_SOURCE_ORGANIZATION_TYPE_LABELS[value as keyof typeof TENDER_SOURCE_ORGANIZATION_TYPE_LABELS] ?? value;
+}
+
+function participationConditionLabel(tender: Tender) {
+  const qualification = tender.required_qualification ?? "";
+  if (tender.tender_type === "open_counter" || !tender.qualification_required) return "資格不要・オープンカウンター";
+  if (tender.tender_type === "unified_qualification" || /全省庁|統一資格/.test(qualification)) return "全省庁統一資格対象";
+  if (/地域|エリア|参加地域/.test(qualification)) return "エリア指定";
+  return "その他条件あり";
 }

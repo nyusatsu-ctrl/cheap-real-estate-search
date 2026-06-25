@@ -22,7 +22,11 @@ export default async function AdminSystemCheckPage() {
             <CheckRow label="NEXT_PUBLIC_SUPABASE_URL" ok={check.env.nextPublicSupabaseUrl} />
             <CheckRow label="NEXT_PUBLIC_SUPABASE_ANON_KEY" ok={check.env.nextPublicSupabaseAnonKey} />
             <CheckRow label="SUPABASE_SERVICE_ROLE_KEY" ok={check.env.serviceRoleKey} />
-            <MaskedValueRow label="Supabase Project Ref" value={check.env.projectRefMasked} />
+            <CheckRow label="診断用Project Ref一致" ok={check.env.projectRefMatchesDiagnosisProject} />
+            <MaskedValueRow label="Supabase Project Ref" value={check.env.projectRef} />
+            <MaskedValueRow label="Project Ref masked" value={check.env.projectRefMasked} />
+            <MaskedValueRow label="ANON KEY形式" value={check.env.anonKeyFormat} />
+            <MaskedValueRow label="SERVICE ROLE KEY形式" value={check.env.serviceRoleKeyFormat} />
           </dl>
         </div>
 
@@ -30,6 +34,9 @@ export default async function AdminSystemCheckPage() {
           <h3 className="font-black text-slate-950">Supabase接続テスト</h3>
           <p className={`mt-3 rounded px-3 py-2 text-sm font-bold ${check.connection.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
             {check.connection.message}
+          </p>
+          <p className={`mt-3 rounded px-3 py-2 text-sm font-bold ${check.diagnosisConnection.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+            {check.diagnosisConnection.message}
           </p>
         </div>
       </section>
@@ -42,6 +49,7 @@ export default async function AdminSystemCheckPage() {
           <CountCard label="公開中 properties 件数" value={check.counts.publishedProperties} />
           <CountCard label="非公開 properties 件数" value={check.counts.nonPublishedProperties} />
           <CountCard label="直近7日取得件数" value={check.counts.recentDetectedProperties} />
+          <CountCard label="construction_diagnoses 件数" value={check.counts.constructionDiagnoses} />
         </div>
       </section>
 

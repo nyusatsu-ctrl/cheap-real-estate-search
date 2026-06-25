@@ -11,6 +11,21 @@ export function createTenderSupabaseServiceRoleClient() {
   return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 }
 
+export function getTenderSupabaseConfigStatus() {
+  const supabaseUrl = getTenderSupabaseUrl();
+  const anonKey = getTenderSupabaseAnonKey();
+  const serviceRoleKey = getTenderSupabaseServiceRoleKey();
+
+  return {
+    hasUrl: Boolean(supabaseUrl),
+    projectRef: supabaseUrl ? parseProjectRef(supabaseUrl) : null,
+    hasAnonKey: Boolean(anonKey),
+    anonKeyFormat: keyFormat(anonKey),
+    hasServiceRoleKey: Boolean(serviceRoleKey),
+    serviceRoleKeyFormat: keyFormat(serviceRoleKey)
+  };
+}
+
 export async function createTenderSupabaseServerClient() {
   const supabaseUrl = getTenderSupabaseUrl();
   const supabaseAnonKey = getTenderSupabaseAnonKey();
@@ -46,4 +61,20 @@ function getTenderSupabaseAnonKey() {
 
 function getTenderSupabaseServiceRoleKey() {
   return process.env.TENDER_SUPABASE_SERVICE_ROLE_KEY;
+}
+
+function parseProjectRef(value: string) {
+  try {
+    return new URL(value).hostname.split(".")[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function keyFormat(value: string | undefined) {
+  if (!value) return "missing";
+  if (value.startsWith("sb_publishable_")) return "sb_publishable";
+  if (value.startsWith("sb_secret_")) return "sb_secret";
+  if (value.startsWith("eyJ")) return "jwt";
+  return "other";
 }

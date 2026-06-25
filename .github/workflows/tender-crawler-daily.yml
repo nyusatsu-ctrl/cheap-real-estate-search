@@ -60,3 +60,8 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
         run: npm run crawl:defense -- --max-sources=10
+
+      - name: Summarize tender database
+        if: always()
+        timeout-minutes: 2
+        run: node scripts/tender-db-summary.mjs

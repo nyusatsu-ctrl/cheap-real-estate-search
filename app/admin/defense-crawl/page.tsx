@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAction, runPortalTenderCrawlAction } from "@/app/admin/defense-crawl/actions";
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
-import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderSources } from "@/lib/tenders";
+import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import type { Tender, TenderCandidate, TenderCrawlLog, TenderSource } from "@/lib/types";
 
@@ -38,6 +38,7 @@ export default async function DefenseCrawlPage() {
   const [dbSources, dbCandidates, dbTenders, crawlLogs] = admin
     ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20)])
     : [[], [], [], [] as TenderCrawlLog[]];
+  const dbDiagnostics = admin ? await getTenderDatabaseDiagnostics() : null;
   const sources = admin && dbSources.length ? dbSources : localSources;
   const candidates = (admin ? dbCandidates : localCandidates).map(normalizeDefenseTender);
   const pendingCandidates = candidates.filter((candidate) => candidate.review_status === "pending");
@@ -47,7 +48,7 @@ export default async function DefenseCrawlPage() {
   const defenseMetrics = countDefenseMetrics(candidates, publishedTenders);
   const counts = countSources(sources);
   const crawlReadyCount = sources.filter((source) => source.is_active && source.crawl_ready && source.crawler_type !== "manual_only").length;
-  const latestLog = crawlLogs[0] ?? null;
+  const latestLog = crawlLogs[0] ?? dbDiagnostics?.latestLog ?? null;
   const sourceErrors = sources.filter((source) => source.last_error_message);
   const crawlErrors = crawlSummary?.errors ?? [];
   const errors = [...sourceErrors.map((source) => ({
@@ -78,6 +79,10 @@ export default async function DefenseCrawlPage() {
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           現在は読み取り専用表示です。再スキャン、手動クロール、候補承認には管理者ログインが必要です。
         </div>
+      ) : null}
+
+      {admin && dbDiagnostics ? (
+        <TenderDatabaseStatus diagnostics={dbDiagnostics} displayedPublishedCount={publishedTenders.length} displayedCandidateCount={candidates.length} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -240,6 +245,85 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   );
 }
 
+function TenderDatabaseStatus({
+  diagnostics,
+  displayedPublishedCount,
+  displayedCandidateCount
+}: {
+  diagnostics: TenderDatabaseDiagnostics;
+  displayedPublishedCount: number;
+  displayedCandidateCount: number;
+}) {
+  const connected = diagnostics.canUseServiceRole && diagnostics.errors.length === 0;
+  const dbPublishedCount = diagnostics.counts.publishedTenders;
+  const dbCandidateCount = diagnostics.counts.candidates;
+  const likelyFallback = !diagnostics.canUseServiceRole || dbPublishedCount === null || dbCandidateCount === null;
+  const mismatch = (dbPublishedCount !== null && dbPublishedCount !== displayedPublishedCount) || (dbCandidateCount !== null && dbCandidateCount !== displayedCandidateCount);
+
+  return (
+    <div className={`mb-5 rounded-lg border p-4 text-sm shadow-sm ${connected && !mismatch ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black">官公庁案件DB 接続状態</h3>
+          <p className="mt-1">
+            表示データ: {likelyFallback ? "ローカルfallbackの可能性あり" : "Supabase DB"}
+            {mismatch ? "（DB件数と表示件数に差があります）" : ""}
+          </p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${connected && !mismatch ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+          {connected ? "DB疎通OK" : "確認が必要"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="Project Ref" value={diagnostics.config.projectRef ?? "-"} />
+        <StatusItem label="URL" value={diagnostics.config.hasUrl ? "設定済み" : "未設定"} />
+        <StatusItem label="ANON KEY" value={formatKeyStatus(diagnostics.config.hasAnonKey, diagnostics.config.anonKeyFormat)} />
+        <StatusItem label="SERVICE ROLE KEY" value={formatKeyStatus(diagnostics.config.hasServiceRoleKey, diagnostics.config.serviceRoleKeyFormat)} />
+        <StatusItem label="DB取得元" value={formatNullableCount(diagnostics.counts.sources)} />
+        <StatusItem label="自動取得対象" value={formatNullableCount(diagnostics.counts.crawlReadySources)} />
+        <StatusItem label="DB公開案件" value={formatNullableCount(diagnostics.counts.publishedTenders)} />
+        <StatusItem label="DB候補" value={formatNullableCount(diagnostics.counts.candidates)} />
+        <StatusItem label="DBログ" value={formatNullableCount(diagnostics.counts.crawlLogs)} />
+        <StatusItem label="DBエラー" value={formatNullableCount(diagnostics.counts.sourceErrors)} />
+        <StatusItem label="画面の公開案件" value={String(displayedPublishedCount)} />
+        <StatusItem label="画面の候補" value={String(displayedCandidateCount)} />
+      </div>
+
+      {diagnostics.latestLog ? (
+        <p className="mt-3 text-xs">
+          最新DBログ: {formatDateTime(diagnostics.latestLog.started_at)} / 状態: {crawlStatusLabel(diagnostics.latestLog.status)} / 取得: {diagnostics.latestLog.fetched_count} / 登録: {diagnostics.latestLog.created_count} / 既存: {diagnostics.latestLog.duplicate_count} / エラー: {diagnostics.latestLog.error_count ?? 0}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs">最新DBログ: -</p>
+      )}
+
+      {diagnostics.latestSourceError ? (
+        <p className="mt-2 break-all text-xs">
+          最新エラー: {diagnostics.latestSourceError.error_type ?? "crawl_error"} / {diagnostics.latestSourceError.error_message}
+        </p>
+      ) : null}
+
+      {diagnostics.errors.length ? (
+        <div className="mt-3 grid gap-1 text-xs">
+          {diagnostics.errors.slice(0, 5).map((error) => (
+            <p key={error}>確認事項: {error}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-white/70 bg-white/70 p-3">
+      <p className="text-xs font-bold opacity-70">{label}</p>
+      <p className="mt-1 font-black">{value}</p>
+    </div>
+  );
+}
+
 function ActionButton({ action, group, label, primary = false }: { action: (formData: FormData) => Promise<void>; group: string; label: string; primary?: boolean }) {
   return (
     <form action={action}>
@@ -304,6 +388,15 @@ function crawlStatusLabel(status: TenderCrawlLog["status"]) {
   if (status === "success") return "成功";
   if (status === "partial_success") return "一部成功";
   return "失敗";
+}
+
+function formatNullableCount(value: number | null) {
+  return value === null ? "-" : String(value);
+}
+
+function formatKeyStatus(hasValue: boolean, format: string) {
+  if (!hasValue) return "未設定";
+  return `設定済み (${format})`;
 }
 
 function readJson<T>(filePath: string, fallback: T) {

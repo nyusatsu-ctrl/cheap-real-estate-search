@@ -1384,7 +1384,7 @@ function formatDefenseCrawlError(error) {
 }
 
 async function insertDefenseSourceErrors(supabase, crawlLogId, errors) {
-  if (!errors.length) return;
+  if (!errors.length) return { saved: 0, error: null };
   const rows = errors.map((error) => ({
     source_id: null,
     crawl_log_id: crawlLogId,
@@ -1394,7 +1394,16 @@ async function insertDefenseSourceErrors(supabase, crawlLogId, errors) {
     status_code: error.status ?? null
   }));
   const { error } = await supabase.from("tender_source_errors").insert(rows);
-  if (error) console.error(`Failed to record defense tender_source_errors: ${error.message}`);
+  if (error) {
+    console.error(`Failed to record defense tender_source_errors: ${error.message}`);
+    return { saved: 0, error: error.message };
+  }
+  console.log(JSON.stringify({
+    event: "defense_source_errors_saved",
+    crawl_log_id: crawlLogId,
+    saved_count: rows.length
+  }));
+  return { saved: rows.length, error: null };
 }
 
 async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdCount, duplicateCount, skippedCount, errors, skipped }) {
@@ -1420,7 +1429,18 @@ async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdC
     console.error(`Failed to record defense tender_crawl_logs: ${logResult.error.message}`);
     return;
   }
-  await insertDefenseSourceErrors(supabase, logResult.data?.id ?? null, errors);
+  const crawlLogId = logResult.data?.id ?? null;
+  console.log(JSON.stringify({
+    event: "defense_crawl_log_saved",
+    crawl_log_id: crawlLogId,
+    status,
+    fetched_count: fetchedCount,
+    created_count: createdCount,
+    duplicate_count: duplicateCount,
+    skipped_count: skippedCount,
+    error_count: errors.length
+  }));
+  await insertDefenseSourceErrors(supabase, crawlLogId, errors);
 }
 
 async function supabaseClient() {

@@ -567,7 +567,7 @@ function isTimeoutIssue(issue) {
 }
 
 async function insertSourceErrors(supabase, sourceId, crawlLogId, issues) {
-  if (!issues.length) return;
+  if (!issues.length) return { saved: 0, error: null };
   const rows = issues.map((issue) => ({
     source_id: sourceId,
     crawl_log_id: crawlLogId,
@@ -577,7 +577,17 @@ async function insertSourceErrors(supabase, sourceId, crawlLogId, issues) {
     status_code: issue.statusCode ?? null
   }));
   const { error } = await supabase.from("tender_source_errors").insert(rows);
-  if (error) console.error(`Failed to record tender_source_errors: ${error.message}`);
+  if (error) {
+    console.error(`Failed to record tender_source_errors: ${error.message}`);
+    return { saved: 0, error: error.message };
+  }
+  console.log(JSON.stringify({
+    event: "portal_source_errors_saved",
+    crawl_log_id: crawlLogId,
+    source_id: sourceId,
+    saved_count: rows.length
+  }));
+  return { saved: rows.length, error: null };
 }
 
 async function saveSupabase(tenders, crawlIssues = []) {
@@ -638,9 +648,23 @@ async function saveSupabase(tenders, crawlIssues = []) {
     error_count: issues.length,
     error_message: issues.length ? issues.slice(0, 5).map(formatCrawlIssue).join(" / ") : null
   }).select("id").single();
-  if (logResult.error) console.error(`Failed to record tender_crawl_logs: ${logResult.error.message}`);
+  const crawlLogId = logResult.data?.id ?? null;
+  if (logResult.error) {
+    console.error(`Failed to record tender_crawl_logs: ${logResult.error.message}`);
+  } else {
+    console.log(JSON.stringify({
+      event: "portal_crawl_log_saved",
+      crawl_log_id: crawlLogId,
+      source_id: source.id,
+      status,
+      fetched_count: tenders.length,
+      created_count: created,
+      updated_count: updated,
+      error_count: issues.length
+    }));
+  }
 
-  await insertSourceErrors(supabase, source.id, logResult.data?.id ?? null, issues);
+  const sourceErrorsResult = await insertSourceErrors(supabase, source.id, crawlLogId, issues);
 
   await supabase.from("tender_sources").update({
     last_crawled_at: new Date().toISOString(),
@@ -656,6 +680,8 @@ async function saveSupabase(tenders, crawlIssues = []) {
     errors: issues.length,
     skipped_count: issues.length,
     timeout_count: issues.filter(isTimeoutIssue).length,
+    crawl_log_id: crawlLogId,
+    source_errors_saved: sourceErrorsResult.saved,
     skipped: false
   };
 }

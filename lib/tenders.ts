@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
+import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
 import { isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
@@ -12,6 +12,38 @@ export function canUseMemberFeatures(member: { role: string; subscriptionStatus:
   if (member.subscriptionStatus === "active") return true;
   return member.subscriptionStatus === "trialing" && !member.isTrialExpired;
 }
+
+export type TenderDatabaseDiagnostics = {
+  config: ReturnType<typeof getTenderSupabaseConfigStatus>;
+  canUseServiceRole: boolean;
+  counts: {
+    sources: number | null;
+    activeSources: number | null;
+    crawlReadySources: number | null;
+    tenders: number | null;
+    publishedTenders: number | null;
+    candidates: number | null;
+    pendingCandidates: number | null;
+    crawlLogs: number | null;
+    sourceErrors: number | null;
+  };
+  latestLog: (Pick<
+    TenderCrawlLog,
+    "id" | "source_id" | "started_at" | "finished_at" | "status" | "fetched_count" | "created_count" | "duplicate_count" | "skipped_count" | "error_message" | "created_at"
+  > & {
+    updated_count?: number | null;
+    error_count?: number | null;
+  }) | null;
+  latestSourceError: {
+    id: string;
+    source_url: string | null;
+    error_type: string | null;
+    error_message: string;
+    status_code: number | null;
+    occurred_at: string;
+  } | null;
+  errors: string[];
+};
 
 export async function getPublishedTenders(filters: TenderFilters = {}) {
   const supabase = await createTenderSupabaseServerClient();
@@ -123,6 +155,94 @@ export async function getTenderCrawlLogs(limit: number = 20) {
 
   if (error) return [] as TenderCrawlLog[];
   return (data ?? []) as TenderCrawlLog[];
+}
+
+export async function getTenderDatabaseDiagnostics() {
+  const diagnostics: TenderDatabaseDiagnostics = {
+    config: getTenderSupabaseConfigStatus(),
+    canUseServiceRole: false,
+    counts: {
+      sources: null,
+      activeSources: null,
+      crawlReadySources: null,
+      tenders: null,
+      publishedTenders: null,
+      candidates: null,
+      pendingCandidates: null,
+      crawlLogs: null,
+      sourceErrors: null
+    },
+    latestLog: null,
+    latestSourceError: null,
+    errors: []
+  };
+
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) {
+    diagnostics.errors.push("TENDER_SUPABASE_URL または TENDER_SUPABASE_SERVICE_ROLE_KEY が未設定です。");
+    return diagnostics;
+  }
+
+  diagnostics.canUseServiceRole = true;
+
+  recordDiagnosticCount(diagnostics, "sources", await supabase.from("tender_sources").select("id", { count: "exact", head: true }));
+  recordDiagnosticCount(diagnostics, "activeSources", await supabase.from("tender_sources").select("id", { count: "exact", head: true }).eq("is_active", true));
+  recordDiagnosticCount(
+    diagnostics,
+    "crawlReadySources",
+    await supabase
+      .from("tender_sources")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true)
+      .eq("crawl_ready", true)
+      .neq("crawler_type", "manual_only")
+  );
+  recordDiagnosticCount(diagnostics, "tenders", await supabase.from("tenders").select("id", { count: "exact", head: true }));
+  recordDiagnosticCount(diagnostics, "publishedTenders", await supabase.from("tenders").select("id", { count: "exact", head: true }).eq("status", "published"));
+  recordDiagnosticCount(diagnostics, "candidates", await supabase.from("tender_candidates").select("id", { count: "exact", head: true }));
+  recordDiagnosticCount(diagnostics, "pendingCandidates", await supabase.from("tender_candidates").select("id", { count: "exact", head: true }).eq("review_status", "pending"));
+  recordDiagnosticCount(diagnostics, "crawlLogs", await supabase.from("tender_crawl_logs").select("id", { count: "exact", head: true }));
+  recordDiagnosticCount(diagnostics, "sourceErrors", await supabase.from("tender_source_errors").select("id", { count: "exact", head: true }));
+
+  const latestLogResult = await supabase
+    .from("tender_crawl_logs")
+    .select("id, source_id, started_at, finished_at, status, fetched_count, created_count, updated_count, duplicate_count, skipped_count, error_count, error_message, created_at")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestLogResult.error) {
+    diagnostics.errors.push(`tender_crawl_logs latest: ${latestLogResult.error.message}`);
+  } else {
+    diagnostics.latestLog = latestLogResult.data as TenderDatabaseDiagnostics["latestLog"];
+  }
+
+  const latestErrorResult = await supabase
+    .from("tender_source_errors")
+    .select("id, source_url, error_type, error_message, status_code, occurred_at")
+    .order("occurred_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestErrorResult.error) {
+    diagnostics.errors.push(`tender_source_errors latest: ${latestErrorResult.error.message}`);
+  } else {
+    diagnostics.latestSourceError = latestErrorResult.data as TenderDatabaseDiagnostics["latestSourceError"];
+  }
+
+  return diagnostics;
+}
+
+function recordDiagnosticCount(
+  diagnostics: TenderDatabaseDiagnostics,
+  key: keyof TenderDatabaseDiagnostics["counts"],
+  result: { count: number | null; error: { message: string } | null }
+) {
+  if (result.error) {
+    diagnostics.errors.push(`${key}: ${result.error.message}`);
+    return;
+  }
+  diagnostics.counts[key] = result.count ?? 0;
 }
 
 export async function getTenderCandidate(id: string) {

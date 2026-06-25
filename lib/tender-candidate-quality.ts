@@ -103,13 +103,14 @@ const STRONG_TITLE_WORDS = [
 ];
 
 const GUIDANCE_TITLE_PATTERNS = [
-  { code: "open_counter_guidance", pattern: /^オープンカウンター方式(?:とは|による見積依頼)?$/ },
+  { code: "open_counter_guidance", pattern: /オープンカウンター方式(?:とは|.*(?:実施要領|見積結果|見積依頼))/ },
   { code: "bid_info_link", pattern: /^入札[・･]落札情報はこちら$/ },
   { code: "listed_on_info_page", pattern: /入札情報のページに掲載/ },
   { code: "standard_contract_terms", pattern: /標準契約条項|標準契約書|契約書式|契約様式/ },
-  { code: "purchase_order_terms", pattern: /物品売買請書条項/ },
-  { code: "contract_terms", pattern: /契約条項/ },
+  { code: "purchase_order_terms", pattern: /請書条項/ },
+  { code: "contract_terms", pattern: /契約条項|契約条項等/ },
   { code: "information_disclosure", pattern: /情報の公開|情報の公表|公共調達の適正化/ },
+  { code: "procurement_guideline", pattern: /実施要領|低入札価格調査|特別重点調査|調達時期の目安|標準規格表/ },
   { code: "generic_publication", pattern: /^(?:公表|掲載|案内|一覧)$/ },
   { code: "navigation_link", pattern: /(?:はこちら|こちらをクリック|詳細はこちら|ページに掲載)$/ }
 ];

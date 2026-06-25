@@ -103,7 +103,7 @@ const STRONG_TITLE_WORDS = [
 ];
 
 const GUIDANCE_TITLE_PATTERNS = [
-  { code: "open_counter_guidance", pattern: /オープンカウンター方式(?:とは|.*(?:実施要領|見積結果|見積依頼))/ },
+  { code: "open_counter_guidance", pattern: /オープンカウンター方式/ },
   { code: "bid_info_link", pattern: /^入札[・･]落札情報はこちら$/ },
   { code: "listed_on_info_page", pattern: /入札情報のページに掲載/ },
   { code: "standard_contract_terms", pattern: /標準契約条項|標準契約書|契約書式|契約様式/ },

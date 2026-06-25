@@ -204,7 +204,7 @@ const CLASSIFICATION_ONLY_TITLES = new Set([
   "WORD"
 ]);
 const GUIDANCE_TITLE_PATTERNS = [
-  /オープンカウンター方式(?:とは|.*(?:実施要領|見積結果|見積依頼))/,
+  /オープンカウンター方式/,
   /^入札[・･]落札情報はこちら$/,
   /入札情報のページに掲載/,
   /標準契約条項|標準契約書|契約書式|契約様式/,

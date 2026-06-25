@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import {
   deleteTenderSourceAction,
@@ -22,6 +23,21 @@ import { getCurrentAdmin } from "@/lib/admin";
 import { getTenderSources } from "@/lib/tenders";
 import type { TenderSource } from "@/lib/types";
 
+export const metadata: Metadata = {
+  title: "取得元管理｜官公庁案件サーチ",
+  description: "官公庁案件サーチの取得元サイト、クロール設定、手動取得を管理する画面です。",
+  openGraph: {
+    title: "取得元管理｜官公庁案件サーチ",
+    description: "官公庁案件サーチの取得元サイト、クロール設定、手動取得を管理する画面です。",
+    siteName: "官公庁案件サーチ"
+  },
+  twitter: {
+    card: "summary",
+    title: "取得元管理｜官公庁案件サーチ",
+    description: "官公庁案件サーチの取得元サイト、クロール設定、手動取得を管理する画面です。"
+  }
+};
+
 export default async function TenderSourcesPage() {
   const admin = await getCurrentAdmin();
   if (!admin) {
@@ -39,7 +55,7 @@ export default async function TenderSourcesPage() {
   const sources = await getTenderSources();
 
   return (
-    <AdminShell email={admin.email}>
+    <AdminShell email={admin.email} systemName="官公庁案件サーチ">
       <div className="grid gap-5">
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <form action={saveTenderSourceAction} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

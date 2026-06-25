@@ -1,9 +1,25 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import { TENDER_STATUS_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { getCurrentAdmin } from "@/lib/admin";
 import { getAdminTenders } from "@/lib/tenders";
+
+export const metadata: Metadata = {
+  title: "案件管理｜官公庁案件サーチ",
+  description: "官公庁案件サーチの公開案件を管理する画面です。",
+  openGraph: {
+    title: "案件管理｜官公庁案件サーチ",
+    description: "官公庁案件サーチの公開案件を管理する画面です。",
+    siteName: "官公庁案件サーチ"
+  },
+  twitter: {
+    card: "summary",
+    title: "案件管理｜官公庁案件サーチ",
+    description: "官公庁案件サーチの公開案件を管理する画面です。"
+  }
+};
 
 export default async function AdminTendersPage() {
   const admin = await getCurrentAdmin();
@@ -22,7 +38,7 @@ export default async function AdminTendersPage() {
   const tenders = await getAdminTenders();
 
   return (
-    <AdminShell email={admin.email}>
+    <AdminShell email={admin.email} systemName="官公庁案件サーチ">
       <div className="mb-4 flex justify-end">
         <Link href="/admin/tenders/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">案件を新規登録</Link>
       </div>

@@ -1,0 +1,47 @@
+name: Tender deadline classification
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry_run or apply"
+        required: true
+        default: "dry_run"
+        type: choice
+        options:
+          - dry_run
+          - apply
+      limit:
+        description: "Maximum rows to scan per table"
+        required: true
+        default: "5000"
+      sample:
+        description: "Sample rows per group"
+        required: true
+        default: "10"
+
+jobs:
+  classify-deadlines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Classify tender deadlines
+        run: npm run classify:tender-deadlines -- --mode=${{ inputs.mode }} --limit=${{ inputs.limit }} --sample=${{ inputs.sample }}
+
+      - name: Tender DB summary
+        if: always()
+        run: node scripts/tender-db-summary.mjs

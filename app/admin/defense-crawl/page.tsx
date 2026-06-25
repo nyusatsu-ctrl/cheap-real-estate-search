@@ -6,6 +6,7 @@ import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAc
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
+import { assessTenderDeadline } from "@/lib/tender-deadlines";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import type { Tender, TenderCandidate, TenderCrawlLog, TenderSource } from "@/lib/types";
@@ -47,6 +48,7 @@ export default async function DefenseCrawlPage() {
   const publishedTenders = (admin ? dbTenders : localTenders).map(normalizeDefenseTender).filter((tender) => tender.status === "published");
   const publicDefenseTenderCount = publishedTenders.filter(isDefenseLike).length;
   const defenseMetrics = countDefenseMetrics(candidates, publishedTenders);
+  const deadlineMetrics = countDeadlineMetrics(publishedTenders);
   const counts = countSources(sources);
   const crawlReadyCount = sources.filter((source) => source.is_active && source.crawl_ready && source.crawler_type !== "manual_only").length;
   const latestLog = crawlLogs[0] ?? dbDiagnostics?.latestLog ?? null;
@@ -90,6 +92,11 @@ export default async function DefenseCrawlPage() {
         <Metric label="登録取得元数" value={sources.length} />
         <Metric label="自動取得対象" value={crawlReadyCount} />
         <Metric label="公開案件件数" value={publishedTenders.length} />
+        <Metric label="active件数" value={deadlineMetrics.active} />
+        <Metric label="closing_soon件数" value={deadlineMetrics.closingSoon} />
+        <Metric label="expired件数" value={deadlineMetrics.expired} />
+        <Metric label="unknown件数" value={deadlineMetrics.unknown} />
+        <Metric label="直近7日取得件数" value={deadlineMetrics.recent7Days} />
         <Metric label="候補件数" value={candidates.length} />
         <Metric label="陸上自衛隊 取得元数" value={counts.ground_self_defense_force} />
         <Metric label="海上自衛隊 取得元数" value={counts.maritime_self_defense_force} />
@@ -398,6 +405,35 @@ function countDefenseMetrics(candidates: TenderCandidate[], tenders: Tender[]) {
     westernCandidates: candidates.filter(isWesternAreaAccounting).length,
     westernPublished: tenders.filter(isWesternAreaAccounting).length
   };
+}
+
+function countDeadlineMetrics(tenders: Tender[]) {
+  const now = new Date();
+  const recentThreshold = now.getTime() - 7 * 86_400_000;
+  const counts = {
+    active: 0,
+    closingSoon: 0,
+    expired: 0,
+    unknown: 0,
+    archived: 0,
+    recent7Days: 0,
+    defensePublished: 0
+  };
+
+  for (const tender of tenders) {
+    const deadline = assessTenderDeadline(tender, now);
+    if (deadline.status === "active") counts.active += 1;
+    if (deadline.status === "closing_soon") counts.closingSoon += 1;
+    if (deadline.status === "expired") counts.expired += 1;
+    if (deadline.status === "unknown") counts.unknown += 1;
+    if (deadline.status === "archived") counts.archived += 1;
+    if (isDefenseLike(tender)) counts.defensePublished += 1;
+
+    const fetchedAt = new Date(tender.fetched_at ?? tender.created_at ?? 0).getTime();
+    if (Number.isFinite(fetchedAt) && fetchedAt >= recentThreshold) counts.recent7Days += 1;
+  }
+
+  return counts;
 }
 
 function organizationLabel(value: TenderSource["organization_type"]) {

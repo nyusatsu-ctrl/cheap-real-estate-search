@@ -3,6 +3,7 @@ import path from "node:path";
 import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import { isHighConfidenceTenderCandidate, isPublishableTenderRecord } from "@/lib/tender-candidate-quality";
+import { assessTenderDeadline, deadlineStatusSortPriority } from "@/lib/tender-deadlines";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
 import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
@@ -685,10 +686,11 @@ export function parseTenderFilters(params: Record<string, string | undefined>): 
     prefecture: params.prefecture || undefined,
     tenderType: (tenderType || undefined) as TenderType | undefined,
     qualification: normalizeParticipationCondition(params.qualification),
+    deadlineStatus: normalizeDeadlineStatus(params.deadlineStatus),
     defenseOnly: params.defenseOnly === "1",
     openCounterOnly: params.openCounterOnly === "1",
     keyword: params.keyword || undefined,
-    sort: params.sort === "deadline" ? "deadline" : "new"
+    sort: normalizeTenderSort(params.sort)
   };
 }
 
@@ -696,6 +698,8 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
   const keyword = filters.keyword?.toLowerCase();
   const filtered = tenders.filter((tender) => {
     const normalized = normalizeDefenseTender(tender);
+    const deadline = assessTenderDeadline(normalized);
+    if (!matchesDeadlineStatus(deadline.status, filters.deadlineStatus)) return false;
     if (filters.region && filters.region !== "全国" && tenderRegion(normalized) !== filters.region) return false;
     if (filters.prefecture && tender.prefecture !== filters.prefecture) return false;
     if (filters.tenderType && tender.tender_type !== filters.tenderType) return false;
@@ -710,11 +714,48 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
   });
 
   return [...filtered].sort((a, b) => {
+    const aDeadline = assessTenderDeadline(a);
+    const bDeadline = assessTenderDeadline(b);
     if (filters.sort === "deadline") {
-      return new Date(a.deadline_at ?? "9999-12-31").getTime() - new Date(b.deadline_at ?? "9999-12-31").getTime();
+      return deadlineStatusSortPriority(aDeadline.status) - deadlineStatusSortPriority(bDeadline.status)
+        || new Date(aDeadline.deadlineAt ?? "9999-12-31").getTime() - new Date(bDeadline.deadlineAt ?? "9999-12-31").getTime()
+        || compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
     }
-    return new Date(b.published_at ?? b.created_at).getTime() - new Date(a.published_at ?? a.created_at).getTime();
+    if (filters.sort === "new") {
+      return compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
+    }
+    return deadlineStatusSortPriority(aDeadline.status) - deadlineStatusSortPriority(bDeadline.status)
+      || compareDeadlineAsc(aDeadline.deadlineAt, bDeadline.deadlineAt)
+      || compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
   });
+}
+
+function normalizeDeadlineStatus(value: string | undefined): TenderFilters["deadlineStatus"] {
+  if (value === "available" || value === "closing_soon" || value === "unknown" || value === "expired" || value === "all") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeTenderSort(value: string | undefined): NonNullable<TenderFilters["sort"]> {
+  if (value === "deadline" || value === "new") return value;
+  return "recommended";
+}
+
+function matchesDeadlineStatus(status: ReturnType<typeof assessTenderDeadline>["status"], filter: TenderFilters["deadlineStatus"]) {
+  if (status === "archived") return false;
+  if (!filter) return status !== "expired";
+  if (filter === "all") return true;
+  if (filter === "available") return status === "active" || status === "closing_soon";
+  return status === filter;
+}
+
+function compareDeadlineAsc(a: string | null, b: string | null) {
+  return new Date(a ?? "9999-12-31").getTime() - new Date(b ?? "9999-12-31").getTime();
+}
+
+function compareDateDesc(a: string | null | undefined, b: string | null | undefined) {
+  return new Date(b ?? 0).getTime() - new Date(a ?? 0).getTime();
 }
 
 function normalizeParticipationCondition(value: string | undefined): TenderFilters["qualification"] {

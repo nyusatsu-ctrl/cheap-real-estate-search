@@ -314,10 +314,11 @@ export type TenderFilters = {
   prefecture?: string;
   tenderType?: TenderType;
   qualification?: "not_required" | "unified_qualification" | "area_specified" | "other_conditions";
+  deadlineStatus?: "available" | "closing_soon" | "unknown" | "expired" | "all";
   defenseOnly?: boolean;
   openCounterOnly?: boolean;
   keyword?: string;
-  sort?: "new" | "deadline";
+  sort?: "recommended" | "new" | "deadline";
 };
 
 export type UserFavoriteTender = {

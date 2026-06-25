@@ -5,6 +5,7 @@ import { saveFavoriteTenderAction } from "@/app/tenders/actions";
 import { FAVORITE_TENDER_STATUS_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { getSimilarPastAwardResults, summarizePastAwards } from "@/lib/past-awards";
+import { assessTenderDeadline, deadlineStatusBadgeClass } from "@/lib/tender-deadlines";
 import { canUseMemberFeatures, getPublishedTender } from "@/lib/tenders";
 import { getCurrentMember } from "@/lib/user";
 import type { SimilarPastAwardResult } from "@/lib/types";
@@ -31,6 +32,7 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
 
   const similarAwards = await getSimilarPastAwardResults(tender, 10);
   const similarAwardStats = summarizePastAwards(similarAwards);
+  const deadline = assessTenderDeadline(tender);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -42,7 +44,7 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{TENDER_TYPE_LABELS[tender.tender_type]}</span>
           {tender.is_new ? <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">新着</span> : null}
-          {tender.is_deadline_soon ? <span className="rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">新着</span> : null}
+          <span className={`rounded px-2 py-1 text-xs font-bold ${deadlineStatusBadgeClass(deadline.status)}`}>{deadline.label}</span>
           {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-1 text-xs font-bold text-white">防衛省・自衛隊系</span> : null}
           {tender.is_admin_verified ? <span className="rounded bg-brand-100 px-2 py-1 text-xs font-bold text-brand-700">管理者確認済み</span> : null}
         </div>
@@ -58,8 +60,11 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
             ["original_label", tender.original_label ?? "-"],
             ["地域", `${tender.region} / ${tender.prefecture}`],
             ["公告日", formatDate(tender.published_at)],
-            ["締切日", formatDate(tender.deadline_at)],
+            ["締切日", deadline.deadlineAt ? formatDate(deadline.deadlineAt) : "期限不明"],
             ["見積期限", formatDate(tender.bid_at)],
+            ["期限ステータス", deadline.label],
+            ["期限判定元", deadline.source ?? "-"],
+            ["期限判定理由", deadline.reason ?? deadline.failureReason ?? "-"],
             ["参加条件", tender.qualification_required ? "条件あり" : "資格不要・オープンカウンター"],
             ["必要な参加資格", tender.required_qualification ?? "-"],
             ["取得日時", formatDate(tender.fetched_at)]

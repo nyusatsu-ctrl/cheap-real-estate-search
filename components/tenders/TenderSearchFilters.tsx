@@ -5,6 +5,7 @@ type Props = {
   prefecture?: string;
   tenderType?: string;
   qualification?: string;
+  deadlineStatus?: string;
   keyword?: string;
   sort?: string;
   defenseOnly?: string;
@@ -44,10 +45,33 @@ export function TenderSearchFilters(props: Props) {
           ]}
         />
         <Select
+          name="deadlineStatus"
+          label="期限"
+          defaultValue={props.deadlineStatus ?? ""}
+          options={[
+            ["", "参加可能・期限不明"],
+            ["available", "参加可能のみ"],
+            ["closing_soon", "締切間近"],
+            ["unknown", "期限不明"],
+            ["all", "期限切れも表示"],
+            ["expired", "期限切れのみ"]
+          ]}
+        />
+        <Select
+          name="defenseOnly"
+          label="発注機関"
+          defaultValue={props.defenseOnly ?? ""}
+          options={[
+            ["", "すべて"],
+            ["1", "防衛省・自衛隊のみ"]
+          ]}
+        />
+        <Select
           name="sort"
           label="並び順"
-          defaultValue={props.sort ?? "new"}
+          defaultValue={props.sort ?? "recommended"}
           options={[
+            ["recommended", "参加しやすい順"],
             ["new", "新着順"],
             ["deadline", "締切日順"]
           ]}

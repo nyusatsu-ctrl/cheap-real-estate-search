@@ -1,19 +1,30 @@
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import {
+  EXPECTED_DIAGNOSIS_PROJECT_REF,
+  createDiagnosisSupabaseServiceRoleClient,
+  getDiagnosisAnonKeyFormat,
+  getDiagnosisProjectRef,
+  getDiagnosisServiceRoleKeyFormat,
+  type DiagnosisKeyFormat
+} from "@/lib/supabase/diagnosis-server";
 
 const CRAWLER_SCOPE_FILTER = "crawler_source_id.not.is.null,crawl_status.in.(candidate,checked,test_reverted,rejected)";
-const EXPECTED_DIAGNOSIS_PROJECT_REF = "kfhjnesoyxljqailuhig";
-type EnvKeyFormat = "sb_publishable" | "sb_secret" | "jwt" | "missing" | "other";
 
 export type AdminSystemCheck = {
   env: {
     nextPublicSupabaseUrl: boolean;
     nextPublicSupabaseAnonKey: boolean;
     serviceRoleKey: boolean;
-    projectRef: string | null;
-    projectRefMasked: string | null;
-    projectRefMatchesDiagnosisProject: boolean;
-    anonKeyFormat: EnvKeyFormat;
-    serviceRoleKeyFormat: EnvKeyFormat;
+    diagnosisSupabaseUrl: boolean;
+    diagnosisSupabaseAnonKey: boolean;
+    diagnosisServiceRoleKey: boolean;
+    realEstateProjectRef: string | null;
+    realEstateProjectRefMasked: string | null;
+    diagnosisProjectRef: string | null;
+    diagnosisProjectRefMasked: string | null;
+    diagnosisProjectRefMatchesExpected: boolean;
+    diagnosisAnonKeyFormat: DiagnosisKeyFormat;
+    diagnosisServiceRoleKeyFormat: DiagnosisKeyFormat;
   };
   connection: {
     ok: boolean;
@@ -35,17 +46,23 @@ export type AdminSystemCheck = {
 };
 
 export async function getAdminSystemCheck(): Promise<AdminSystemCheck> {
-  const projectRef = extractProjectRef(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const realEstateProjectRef = extractProjectRef(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const diagnosisProjectRef = getDiagnosisProjectRef();
   const result: AdminSystemCheck = {
     env: {
       nextPublicSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
       nextPublicSupabaseAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
       serviceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-      projectRef,
-      projectRefMasked: maskProjectRef(projectRef),
-      projectRefMatchesDiagnosisProject: projectRef === EXPECTED_DIAGNOSIS_PROJECT_REF,
-      anonKeyFormat: getKeyFormat(process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "anon"),
-      serviceRoleKeyFormat: getKeyFormat(process.env.SUPABASE_SERVICE_ROLE_KEY, "service_role")
+      diagnosisSupabaseUrl: Boolean(process.env.DIAGNOSIS_SUPABASE_URL),
+      diagnosisSupabaseAnonKey: Boolean(process.env.DIAGNOSIS_SUPABASE_ANON_KEY),
+      diagnosisServiceRoleKey: Boolean(process.env.DIAGNOSIS_SUPABASE_SERVICE_ROLE_KEY),
+      realEstateProjectRef,
+      realEstateProjectRefMasked: maskProjectRef(realEstateProjectRef),
+      diagnosisProjectRef,
+      diagnosisProjectRefMasked: maskProjectRef(diagnosisProjectRef),
+      diagnosisProjectRefMatchesExpected: diagnosisProjectRef === EXPECTED_DIAGNOSIS_PROJECT_REF,
+      diagnosisAnonKeyFormat: getDiagnosisAnonKeyFormat(),
+      diagnosisServiceRoleKeyFormat: getDiagnosisServiceRoleKeyFormat()
     },
     connection: {
       ok: false,
@@ -66,49 +83,66 @@ export async function getAdminSystemCheck(): Promise<AdminSystemCheck> {
     errors: []
   };
 
-  const supabase = createSupabaseServiceRoleClient();
-  if (!supabase) {
-    result.connection.message = "Supabase接続に必要なサーバー側設定が不足しています。";
-    result.diagnosisConnection.message = "construction_diagnoses確認に必要なサーバー側設定が不足しています。";
-    result.errors.push("Supabase service role client is not configured.");
-    return result;
+  const realEstateSupabase = createSupabaseServiceRoleClient();
+  if (!realEstateSupabase) {
+    result.connection.message = "不動産サーチ用Supabase接続に必要なサーバー側設定が不足しています。";
+    result.errors.push("Real estate Supabase service role client is not configured.");
+  } else {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const realEstateErrors: string[] = [];
+    result.counts.properties = await countRows(
+      "properties",
+      () => realEstateSupabase.from("properties").select("id", { count: "exact", head: true }),
+      realEstateErrors
+    );
+    result.counts.crawlerCandidates = await countRows(
+      "crawler candidates",
+      () => realEstateSupabase.from("properties").select("id", { count: "exact", head: true }).or(CRAWLER_SCOPE_FILTER),
+      realEstateErrors
+    );
+    result.counts.publishedProperties = await countRows(
+      "published properties",
+      () => realEstateSupabase.from("properties").select("id", { count: "exact", head: true }).eq("status", "published"),
+      realEstateErrors
+    );
+    result.counts.nonPublishedProperties = await countRows(
+      "non published properties",
+      () => realEstateSupabase.from("properties").select("id", { count: "exact", head: true }).neq("status", "published"),
+      realEstateErrors
+    );
+    result.counts.recentDetectedProperties = await countRows(
+      "recent detected properties",
+      () => realEstateSupabase.from("properties").select("id", { count: "exact", head: true }).gte("first_detected_at", sevenDaysAgo),
+      realEstateErrors
+    );
+
+    result.errors.push(...realEstateErrors);
+    result.connection.ok = result.counts.properties !== null && realEstateErrors.length === 0;
+    result.connection.message = result.connection.ok
+      ? "不動産サーチ用Supabaseに接続できています。"
+      : "不動産サーチ用Supabase接続または件数取得でエラーがあります。";
   }
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const diagnosisSupabase = createDiagnosisSupabaseServiceRoleClient();
+  if (!diagnosisSupabase) {
+    result.diagnosisConnection.message = "construction_diagnoses確認に必要な診断用サーバー側設定が不足しています。";
+    result.errors.push("Diagnosis Supabase service role client is not configured.");
+  } else {
+    const diagnosisErrors: string[] = [];
+    result.counts.constructionDiagnoses = await countRows(
+      "construction diagnoses",
+      () => diagnosisSupabase.from("construction_diagnoses").select("id", { count: "exact", head: true }),
+      diagnosisErrors
+    );
 
-  result.counts.constructionDiagnoses = await countRows(
-    "construction diagnoses",
-    () => supabase.from("construction_diagnoses").select("id", { count: "exact", head: true }),
-    result.errors
-  );
-  result.counts.properties = await countRows("properties", () => supabase.from("properties").select("id", { count: "exact", head: true }), result.errors);
-  result.counts.crawlerCandidates = await countRows(
-    "crawler candidates",
-    () => supabase.from("properties").select("id", { count: "exact", head: true }).or(CRAWLER_SCOPE_FILTER),
-    result.errors
-  );
-  result.counts.publishedProperties = await countRows(
-    "published properties",
-    () => supabase.from("properties").select("id", { count: "exact", head: true }).eq("status", "published"),
-    result.errors
-  );
-  result.counts.nonPublishedProperties = await countRows(
-    "non published properties",
-    () => supabase.from("properties").select("id", { count: "exact", head: true }).neq("status", "published"),
-    result.errors
-  );
-  result.counts.recentDetectedProperties = await countRows(
-    "recent detected properties",
-    () => supabase.from("properties").select("id", { count: "exact", head: true }).gte("first_detected_at", sevenDaysAgo),
-    result.errors
-  );
+    result.errors.push(...diagnosisErrors);
+    result.diagnosisConnection.ok = result.counts.constructionDiagnoses !== null && diagnosisErrors.length === 0;
+    result.diagnosisConnection.message = result.diagnosisConnection.ok
+      ? "construction_diagnoses に接続できています。"
+      : "construction_diagnoses の接続または件数取得でエラーがあります。";
+  }
 
-  result.connection.ok = result.counts.properties !== null && result.errors.length === 0;
-  result.connection.message = result.connection.ok ? "Supabaseに接続できています。" : "Supabase接続または件数取得でエラーがあります。";
-  result.diagnosisConnection.ok = result.counts.constructionDiagnoses !== null;
-  result.diagnosisConnection.message = result.diagnosisConnection.ok
-    ? "construction_diagnoses に接続できています。"
-    : "construction_diagnoses の接続または件数取得でエラーがあります。";
   return result;
 }
 
@@ -129,15 +163,6 @@ function maskProjectRef(projectRef: string | null) {
   if (!projectRef) return null;
   if (projectRef.length <= 8) return `${projectRef.slice(0, 2)}...${projectRef.slice(-2)}`;
   return `${projectRef.slice(0, 4)}...${projectRef.slice(-4)}`;
-}
-
-function getKeyFormat(value: string | undefined, expected: "anon" | "service_role"): EnvKeyFormat {
-  const normalized = String(value ?? "").trim();
-  if (!normalized) return "missing";
-  if (expected === "anon" && normalized.startsWith("sb_publishable_")) return "sb_publishable";
-  if (expected === "service_role" && normalized.startsWith("sb_secret_")) return "sb_secret";
-  if (normalized.startsWith("eyJ")) return "jwt";
-  return "other";
 }
 
 async function countRows(

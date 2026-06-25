@@ -1,4 +1,4 @@
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createDiagnosisSupabaseServerClient, createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
 
 export type DiagnosisTypeCode = "A" | "B" | "C" | "D" | "E" | "F" | "G";
 export type LeadSource = "aidma" | "meta" | "lp" | "referral" | "direct" | "other";
@@ -914,7 +914,7 @@ function buildPlatformSuggestions({
 }
 
 export async function getDiagnosisClient() {
-  return createSupabaseServiceRoleClient() ?? await createSupabaseServerClient();
+  return createDiagnosisSupabaseServiceRoleClient() ?? await createDiagnosisSupabaseServerClient();
 }
 
 export async function getConstructionDiagnosis(id: string) {

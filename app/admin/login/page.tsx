@@ -1,5 +1,6 @@
 import { signInAction } from "@/app/admin/actions";
 import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
+import { hasDiagnosisSupabaseEnv } from "@/lib/supabase/diagnosis-server";
 import { hasSupabaseEnv } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -24,6 +25,12 @@ function safeLoginRedirectPath(value: string | undefined) {
   return value;
 }
 
+function hasRequiredSupabaseEnv(redirectTo: string) {
+  if (redirectTo.startsWith("/admin/diagnoses")) return hasDiagnosisSupabaseEnv();
+  if (redirectTo.startsWith("/admin/system-check")) return hasSupabaseEnv() || hasDiagnosisSupabaseEnv();
+  return hasSupabaseEnv();
+}
+
 export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<AdminLoginSearchParams> }) {
   const resolvedSearchParams = await searchParams;
   const redirectTo = safeLoginRedirectPath(resolvedSearchParams.next ?? resolvedSearchParams.redirectTo ?? resolvedSearchParams.continue);
@@ -42,7 +49,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
         <p className="mt-4 text-sm font-bold text-brand-700">建設業売上アップ診断</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
         <p className="mt-2 text-sm text-slate-600">診断者一覧、リード対応状況、診断詳細を管理するアカウントでログインしてください。</p>
-        {!hasSupabaseEnv() ? (
+        {!hasRequiredSupabaseEnv(redirectTo) ? (
           <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Supabase 環境変数が未設定です。.env.local を設定するとログインできます。
           </p>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/admin/actions";
 import { LeadStatusSelect } from "@/components/diagnoses/LeadStatusSelect";
-import { getCurrentAdmin } from "@/lib/admin";
+import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
@@ -25,7 +25,7 @@ import { Download, Filter, LogOut } from "lucide-react";
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function AdminDiagnosesPage({ searchParams }: { searchParams: AdminDiagnosesSearchParams }) {
-  const admin = await getCurrentAdmin();
+  const admin = await getCurrentDiagnosisAdmin();
   if (!admin) return <LoginRequired />;
 
   const params = await searchParams;

@@ -1,9 +1,13 @@
 import { AdminShell } from "@/components/AdminShell";
 import { getAdminSystemCheck } from "@/lib/admin-system-check";
-import { requireAdmin } from "@/lib/admin";
+import { getCurrentAdmin } from "@/lib/admin";
+import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
+import { redirect } from "next/navigation";
 
 export default async function AdminSystemCheckPage() {
-  const admin = await requireAdmin("/admin/system-check");
+  const admin = (await getCurrentAdmin()) ?? (await getCurrentDiagnosisAdmin());
+  if (!admin) redirect("/admin/login?next=/admin/system-check");
+
   const check = await getAdminSystemCheck();
 
   return (
@@ -22,11 +26,16 @@ export default async function AdminSystemCheckPage() {
             <CheckRow label="NEXT_PUBLIC_SUPABASE_URL" ok={check.env.nextPublicSupabaseUrl} />
             <CheckRow label="NEXT_PUBLIC_SUPABASE_ANON_KEY" ok={check.env.nextPublicSupabaseAnonKey} />
             <CheckRow label="SUPABASE_SERVICE_ROLE_KEY" ok={check.env.serviceRoleKey} />
-            <CheckRow label="診断用Project Ref一致" ok={check.env.projectRefMatchesDiagnosisProject} />
-            <MaskedValueRow label="Supabase Project Ref" value={check.env.projectRef} />
-            <MaskedValueRow label="Project Ref masked" value={check.env.projectRefMasked} />
-            <MaskedValueRow label="ANON KEY形式" value={check.env.anonKeyFormat} />
-            <MaskedValueRow label="SERVICE ROLE KEY形式" value={check.env.serviceRoleKeyFormat} />
+            <CheckRow label="DIAGNOSIS_SUPABASE_URL" ok={check.env.diagnosisSupabaseUrl} />
+            <CheckRow label="DIAGNOSIS_SUPABASE_ANON_KEY" ok={check.env.diagnosisSupabaseAnonKey} />
+            <CheckRow label="DIAGNOSIS_SUPABASE_SERVICE_ROLE_KEY" ok={check.env.diagnosisServiceRoleKey} />
+            <CheckRow label="診断用Project Ref一致" ok={check.env.diagnosisProjectRefMatchesExpected} />
+            <MaskedValueRow label="不動産サーチ用 Project Ref" value={check.env.realEstateProjectRef} />
+            <MaskedValueRow label="不動産サーチ用 Project Ref masked" value={check.env.realEstateProjectRefMasked} />
+            <MaskedValueRow label="診断用 Project Ref" value={check.env.diagnosisProjectRef} />
+            <MaskedValueRow label="診断用 Project Ref masked" value={check.env.diagnosisProjectRefMasked} />
+            <MaskedValueRow label="診断用ANON KEY形式" value={check.env.diagnosisAnonKeyFormat} />
+            <MaskedValueRow label="診断用SERVICE ROLE KEY形式" value={check.env.diagnosisServiceRoleKeyFormat} />
           </dl>
         </div>
 

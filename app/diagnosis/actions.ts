@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createDiagnosisSupabaseServerClient, createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
 import {
   CONSTRUCTION_DIAGNOSIS_RESULT_COOKIE,
   DIAGNOSIS_QUESTIONS,
@@ -103,8 +103,8 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
   const diagnosisId = randomUUID();
   const now = new Date().toISOString();
 
-  const serverClient = await createSupabaseServerClient();
-  const serviceRoleClient = createSupabaseServiceRoleClient();
+  const serverClient = await createDiagnosisSupabaseServerClient();
+  const serviceRoleClient = createDiagnosisSupabaseServiceRoleClient();
   if (!serverClient && !serviceRoleClient) {
     console.error("Construction diagnosis submit failed: Supabase client is not configured.");
     return {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateDiagnosisLeadDetailsAction } from "@/app/admin/diagnoses/actions";
-import { getCurrentAdmin } from "@/lib/admin";
+import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_QUESTIONS,
@@ -19,7 +19,7 @@ import {
 } from "@/lib/construction-diagnosis";
 
 export default async function AdminDiagnosisDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const admin = await getCurrentAdmin();
+  const admin = await getCurrentDiagnosisAdmin();
   if (!admin) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">

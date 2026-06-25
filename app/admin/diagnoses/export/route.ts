@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentAdmin } from "@/lib/admin";
+import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
@@ -20,7 +20,7 @@ import {
 } from "@/lib/construction-diagnosis";
 
 export async function GET(request: Request) {
-  const admin = await getCurrentAdmin();
+  const admin = await getCurrentDiagnosisAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const filters = getFilters(new URL(request.url).searchParams);

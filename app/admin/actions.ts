@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createDiagnosisSupabaseServerClient } from "@/lib/supabase/diagnosis-server";
 import { requireAdmin } from "@/lib/admin";
 import type { PropertyStatus } from "@/lib/types";
 
@@ -27,33 +28,62 @@ function safeAdminRedirectPath(value: FormDataEntryValue | null) {
   return path;
 }
 
-export async function signInAction(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) throw new Error("Supabase environment variables are not set.");
+function isDiagnosisAdminPath(path: string) {
+  return path.startsWith("/admin/diagnoses");
+}
 
+function isSystemCheckPath(path: string) {
+  return path.startsWith("/admin/system-check");
+}
+
+async function getSignInClients(redirectTo: string) {
+  const genericSupabase = await createSupabaseServerClient();
+  const diagnosisSupabase = await createDiagnosisSupabaseServerClient();
+  const presentClients = [genericSupabase, diagnosisSupabase].filter(
+    (client): client is NonNullable<typeof genericSupabase> => Boolean(client)
+  );
+
+  if (isDiagnosisAdminPath(redirectTo)) return diagnosisSupabase ? [diagnosisSupabase] : [];
+  if (isSystemCheckPath(redirectTo)) return presentClients;
+  return genericSupabase ? [genericSupabase] : [];
+}
+
+export async function signInAction(formData: FormData) {
   const email = requiredString(formData, "email");
   const password = requiredString(formData, "password");
   const redirectTo = safeAdminRedirectPath(formData.get("redirect_to"));
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    const params = new URLSearchParams({ error: error.message, next: redirectTo });
-    redirect(`/admin/login?${params.toString()}`);
+  const clients = await getSignInClients(redirectTo);
+  if (!clients.length) throw new Error("Supabase environment variables are not set.");
+
+  let lastError: string | null = null;
+  for (const supabase of clients) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      lastError = error.message;
+      continue;
+    }
+
+    if (process.env.ADMIN_AUTH_DEBUG === "1" || process.env.NODE_ENV === "development") {
+      console.info("[admin-auth] sign_in", {
+        userId: data.user?.id ?? null,
+        email: data.user?.email ?? null,
+        hasSession: Boolean(data.session),
+        redirectTo
+      });
+    }
+
+    redirect(redirectTo);
   }
 
-  if (process.env.ADMIN_AUTH_DEBUG === "1" || process.env.NODE_ENV === "development") {
-    console.info("[admin-auth] sign_in", {
-      userId: data.user?.id ?? null,
-      email: data.user?.email ?? null,
-      hasSession: Boolean(data.session)
-    });
-  }
-
-  redirect(redirectTo);
+  const params = new URLSearchParams({ error: lastError ?? "ログインできませんでした。", next: redirectTo });
+  redirect(`/admin/login?${params.toString()}`);
 }
 
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
   if (supabase) await supabase.auth.signOut();
+  const diagnosisSupabase = await createDiagnosisSupabaseServerClient();
+  if (diagnosisSupabase) await diagnosisSupabase.auth.signOut();
   redirect("/admin/login");
 }
 

@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin";
+import { requireDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import { normalizeLeadStatus } from "@/lib/construction-diagnosis";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -25,9 +25,9 @@ function nullableDateTime(formData: FormData, key: string) {
 }
 
 async function getAdminServiceRoleClient() {
-  await requireAdmin();
-  const supabase = createSupabaseServiceRoleClient();
-  if (!supabase) throw new Error("Supabase service role environment variable is not set.");
+  await requireDiagnosisAdmin();
+  const supabase = createDiagnosisSupabaseServiceRoleClient();
+  if (!supabase) throw new Error("Diagnosis Supabase service role environment variable is not set.");
   return supabase;
 }
 

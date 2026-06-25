@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
-import { isPublishableTenderRecord, isReviewableTenderCandidate } from "@/lib/tender-candidate-quality";
+import { isHighConfidenceTenderCandidate, isPublishableTenderRecord } from "@/lib/tender-candidate-quality";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
 import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
@@ -217,7 +217,7 @@ export async function getTenderCandidatesPage({
       return paginateCandidates(fallbackCandidates, totalPages, normalizedPerPage, clampedResult.error.message);
     }
     return {
-      candidates: ((clampedResult.data ?? []) as TenderCandidate[]).map(normalizeDefenseTender),
+      candidates: await attachPublishedTenderStatus(((clampedResult.data ?? []) as TenderCandidate[]).map(normalizeDefenseTender)),
       total,
       page: totalPages,
       perPage: normalizedPerPage,
@@ -227,7 +227,7 @@ export async function getTenderCandidatesPage({
   }
 
   return {
-    candidates: ((firstResult.data ?? []) as TenderCandidate[]).map(normalizeDefenseTender),
+    candidates: await attachPublishedTenderStatus(((firstResult.data ?? []) as TenderCandidate[]).map(normalizeDefenseTender)),
     total,
     page: normalizedPage,
     perPage: normalizedPerPage,
@@ -371,6 +371,32 @@ function paginateCandidates(candidates: TenderCandidate[], page: number, perPage
   };
 }
 
+async function attachPublishedTenderStatus(candidates: TenderCandidate[]) {
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase || candidates.length === 0) return candidates;
+
+  const sourceUrls = [...new Set(candidates.map((candidate) => candidate.source_url).filter(Boolean))];
+  if (!sourceUrls.length) return candidates;
+
+  const publishedByUrl = new Map<string, { id: string; status: string | null }>();
+  for (const chunk of chunks(sourceUrls, 200)) {
+    const { data, error } = await supabase.from("tenders").select("id, source_url, status").in("source_url", chunk);
+    if (error) return candidates;
+    for (const tender of data ?? []) {
+      if (tender.source_url) publishedByUrl.set(String(tender.source_url), { id: String(tender.id), status: tender.status ?? null });
+    }
+  }
+
+  return candidates.map((candidate) => {
+    const published = publishedByUrl.get(candidate.source_url);
+    return published ? {
+      ...candidate,
+      published_tender_id: published.id,
+      published_tender_status: published.status
+    } : candidate;
+  });
+}
+
 function pendingBulkFilters(filters: CountFilter[]) {
   return [{ op: "eq" as const, column: "review_status", value: "pending" }, ...filters];
 }
@@ -473,7 +499,7 @@ function isBulkApprovableCandidate(candidate: TenderCandidate) {
   if (!candidate.agency_name.trim()) return false;
   if (candidate.review_status !== "pending") return false;
   if (candidate.duplicate_candidate_id) return false;
-  if (!isReviewableTenderCandidate(candidate)) return false;
+  if (!isHighConfidenceTenderCandidate(candidate)) return false;
   return candidate.tender_type !== "unknown" && candidate.tender_type !== "construction";
 }
 
@@ -833,4 +859,12 @@ function safeOrigin(value: string) {
   } catch {
     return null;
   }
+}
+
+function chunks<T>(values: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    result.push(values.slice(index, index + size));
+  }
+  return result;
 }

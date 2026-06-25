@@ -210,6 +210,9 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
             {candidate.duplicate_candidate_id ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">重複候補あり</span> : null}
             {quality.status === "reject" ? <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">品質NG: {quality.reason}</span> : null}
             {quality.status === "duplicate" ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">duplicate推奨</span> : null}
+            {quality.autoPublish ? <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">高確度公開候補</span> : null}
+            {quality.decision === "hold" ? <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">判断保留</span> : null}
+            {candidate.published_tender_id ? <span className="rounded bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">公開済み反映あり</span> : null}
           </div>
           <h3 className="mt-2 text-lg font-black leading-7 text-slate-950">{candidate.title}</h3>
           <p className="mt-1 text-sm text-slate-600">
@@ -221,6 +224,18 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
           <p className="mt-1 text-xs text-slate-500">
             入札日 {formatDate(candidate.bid_at)} / 取得日時 {formatDate(candidate.fetched_at)} / 信頼度 {candidate.classification_confidence ?? "-"} / 重複候補 {candidate.duplicate_candidate_id ?? "なし"}
           </p>
+          <div className="mt-3 grid gap-2 rounded border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 md:grid-cols-2">
+            <div>
+              <p className="font-black text-slate-900">品質スコア: {quality.score}</p>
+              <p className="mt-1 font-semibold">自動公開: {quality.autoPublish ? "対象" : "対象外"} / 自動却下: {quality.autoReject ? "対象" : "対象外"}</p>
+              <p className="mt-1 font-semibold">反映済み: {candidate.published_tender_id ? `あり (${candidate.published_tender_status ?? "status未取得"})` : "なし"}</p>
+            </div>
+            <div>
+              {quality.positiveReasons.length ? <p><span className="font-black text-emerald-700">OK理由:</span> {quality.positiveReasons.join(" / ")}</p> : null}
+              {quality.negativeReasons.length ? <p><span className="font-black text-rose-700">NG理由:</span> {quality.negativeReasons.join(" / ")}</p> : null}
+              {quality.holdReasons.length ? <p><span className="font-black text-amber-700">保留理由:</span> {quality.holdReasons.join(" / ")}</p> : null}
+            </div>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <a href={candidate.source_url} target="_blank" rel="noreferrer" className="rounded border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus-ring">元URL</a>

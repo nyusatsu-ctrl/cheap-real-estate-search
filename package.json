@@ -33,6 +33,7 @@
     "list:defense-sources": "node scripts/defense-crawler.mjs sources --group=all",
     "dry-run:defense-source": "node scripts/defense-crawler.mjs crawl --group=all --dry-run --no-db --max-sources=1",
     "cleanup:tender-guidance": "node scripts/cleanup-guidance-tenders.mjs",
+    "classify:tender-candidates": "node scripts/classify-tender-candidates.mjs",
     "normalize:defense-tenders": "node scripts/normalize-defense-tenders.mjs",
     "gps:tcp": "node server/mv930g/tcp-server.mjs",
     "gps:test-send": "node server/mv930g/send-test.mjs"

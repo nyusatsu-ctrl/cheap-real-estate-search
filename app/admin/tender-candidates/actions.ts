@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
-import { assessTenderCandidateQuality, isReviewableTenderCandidate } from "@/lib/tender-candidate-quality";
+import { assessTenderCandidateQuality, isHighConfidenceTenderCandidate } from "@/lib/tender-candidate-quality";
 import type { Tender, TenderCandidate, TenderCandidateReviewStatus, TenderCandidateType, TenderType } from "@/lib/types";
 
 const candidatePath = path.join(process.cwd(), "data", "defense-candidates.json");
@@ -523,7 +523,7 @@ function isBulkApprovable(candidate: TenderCandidate) {
   if (!candidate.agency_name.trim()) return false;
   if (candidate.review_status !== "pending") return false;
   if (candidate.duplicate_candidate_id) return false;
-  if (!isReviewableTenderCandidate(candidate)) return false;
+  if (!isHighConfidenceTenderCandidate(candidate)) return false;
   if (candidate.tender_type === "unknown" || candidate.tender_type === "construction") return false;
   if (isClearlyExcludedCandidate(candidate)) return false;
   return true;

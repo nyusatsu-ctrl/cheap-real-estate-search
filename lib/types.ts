@@ -241,6 +241,8 @@ export type TenderCandidate = {
   fetched_at: string | null;
   created_at: string;
   updated_at: string;
+  published_tender_id?: string | null;
+  published_tender_status?: TenderStatus | string | null;
   tender_sources?: Pick<TenderSource, "name" | "source_name" | "organization_type" | "base_url"> | null;
 };
 

@@ -1,0 +1,48 @@
+name: Tender candidate quality review
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry_run only prints counts. apply publishes high-confidence candidates and rejects clear guidance rows."
+        required: true
+        default: "dry_run"
+        type: choice
+        options:
+          - dry_run
+          - apply
+      limit:
+        description: "Maximum pending candidates to classify"
+        required: true
+        default: "5000"
+      sample:
+        description: "Sample rows per group in logs"
+        required: true
+        default: "10"
+
+jobs:
+  classify:
+    name: Classify tender candidates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Dry-run candidate classification
+        if: ${{ inputs.mode == 'dry_run' }}
+        run: npm run classify:tender-candidates -- --limit=${{ inputs.limit }} --sample=${{ inputs.sample }}
+
+      - name: Apply candidate classification
+        if: ${{ inputs.mode == 'apply' }}
+        run: npm run classify:tender-candidates -- --limit=${{ inputs.limit }} --sample=${{ inputs.sample }} --commit

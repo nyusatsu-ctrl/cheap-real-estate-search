@@ -37,13 +37,13 @@ export async function createTenderSupabaseServerClient() {
 }
 
 function getTenderSupabaseUrl() {
-  return process.env.TENDER_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return process.env.TENDER_SUPABASE_URL;
 }
 
 function getTenderSupabaseAnonKey() {
-  return process.env.TENDER_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return process.env.TENDER_SUPABASE_ANON_KEY;
 }
 
 function getTenderSupabaseServiceRoleKey() {
-  return process.env.TENDER_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return process.env.TENDER_SUPABASE_SERVICE_ROLE_KEY;
 }

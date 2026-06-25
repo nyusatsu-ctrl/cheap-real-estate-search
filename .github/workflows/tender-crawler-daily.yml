@@ -1,0 +1,40 @@
+name: Daily government tender crawler
+
+on:
+  schedule:
+    # 06:00 JST every day. GitHub Actions cron uses UTC.
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-government-tender-crawler
+  cancel-in-progress: false
+
+jobs:
+  crawl-tenders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Crawl procurement portal tenders
+        run: npm run crawl:tenders -- --limit=300
+
+      - name: Crawl defense tender candidates
+        run: npm run crawl:defense

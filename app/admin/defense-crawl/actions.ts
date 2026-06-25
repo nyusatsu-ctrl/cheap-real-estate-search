@@ -25,6 +25,34 @@ export async function runDefenseCrawlAction(formData: FormData) {
   redirect("/admin/defense-crawl");
 }
 
+export async function runPortalTenderCrawlAction() {
+  await requireAdmin();
+  await execFileAsync("node", ["scripts/crawl-tenders.mjs", "--limit=300"], {
+    cwd: process.cwd(),
+    timeout: 180000,
+    maxBuffer: 1024 * 1024 * 10
+  });
+  revalidatePath("/tenders");
+  revalidatePath("/admin/defense-crawl");
+  revalidatePath("/admin/tenders");
+  redirect("/admin/defense-crawl");
+}
+
+export async function runDailyTenderCrawlAction() {
+  await requireAdmin();
+  await execFileAsync("node", ["scripts/crawl-tenders.mjs", "--limit=300"], {
+    cwd: process.cwd(),
+    timeout: 180000,
+    maxBuffer: 1024 * 1024 * 10
+  });
+  await runDefenseScript("crawl", "all");
+  revalidatePath("/tenders");
+  revalidatePath("/admin/defense-crawl");
+  revalidatePath("/admin/tenders");
+  revalidatePath("/admin/tender-candidates");
+  redirect("/admin/defense-crawl");
+}
+
 async function runDefenseScript(command: string, group: string) {
   await execFileAsync("node", ["scripts/defense-crawler.mjs", command, `--group=${group}`], {
     cwd: process.cwd(),

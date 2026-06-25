@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
-import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
+import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
 
 export function canUseMemberFeatures(member: { role: string; subscriptionStatus: string; isTrialExpired: boolean } | null) {
   if (!member) return false;
@@ -109,6 +109,20 @@ export async function getTenderCandidates(status: string = "pending") {
   const { data, error } = await query;
   if (error) return fallbackCandidates;
   return (data ?? []) as TenderCandidate[];
+}
+
+export async function getTenderCrawlLogs(limit: number = 20) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [] as TenderCrawlLog[];
+
+  const { data, error } = await supabase
+    .from("tender_crawl_logs")
+    .select("*, tender_sources(name, source_name, url)")
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return [] as TenderCrawlLog[];
+  return (data ?? []) as TenderCrawlLog[];
 }
 
 export async function getTenderCandidate(id: string) {

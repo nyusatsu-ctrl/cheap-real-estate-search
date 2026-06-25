@@ -264,6 +264,7 @@ export type TenderCrawlLog = {
   skipped_count: number;
   error_message: string | null;
   created_at: string;
+  tender_sources?: Pick<TenderSource, "name" | "source_name" | "url"> | null;
 };
 
 export type PastAwardReviewStatus = "pending" | "approved" | "rejected";

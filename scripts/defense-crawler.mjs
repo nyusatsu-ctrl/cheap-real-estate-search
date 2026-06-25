@@ -963,6 +963,7 @@ async function discover(group) {
 }
 
 async function crawl(group) {
+  const startedAt = new Date().toISOString();
   let sources = await readJson(SOURCES_PATH, []);
   if (!sources.length) sources = (await discover(group)).sources;
   sources = filterSources(sources, group);
@@ -984,6 +985,16 @@ async function crawl(group) {
   const uniqueCandidates = uniqueBy(candidates, (item) => `${item.source_url}-${item.title}`);
   await writeJson(CANDIDATES_PATH, uniqueCandidates);
   const supabase = await saveCandidatesToSupabase(uniqueCandidates);
+  await saveCrawlLogToSupabase({
+    startedAt,
+    group,
+    fetchedCount: uniqueCandidates.length,
+    createdCount: supabase.saved ?? 0,
+    duplicateCount: supabase.duplicates ?? 0,
+    skippedCount: errors.length,
+    errors: [...errors.map((error) => `${error.source_name}: ${error.error}`), ...(supabase.errors ?? [])],
+    skipped: supabase.skipped
+  });
   await writeJson(CRAWL_SUMMARY_PATH, {
     command: "crawl",
     group,
@@ -1168,6 +1179,26 @@ async function saveCandidatesToSupabase(candidates) {
     else saved += 1;
   }
   return { skipped: false, saved, duplicates, errors };
+}
+
+async function saveCrawlLogToSupabase({ startedAt, group, fetchedCount, createdCount, duplicateCount, skippedCount, errors, skipped }) {
+  if (process.argv.includes("--no-db") || skipped) return;
+  const supabase = await supabaseClient();
+  if (!supabase) return;
+  const status = errors.length
+    ? createdCount > 0 ? "partial_success" : "failed"
+    : "success";
+  await supabase.from("tender_crawl_logs").insert({
+    source_id: null,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    status,
+    fetched_count: fetchedCount,
+    created_count: createdCount,
+    duplicate_count: duplicateCount,
+    skipped_count: skippedCount,
+    error_message: errors.length ? `防衛系クロール(${group}): ${errors.slice(0, 5).join(" / ")}` : null
+  });
 }
 
 async function supabaseClient() {

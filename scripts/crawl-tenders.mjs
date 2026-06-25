@@ -452,27 +452,49 @@ async function saveLocal(tenders) {
 }
 
 async function saveSupabase(tenders) {
+  await loadEnv();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { saved: 0, skipped: true };
 
   const supabase = createClient(url, key, { auth: { persistSession: false } });
-  const { data: source, error: sourceError } = await supabase
+  const startedAt = new Date().toISOString();
+  const sourcePayload = {
+    name: "調達ポータル",
+    url: PORTAL_ORIGIN,
+    source_type: "p_portal",
+    source_name: "調達ポータル",
+    organization_type: "national_government",
+    region: "全国",
+    base_url: PORTAL_ORIGIN,
+    tender_list_url: `${PORTAL_ORIGIN}${SEARCH_PATH}`,
+    target_types: ["goods", "services", "open_counter", "qualification_required"],
+    source_format: "search_form",
+    crawler_type: "p_portal",
+    crawler_difficulty: "medium",
+    crawl_priority: "A",
+    is_active: true,
+    crawl_ready: true,
+    crawl_frequency: "daily",
+    last_crawled_at: new Date().toISOString()
+  };
+  const { data: existingSource, error: findSourceError } = await supabase
     .from("tender_sources")
-    .upsert({
-      name: "調達ポータル",
-      url: PORTAL_ORIGIN,
-      source_type: "procurement_portal",
-      is_active: true,
-      crawl_frequency: "daily",
-      last_crawled_at: new Date().toISOString()
-    })
     .select("id")
-    .single();
+    .eq("url", PORTAL_ORIGIN)
+    .maybeSingle();
+  if (findSourceError) throw new Error(findSourceError.message);
 
-  if (sourceError) throw new Error(sourceError.message);
+  const sourceResult = existingSource
+    ? await supabase.from("tender_sources").update(sourcePayload).eq("id", existingSource.id).select("id").single()
+    : await supabase.from("tender_sources").insert(sourcePayload).select("id").single();
+  if (sourceResult.error) throw new Error(sourceResult.error.message);
+  const source = sourceResult.data;
 
   let saved = 0;
+  let created = 0;
+  let updated = 0;
+  const errors = [];
   for (const tender of tenders) {
     const payload = { ...tender, source_id: source.id };
     delete payload.id;
@@ -488,11 +510,53 @@ async function saveSupabase(tenders) {
     const result = existing
       ? await supabase.from("tenders").update(payload).eq("id", existing.id)
       : await supabase.from("tenders").insert(payload);
-    if (result.error) throw new Error(result.error.message);
+    if (result.error) {
+      errors.push(result.error.message);
+      continue;
+    }
     saved += 1;
+    if (existing) updated += 1;
+    else created += 1;
   }
 
-  return { saved, skipped: false };
+  const status = errors.length
+    ? saved > 0 ? "partial_success" : "failed"
+    : "success";
+  await supabase.from("tender_crawl_logs").insert({
+    source_id: source.id,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    status,
+    fetched_count: tenders.length,
+    created_count: created,
+    duplicate_count: updated,
+    skipped_count: errors.length,
+    error_message: errors.length ? errors.slice(0, 5).join(" / ") : null
+  });
+
+  await supabase.from("tender_sources").update({
+    last_crawled_at: new Date().toISOString(),
+    last_success_at: status === "failed" ? null : new Date().toISOString(),
+    last_error_at: errors.length ? new Date().toISOString() : null,
+    last_error_message: errors.length ? errors.slice(0, 3).join(" / ") : null
+  }).eq("id", source.id);
+
+  return { saved, created, updated, errors: errors.length, skipped: false };
+}
+
+async function loadEnv() {
+  for (const fileName of [".env.local", ".env"]) {
+    try {
+      const content = await fs.readFile(path.join(APP_ROOT, fileName), "utf8");
+      for (const line of content.split(/\r?\n/)) {
+        const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+        if (!match || process.env[match[1]]) continue;
+        process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, "");
+      }
+    } catch {
+      // Environment files are optional for local no-DB crawls.
+    }
+  }
 }
 
 async function main() {

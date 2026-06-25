@@ -1,17 +1,33 @@
 import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
-import { runDefenseCrawlAction, runDefenseDiscoveryAction } from "@/app/admin/defense-crawl/actions";
+import type { Metadata } from "next";
+import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAction, runPortalTenderCrawlAction } from "@/app/admin/defense-crawl/actions";
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
-import { getTenderCandidates, getTenderSources } from "@/lib/tenders";
+import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderSources } from "@/lib/tenders";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
-import type { Tender, TenderCandidate, TenderSource } from "@/lib/types";
+import type { Tender, TenderCandidate, TenderCrawlLog, TenderSource } from "@/lib/types";
 
 const sourcePath = path.join(process.cwd(), "data", "defense-sources.json");
 const candidatePath = path.join(process.cwd(), "data", "defense-candidates.json");
 const summaryPath = path.join(process.cwd(), "data", "defense-crawl-summary.json");
 const tenderImportPath = path.join(process.cwd(), "data", "tender-imports.json");
+
+export const metadata: Metadata = {
+  title: "官公庁案件 取得状況｜株式会社エコループ",
+  description: "官公庁案件サーチの取得元、手動クロール、日次取得ログを確認する管理画面です。",
+  openGraph: {
+    title: "官公庁案件 取得状況｜株式会社エコループ",
+    description: "官公庁案件サーチの取得元、手動クロール、日次取得ログを確認する管理画面です。",
+    siteName: "官公庁案件サーチ"
+  },
+  twitter: {
+    card: "summary",
+    title: "官公庁案件 取得状況｜株式会社エコループ",
+    description: "官公庁案件サーチの取得元、手動クロール、日次取得ログを確認する管理画面です。"
+  }
+};
 
 export default async function DefenseCrawlPage() {
   const admin = await getCurrentAdmin();
@@ -19,16 +35,19 @@ export default async function DefenseCrawlPage() {
   const localCandidates = readJson<TenderCandidate[]>(candidatePath, []);
   const localTenders = readJson<Tender[]>(tenderImportPath, []);
   const crawlSummary = readJson<DefenseCrawlSummary>(summaryPath, null);
-  const [dbSources, pendingCandidates] = admin
-    ? await Promise.all([getTenderSources(), getTenderCandidates("pending")])
-    : [[], localCandidates.filter((candidate) => candidate.review_status === "pending")];
-  const sources = localSources.length ? localSources : dbSources.filter((source) => String(source.organization_type ?? "").includes("defense") || String(source.crawler_type ?? "").includes("defense"));
-  const candidates = localCandidates.map(normalizeDefenseTender);
+  const [dbSources, dbCandidates, dbTenders, crawlLogs] = admin
+    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20)])
+    : [[], [], [], [] as TenderCrawlLog[]];
+  const sources = admin && dbSources.length ? dbSources : localSources;
+  const candidates = (admin ? dbCandidates : localCandidates).map(normalizeDefenseTender);
+  const pendingCandidates = candidates.filter((candidate) => candidate.review_status === "pending");
   const candidateStatusCounts = countCandidateStatuses(candidates);
-  const publishedTenders = localTenders.map(normalizeDefenseTender).filter((tender) => tender.status === "published");
+  const publishedTenders = (admin ? dbTenders : localTenders).map(normalizeDefenseTender).filter((tender) => tender.status === "published");
   const publicDefenseTenderCount = publishedTenders.filter(isDefenseLike).length;
   const defenseMetrics = countDefenseMetrics(candidates, publishedTenders);
   const counts = countSources(sources);
+  const crawlReadyCount = sources.filter((source) => source.is_active && source.crawl_ready && source.crawler_type !== "manual_only").length;
+  const latestLog = crawlLogs[0] ?? null;
   const sourceErrors = sources.filter((source) => source.last_error_message);
   const crawlErrors = crawlSummary?.errors ?? [];
   const errors = [...sourceErrors.map((source) => ({
@@ -41,12 +60,12 @@ export default async function DefenseCrawlPage() {
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-slate-950">空き家・古家・土地・山林取得状況</h2>
-          <p className="mt-1 text-sm text-slate-600">公式ページのみを対象に、取得元発見と候補抽出の状態を確認します。</p>
+          <h2 className="text-xl font-black text-slate-950">官公庁案件 取得状況</h2>
+          <p className="mt-1 text-sm text-slate-600">調達ポータル、防衛省・自衛隊、各省庁などの取得元とクロール実行ログを確認します。</p>
         </div>
         {admin ? (
           <Link href="/admin/tender-candidates" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
-            未確認物件を確認する
+            未確認候補を確認する
           </Link>
         ) : (
           <Link href="/admin/login" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
@@ -62,17 +81,23 @@ export default async function DefenseCrawlPage() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Metric label="陸上古家 取得元数" value={counts.ground_self_defense_force} />
-        <Metric label="海上古家 取得元数" value={counts.maritime_self_defense_force} />
-        <Metric label="航空古家 取得元数" value={counts.air_self_defense_force} />
+        <Metric label="登録取得元数" value={sources.length} />
+        <Metric label="自動取得対象" value={crawlReadyCount} />
+        <Metric label="公開案件件数" value={publishedTenders.length} />
+        <Metric label="候補件数" value={candidates.length} />
+        <Metric label="陸上自衛隊 取得元数" value={counts.ground_self_defense_force} />
+        <Metric label="海上自衛隊 取得元数" value={counts.maritime_self_defense_force} />
+        <Metric label="航空自衛隊 取得元数" value={counts.air_self_defense_force} />
         <Metric label="地方防衛局 取得元数" value={counts.defense_bureau} />
         <Metric label="防衛装備庁 取得元数" value={counts.defense_equipment_agency} />
-        <Metric label="最終クロール日時" value={crawlSummary?.finished_at ? formatDateTime(crawlSummary.finished_at) : "-"} />
-        <Metric label="抽出候補件数" value={candidates.length} />
-        <Metric label="空き家候補件数" value={defenseMetrics.defenseCandidates} />
-        <Metric label="空き家公開済み件数" value={defenseMetrics.defensePublished} />
-        <Metric label="九州の空き家候補件数" value={defenseMetrics.kyushuDefenseCandidates} />
-        <Metric label="九州の空き家公開済み件数" value={defenseMetrics.kyushuDefensePublished} />
+        <Metric label="最終DBログ日時" value={latestLog?.started_at ? formatDateTime(latestLog.started_at) : "-"} />
+        <Metric label="最終取得件数" value={latestLog?.fetched_count ?? "-"} />
+        <Metric label="最終登録件数" value={latestLog?.created_count ?? "-"} />
+        <Metric label="最終既存/更新件数" value={latestLog?.duplicate_count ?? "-"} />
+        <Metric label="防衛系候補件数" value={defenseMetrics.defenseCandidates} />
+        <Metric label="防衛系公開済み件数" value={defenseMetrics.defensePublished} />
+        <Metric label="九州の防衛系候補件数" value={defenseMetrics.kyushuDefenseCandidates} />
+        <Metric label="九州の防衛系公開済み件数" value={defenseMetrics.kyushuDefensePublished} />
         <Metric label="西部方面会計隊候補件数" value={defenseMetrics.westernCandidates} />
         <Metric label="西部方面会計隊公開済み件数" value={defenseMetrics.westernPublished} />
         <Metric label="確認待ち件数" value={candidateStatusCounts.pending || pendingCandidates.length} />
@@ -87,15 +112,58 @@ export default async function DefenseCrawlPage() {
         <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="font-black text-slate-950">操作</h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            <ActionButton action={runDefenseDiscoveryAction} group="all" label="空き家リンク集を再スキャン" />
-            <ActionButton action={runDefenseDiscoveryAction} group="gsdf" label="陸上古家を再スキャン" />
-            <ActionButton action={runDefenseDiscoveryAction} group="msdf" label="海上古家を再スキャン" />
-            <ActionButton action={runDefenseDiscoveryAction} group="asdf" label="航空古家を再スキャン" />
+            <SimpleActionButton action={runPortalTenderCrawlAction} label="調達ポータルを手動取得" />
+            <SimpleActionButton action={runDailyTenderCrawlAction} label="日次取得を手動実行" primary />
+            <ActionButton action={runDefenseDiscoveryAction} group="all" label="防衛系リンク集を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="gsdf" label="陸上自衛隊を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="msdf" label="海上自衛隊を再スキャン" />
+            <ActionButton action={runDefenseDiscoveryAction} group="asdf" label="航空自衛隊を再スキャン" />
             <ActionButton action={runDefenseDiscoveryAction} group="defense-bureaus" label="地方防衛局を再スキャン" />
-            <ActionButton action={runDefenseCrawlAction} group="all" label="全古家を手動クロール" primary />
+            <ActionButton action={runDefenseCrawlAction} group="all" label="防衛系を手動クロール" />
           </div>
         </div>
       ) : null}
+
+      <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h3 className="font-black text-slate-950">クロール実行ログ</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
+              <tr>
+                <th className="px-3 py-3">開始</th>
+                <th className="px-3 py-3">取得元</th>
+                <th className="px-3 py-3">状態</th>
+                <th className="px-3 py-3">取得</th>
+                <th className="px-3 py-3">登録</th>
+                <th className="px-3 py-3">既存/更新</th>
+                <th className="px-3 py-3">エラー/スキップ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {crawlLogs.length ? crawlLogs.map((log) => (
+                <tr key={log.id}>
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{formatDateTime(log.started_at)}</td>
+                  <td className="px-3 py-3 text-slate-700">{log.tender_sources?.source_name ?? log.tender_sources?.name ?? "防衛系一括"}</td>
+                  <td className="px-3 py-3 font-bold text-slate-900">{crawlStatusLabel(log.status)}</td>
+                  <td className="px-3 py-3 text-slate-700">{log.fetched_count}</td>
+                  <td className="px-3 py-3 text-slate-700">{log.created_count}</td>
+                  <td className="px-3 py-3 text-slate-700">{log.duplicate_count}</td>
+                  <td className="px-3 py-3 text-slate-700">
+                    {log.skipped_count}
+                    {log.error_message ? <p className="mt-1 max-w-xl text-xs text-rose-700">{log.error_message}</p> : null}
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="px-3 py-5 text-slate-500" colSpan={7}>DBにクロールログはまだありません。</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -151,7 +219,7 @@ export default async function DefenseCrawlPage() {
   );
 
   if (admin) {
-    return <AdminShell email={admin.email}>{content}</AdminShell>;
+    return <AdminShell email={admin.email} systemName="官公庁案件サーチ">{content}</AdminShell>;
   }
 
   return (
@@ -176,6 +244,16 @@ function ActionButton({ action, group, label, primary = false }: { action: (form
   return (
     <form action={action}>
       <input type="hidden" name="group" value={group} />
+      <button className={`rounded px-4 py-2 text-sm font-bold focus-ring ${primary ? "bg-brand-700 text-white" : "border border-slate-300 bg-white text-slate-700"}`}>
+        {label}
+      </button>
+    </form>
+  );
+}
+
+function SimpleActionButton({ action, label, primary = false }: { action: () => Promise<void>; label: string; primary?: boolean }) {
+  return (
+    <form action={action}>
       <button className={`rounded px-4 py-2 text-sm font-bold focus-ring ${primary ? "bg-brand-700 text-white" : "border border-slate-300 bg-white text-slate-700"}`}>
         {label}
       </button>
@@ -220,6 +298,12 @@ function countDefenseMetrics(candidates: TenderCandidate[], tenders: Tender[]) {
     westernCandidates: candidates.filter(isWesternAreaAccounting).length,
     westernPublished: tenders.filter(isWesternAreaAccounting).length
   };
+}
+
+function crawlStatusLabel(status: TenderCrawlLog["status"]) {
+  if (status === "success") return "成功";
+  if (status === "partial_success") return "一部成功";
+  return "失敗";
 }
 
 function readJson<T>(filePath: string, fallback: T) {

@@ -162,7 +162,7 @@ const DEFENSE_CONTEXT_WORDS = [
 ];
 
 const GUIDANCE_TITLE_PATTERNS = [
-  { code: "open_counter_guidance", pattern: /オープンカウンター方式/ },
+  { code: "open_counter_guidance", pattern: /^オープンカウンター方式(?:とは|について)?$/ },
   { code: "contract_handbook", pattern: /入札及び契約心得/ },
   { code: "quote_notice_guidance", pattern: /随意契約を前提とした見積依頼/ },
   { code: "table_header_title", pattern: /見積依頼公開日.*見積書提出期限/ },
@@ -172,7 +172,7 @@ const GUIDANCE_TITLE_PATTERNS = [
   { code: "listed_on_info_page", pattern: /入札情報のページに掲載/ },
   { code: "standard_contract_terms", pattern: /標準契約条項|標準契約書|契約書式|契約様式/ },
   { code: "purchase_order_terms", pattern: /請書条項/ },
-  { code: "contract_terms", pattern: /契約条項|契約条項等/ },
+  { code: "contract_terms", pattern: /契約条項|契約条項等|特約条項|特別条項|特殊条項|契約不適合/ },
   { code: "information_disclosure", pattern: /情報の公開|情報の公表|公共調達の適正化/ },
   { code: "procurement_guideline", pattern: /実施要領|低入札価格調査|特別重点調査|調達時期の目安|標準規格表/ },
   { code: "procurement_policy", pattern: /調達方針|調達予定のみ|契約制度|入札手続|契約手続|参加手続/ },

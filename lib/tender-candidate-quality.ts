@@ -1,5 +1,3 @@
-import type { TenderCandidate } from "@/lib/types";
-
 export type TenderCandidateQualityStatus = "reviewable" | "reject" | "duplicate";
 
 export type TenderCandidateQuality = {
@@ -8,10 +6,14 @@ export type TenderCandidateQuality = {
   reason: string | null;
 };
 
-type TenderCandidateQualityInput = Pick<
-  Partial<TenderCandidate>,
-  "title" | "raw_text" | "source_url" | "tender_type" | "duplicate_candidate_id"
->;
+type TenderCandidateQualityInput = {
+  title?: string | null;
+  raw_text?: string | null;
+  detail_memo?: string | null;
+  source_url?: string | null;
+  tender_type?: string | null;
+  duplicate_candidate_id?: string | null;
+};
 
 const CLASSIFICATION_ONLY_TITLES = new Set([
   "公告",
@@ -100,6 +102,18 @@ const STRONG_TITLE_WORDS = [
   "製造"
 ];
 
+const GUIDANCE_TITLE_PATTERNS = [
+  { code: "open_counter_guidance", pattern: /^オープンカウンター方式(?:とは|による見積依頼)?$/ },
+  { code: "bid_info_link", pattern: /^入札[・･]落札情報はこちら$/ },
+  { code: "listed_on_info_page", pattern: /入札情報のページに掲載/ },
+  { code: "standard_contract_terms", pattern: /標準契約条項|標準契約書|契約書式|契約様式/ },
+  { code: "purchase_order_terms", pattern: /物品売買請書条項/ },
+  { code: "contract_terms", pattern: /契約条項/ },
+  { code: "information_disclosure", pattern: /情報の公開|情報の公表|公共調達の適正化/ },
+  { code: "generic_publication", pattern: /^(?:公表|掲載|案内|一覧)$/ },
+  { code: "navigation_link", pattern: /(?:はこちら|こちらをクリック|詳細はこちら|ページに掲載)$/ }
+];
+
 export function assessTenderCandidateQuality(candidate: TenderCandidateQualityInput): TenderCandidateQuality {
   if (candidate.duplicate_candidate_id) {
     return {
@@ -115,13 +129,15 @@ export function assessTenderCandidateQuality(candidate: TenderCandidateQualityIn
   if (isMonthOnlyTitle(compact)) return reject("month_only_title", "案件名が月だけです。");
   if (isDateOnlyTitle(compact)) return reject("date_only_title", "案件名が日付だけです。");
   if (isNumberOrSymbolOnlyTitle(compact)) return reject("number_or_symbol_only_title", "案件名が番号・記号だけです。");
+  const guidanceCode = guidanceTitleCode(title);
+  if (guidanceCode) return reject(guidanceCode, "案内ページ・説明ページ・書式ページに見える候補です。");
   if (isClassificationOnlyTitle(compact)) return reject("classification_only_title", "案件名が分類名だけです。");
   if (compact.length <= 3) return reject("too_short_title", "案件名が短すぎます。");
   if (compact.length <= 5 && !hasStrongTitleWord(title)) {
     return reject("too_short_weak_title", "案件名が短く、物品名・役務名として判断できません。");
   }
   if (looksLikeNavigationTitle(title)) return reject("navigation_title", "公告タイトルではなく一覧・案内リンクに見えます。");
-  if (candidate.tender_type === "unknown" && !hasStrongTitleWord(`${title} ${candidate.raw_text ?? ""}`)) {
+  if (candidate.tender_type === "unknown" && !hasStrongTitleWord(`${title} ${candidate.raw_text ?? ""} ${candidate.detail_memo ?? ""}`)) {
     return reject("unknown_weak_title", "分類不明で、物品名・役務名を示す語がありません。");
   }
 
@@ -134,6 +150,10 @@ export function assessTenderCandidateQuality(candidate: TenderCandidateQualityIn
 
 export function isReviewableTenderCandidate(candidate: TenderCandidateQualityInput) {
   return assessTenderCandidateQuality(candidate).status === "reviewable";
+}
+
+export function isPublishableTenderRecord(tender: TenderCandidateQualityInput) {
+  return assessTenderCandidateQuality(tender).status === "reviewable";
 }
 
 export function tenderCandidateQualityLabel(quality: TenderCandidateQuality) {
@@ -185,6 +205,14 @@ function isClassificationOnlyTitle(value: string) {
   const upper = value.toUpperCase();
   if (CLASSIFICATION_ONLY_TITLES.has(value) || CLASSIFICATION_ONLY_TITLES.has(upper)) return true;
   return /^(?:令和\d{1,2}年度|R\d{1,2}年度|20\d{2}年度)?(?:入札公告|公告|公示|公募|調達情報|契約情報|入札情報|見積依頼|オープンカウンター|オープンカウンタ|物品|役務|工事)(?:一覧)?$/i.test(value);
+}
+
+function guidanceTitleCode(value: string) {
+  const compact = compactTitle(value);
+  for (const { code, pattern } of GUIDANCE_TITLE_PATTERNS) {
+    if (pattern.test(value) || pattern.test(compact)) return code;
+  }
+  return null;
 }
 
 function hasStrongTitleWord(value: string) {

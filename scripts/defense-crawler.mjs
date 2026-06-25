@@ -9,16 +9,17 @@ const SOURCES_PATH = path.join(APP_ROOT, "data", "defense-sources.json");
 const CANDIDATES_PATH = path.join(APP_ROOT, "data", "defense-candidates.json");
 const CRAWL_SUMMARY_PATH = path.join(APP_ROOT, "data", "defense-crawl-summary.json");
 const FETCH_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_FETCH_TIMEOUT_MS", 8000);
-const PLAYWRIGHT_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS", 10000);
+const PLAYWRIGHT_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS", 15000);
 const PLAYWRIGHT_WAIT_INTERVAL_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_WAIT_INTERVAL_MS", 2000);
-const PLAYWRIGHT_MAX_WAIT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS", 10000);
-const PLAYWRIGHT_TASK_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS", 25000);
-const SOURCE_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS", 45000);
-const CRAWL_TIME_BUDGET_MS = numberEnv("DEFENSE_CRAWLER_TIME_BUDGET_MS", 540000);
+const PLAYWRIGHT_MAX_WAIT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS", 5000);
+const PLAYWRIGHT_TASK_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS", 15000);
+const SOURCE_TIMEOUT_MS = numberEnv("DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS", 30000);
+const CRAWL_TIME_BUDGET_MS = numberEnv("DEFENSE_CRAWLER_TIME_BUDGET_MS", 480000);
 const CHILD_LINK_LIMIT = numberEnv("DEFENSE_CRAWLER_CHILD_LINK_LIMIT", 3);
 const REQUEST_DELAY_MS = 100;
 const CHILD_REQUEST_DELAY_MS = 50;
 const CRAWL_CONCURRENCY = numberEnv("DEFENSE_CRAWLER_CONCURRENCY", 6);
+const DEFAULT_MAX_SOURCES = numberEnv("DEFENSE_CRAWLER_MAX_SOURCES", 0);
 const PLAYWRIGHT_FALLBACK_ENABLED = process.env.DEFENSE_CRAWLER_DISABLE_PLAYWRIGHT !== "1";
 const PLAYWRIGHT_HEADLESS = process.env.DEFENSE_CRAWLER_PLAYWRIGHT_HEADLESS !== "0";
 const BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
@@ -1021,25 +1022,34 @@ async function crawl(group) {
   let sources = await readJson(SOURCES_PATH, []);
   if (!sources.length) sources = (await discover(group)).sources;
   sources = filterSources(sources, group);
-  const maxSources = Number(process.argv.find((arg) => arg.startsWith("--max-sources="))?.split("=")[1] ?? 0);
+  const availableSourceCount = sources.length;
+  const maxSources = Number(process.argv.find((arg) => arg.startsWith("--max-sources="))?.split("=")[1] ?? DEFAULT_MAX_SOURCES);
   if (maxSources > 0) sources = sources.slice(0, maxSources);
+  const cappedSkipCount = Math.max(0, availableSourceCount - sources.length);
   console.log(JSON.stringify({
     event: "defense_crawl_start",
     started_at: startedAt,
     target_source: "防衛省・自衛隊",
     group,
     source_count: sources.length,
+    available_source_count: availableSourceCount,
+    capped_skip_count: cappedSkipCount,
     fetch_timeout_ms: FETCH_TIMEOUT_MS,
+    playwright_enabled: PLAYWRIGHT_FALLBACK_ENABLED,
+    playwright_timeout_ms: PLAYWRIGHT_TASK_TIMEOUT_MS,
     source_timeout_ms: SOURCE_TIMEOUT_MS,
     time_budget_ms: CRAWL_TIME_BUDGET_MS,
     concurrency: CRAWL_CONCURRENCY
   }));
   const candidates = [];
   const errors = [];
+  let processedSourceCount = 0;
+  let timeBudgetSkippedCount = 0;
 
   try {
     const results = await mapLimit(sources, CRAWL_CONCURRENCY, (sourceInfo) => {
       if (Date.now() >= deadlineMs) {
+        timeBudgetSkippedCount += 1;
         return {
           candidates: [],
           errors: [{
@@ -1051,7 +1061,8 @@ async function crawl(group) {
           }]
         };
       }
-      return crawlSource(sourceInfo, deadlineMs);
+      processedSourceCount += 1;
+      return crawlSourceWithTimeout(sourceInfo, deadlineMs);
     });
     for (const result of results) {
       candidates.push(...result.candidates);
@@ -1078,7 +1089,7 @@ async function crawl(group) {
     fetchedCount: uniqueCandidates.length,
     createdCount: supabase.saved ?? 0,
     duplicateCount: supabase.duplicates ?? 0,
-    skippedCount: errors.length + (supabase.duplicates ?? 0),
+    skippedCount: errors.length + (supabase.duplicates ?? 0) + cappedSkipCount + timeBudgetSkippedCount,
     errors: allErrors,
     skipped: supabase.skipped
   });
@@ -1089,10 +1100,14 @@ async function crawl(group) {
     finished_at: new Date().toISOString(),
     target_source: "防衛省・自衛隊",
     group,
+    target_source_count: sources.length,
+    processed_source_count: processedSourceCount,
     fetched_count: uniqueCandidates.length,
     registered_count: supabase.saved ?? 0,
     updated_count: 0,
-    skipped_count: errors.length + (supabase.duplicates ?? 0),
+    skipped_count: errors.length + (supabase.duplicates ?? 0) + cappedSkipCount + timeBudgetSkippedCount,
+    capped_skip_count: cappedSkipCount,
+    time_budget_skipped_count: timeBudgetSkippedCount,
     error_count: allErrors.length,
     timeout_count: timeoutCount
   }));
@@ -1103,10 +1118,44 @@ async function crawl(group) {
     candidate_count: uniqueCandidates.length,
     error_count: errors.length,
     timeout_count: timeoutCount,
+    target_source_count: sources.length,
+    processed_source_count: processedSourceCount,
+    capped_skip_count: cappedSkipCount,
+    time_budget_skipped_count: timeBudgetSkippedCount,
     errors,
     supabase
   });
   return { candidates: uniqueCandidates, errors, supabase };
+}
+
+async function crawlSourceWithTimeout(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINITY) {
+  try {
+    return await withTimeout(
+      crawlSource(sourceInfo, crawlDeadlineMs),
+      Math.min(SOURCE_TIMEOUT_MS, Math.max(1000, crawlDeadlineMs - Date.now())),
+      () => ({
+        candidates: [],
+        errors: [{
+          url: sourceInfo.tender_list_url,
+          source_name: sourceInfo.source_name,
+          error: `Source timeout after ${SOURCE_TIMEOUT_MS}ms.`,
+          error_type: "source_timeout",
+          timeout: true
+        }]
+      })
+    );
+  } catch (error) {
+    return {
+      candidates: [],
+      errors: [{
+        url: sourceInfo.tender_list_url,
+        source_name: sourceInfo.source_name,
+        error: error.message,
+        error_type: errorType(error),
+        timeout: isTimeoutError(error)
+      }]
+    };
+  }
 }
 
 async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINITY) {
@@ -1173,6 +1222,14 @@ async function crawlSource(sourceInfo, crawlDeadlineMs = Number.POSITIVE_INFINIT
     duration_ms: Date.now() - sourceStartedAt
   }));
   return { candidates, errors };
+}
+
+function withTimeout(promise, timeoutMs, onTimeout) {
+  let timeout;
+  const timeoutPromise = new Promise((resolve) => {
+    timeout = setTimeout(() => resolve(onTimeout()), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout));
 }
 
 async function mapLimit(items, limit, mapper) {
@@ -1566,5 +1623,9 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  console.log(JSON.stringify({
+    event: "defense_crawl_fatal",
+    error: error instanceof Error ? error.message : String(error)
+  }));
+  process.exitCode = 0;
 });

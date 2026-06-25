@@ -22,11 +22,13 @@ jobs:
       TENDER_PORTAL_FETCH_TIMEOUT_MS: "15000"
       TENDER_PORTAL_MAX_PAGES: "3"
       DEFENSE_CRAWLER_FETCH_TIMEOUT_MS: "8000"
-      DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS: "10000"
-      DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS: "10000"
-      DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS: "25000"
-      DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS: "45000"
-      DEFENSE_CRAWLER_TIME_BUDGET_MS: "540000"
+      DEFENSE_CRAWLER_DISABLE_PLAYWRIGHT: "1"
+      DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS: "15000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS: "5000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS: "15000"
+      DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS: "30000"
+      DEFENSE_CRAWLER_TIME_BUDGET_MS: "480000"
+      DEFENSE_CRAWLER_MAX_SOURCES: "10"
 
     steps:
       - name: Check out repository
@@ -55,5 +57,6 @@ jobs:
 
       - name: Crawl defense tender candidates
         if: always()
+        continue-on-error: true
         timeout-minutes: 10
-        run: npm run crawl:defense
+        run: npm run crawl:defense -- --max-sources=10

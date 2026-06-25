@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calculator, ExternalLink, MapPin } from "lucide-react";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
@@ -6,6 +7,20 @@ import { formatArea, formatDate, formatPrice } from "@/lib/format";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
 import { getPublishedProperty } from "@/lib/properties";
 import { ViewedPropertyTracker } from "@/components/ViewedPropertyTracker";
+
+export const metadata: Metadata = {
+  title: "物件詳細｜格安不動産サーチ",
+  description: "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。",
+  icons: {
+    icon: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }],
+    apple: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }]
+  },
+  openGraph: {
+    title: "物件詳細｜格安不動産サーチ",
+    description: "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。",
+    siteName: "格安不動産サーチ"
+  }
+};
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -7,7 +7,7 @@ export const BUSINESS_INFO = {
   address: "熊本県熊本市東区長嶺東5-8-8",
   phone: "096-201-7191",
   businessHours: "9:30〜17:30 日祝休み",
-  serviceName: "建設業売上アップ診断",
+  serviceName: "格安不動産サーチ",
   monthlyPriceText: "月額4,980円",
   trialDaysText: "14日間",
   paymentMethod: "クレジットカード決済"

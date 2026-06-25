@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import {
+  CONSTRUCTION_DIAGNOSIS_RESULT_COOKIE,
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
+  type ConstructionDiagnosis,
   formatDiagnosisDate,
   getConstructionDiagnosis,
   getPublicWorksRoutePlan
@@ -14,7 +17,7 @@ const CONSULTATION_HREF = "/diagnosis?source=direct&campaign=consultation_cta";
 
 export default async function DiagnosisResultPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const diagnosis = await getConstructionDiagnosis(id);
+  const diagnosis = await getConstructionDiagnosis(id) ?? await getCachedDiagnosis(id);
   if (!diagnosis) notFound();
 
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];
@@ -104,6 +107,23 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
       </section>
     </div>
   );
+}
+
+async function getCachedDiagnosis(id: string): Promise<ConstructionDiagnosis | null> {
+  const cookieStore = await cookies();
+  const encoded = cookieStore.get(CONSTRUCTION_DIAGNOSIS_RESULT_COOKIE)?.value;
+  if (!encoded) return null;
+
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Partial<ConstructionDiagnosis>;
+    if (parsed.id !== id || !parsed.main_type || !parsed.sub_type || !parsed.answers) return null;
+    return parsed as ConstructionDiagnosis;
+  } catch (error) {
+    console.error("Construction diagnosis result cookie parse failed.", {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return null;
+  }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

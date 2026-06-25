@@ -1,11 +1,15 @@
 "use server";
 
+import { randomUUID } from "crypto";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import {
+  CONSTRUCTION_DIAGNOSIS_RESULT_COOKIE,
   DIAGNOSIS_QUESTIONS,
   SUPPLEMENTAL_ANSWER_FIELDS,
+  type ConstructionDiagnosis,
   type DiagnosisAnswerMap,
-  getDiagnosisClient,
   getAnswerString,
   normalizeLeadSource,
   normalizeSeminarInterest,
@@ -96,8 +100,13 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
   }
 
   const { scores, mainType, subType } = scoreDiagnosis(answers);
+  const diagnosisId = randomUUID();
+  const now = new Date().toISOString();
 
-  const supabase = await getDiagnosisClient();
+  const serverClient = await createSupabaseServerClient();
+  const serviceRoleClient = serverClient ? null : createSupabaseServiceRoleClient();
+  const supabase = serverClient ?? serviceRoleClient;
+  const supabaseClientType = serverClient ? "server" : serviceRoleClient ? "service_role" : "missing";
   if (!supabase) {
     console.error("Construction diagnosis submit failed: Supabase client is not configured.");
     return {
@@ -106,30 +115,32 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
     };
   }
 
-  const { data, error } = await supabase
-    .from("construction_diagnoses")
-    .insert({
-      name,
-      company_name: companyName,
-      phone,
-      email,
-      answers,
-      scores,
-      main_type: mainType,
-      sub_type: subType,
-      business_type: getAnswerString(answers.business_type),
-      monthly_sales: getAnswerString(answers.monthly_sales),
-      wants_consultation: getAnswerString(answers.wants_consultation),
-      lead_source: leadSource,
-      source_campaign: sourceCampaign,
-      seminar_interest: seminarInterest,
-      preferred_contact_time: preferredContactTime
-    })
-    .select("id")
-    .single();
+  const diagnosisPayload = {
+    id: diagnosisId,
+    name,
+    company_name: companyName,
+    phone,
+    email,
+    answers,
+    scores,
+    main_type: mainType,
+    sub_type: subType,
+    business_type: getAnswerString(answers.business_type),
+    monthly_sales: getAnswerString(answers.monthly_sales),
+    wants_consultation: getAnswerString(answers.wants_consultation),
+    lead_source: leadSource,
+    source_campaign: sourceCampaign,
+    seminar_interest: seminarInterest,
+    preferred_contact_time: preferredContactTime
+  };
 
-  if (error || !data) {
+  const { error } = await supabase
+    .from("construction_diagnoses")
+    .insert(diagnosisPayload);
+
+  if (error) {
     console.error("Construction diagnosis insert failed.", {
+      clientType: supabaseClientType,
       code: error?.code,
       message: error?.message,
       details: error?.details,
@@ -141,5 +152,31 @@ export async function submitConstructionDiagnosisAction(_previousState: Diagnosi
     };
   }
 
-  redirect(`/diagnosis/results/${data.id}`);
+  await setResultCookie({
+    ...diagnosisPayload,
+    scores,
+    lead_status: "new",
+    admin_memo: null,
+    admin_memo_updated_at: null,
+    last_contacted_at: null,
+    lead_updated_at: now,
+    created_at: now
+  });
+
+  redirect(`/diagnosis/results/${diagnosisId}`);
+}
+
+async function setResultCookie(diagnosis: ConstructionDiagnosis) {
+  const cookieStore = await cookies();
+  cookieStore.set(
+    CONSTRUCTION_DIAGNOSIS_RESULT_COOKIE,
+    Buffer.from(JSON.stringify(diagnosis)).toString("base64url"),
+    {
+      httpOnly: true,
+      maxAge: 60 * 30,
+      path: `/diagnosis/results/${diagnosis.id}`,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production"
+    }
+  );
 }

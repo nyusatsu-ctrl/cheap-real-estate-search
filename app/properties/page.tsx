@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { PropertyCard } from "@/components/PropertyCard";
 import { SearchFilters } from "@/components/SearchFilters";
 import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
@@ -8,6 +9,20 @@ import { getPublishedPropertiesResult, getPublishedPropertyLocations } from "@/l
 
 const PUBLIC_PROPERTIES_PAGE_SIZE = 100;
 const PRESERVED_PAGE_PARAM_KEYS = ["region", "prefecture", "city", "propertyType", "priceRange", "sort", "keyword"] as const;
+
+export const metadata: Metadata = {
+  title: "物件一覧｜格安不動産サーチ",
+  description: "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。",
+  icons: {
+    icon: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }],
+    apple: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }]
+  },
+  openGraph: {
+    title: "物件一覧｜格安不動産サーチ",
+    description: "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。",
+    siteName: "格安不動産サーチ"
+  }
+};
 
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const resolvedSearchParams = await searchParams;

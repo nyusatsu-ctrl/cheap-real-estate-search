@@ -108,6 +108,8 @@ export type PublicWorksRoutePlan = {
   permitBarrier?: string;
 };
 
+export const CONSTRUCTION_DIAGNOSIS_RESULT_COOKIE = "construction_diagnosis_result";
+
 type PublicWorksRouteInput = {
   answers: DiagnosisAnswerMap;
   main_type?: DiagnosisTypeCode;

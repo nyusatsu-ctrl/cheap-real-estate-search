@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
@@ -9,19 +7,19 @@ import { AdminShell } from "@/components/AdminShell";
 import { TENDER_CANDIDATE_REVIEW_STATUS_LABELS, TENDER_CANDIDATE_TYPE_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { getCurrentAdmin } from "@/lib/admin";
-import { getTenderCandidates } from "@/lib/tenders";
-import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
-import type { Tender, TenderAttachment, TenderCandidate } from "@/lib/types";
+import { getTenderCandidateBulkCounts, getTenderCandidateMetrics, getTenderCandidatesPage, type TenderCandidateBulkCounts, type TenderCandidateMetrics, type TenderCandidatePageResult } from "@/lib/tenders";
+import type { TenderAttachment, TenderCandidate } from "@/lib/types";
 
 type SearchParams = {
   status?: string;
   page?: string;
+  perPage?: string;
   bulkApproved?: string;
   bulkSkipped?: string;
+  bulkScope?: string;
 };
 
 const PAGE_SIZE = 50;
-const tenderImportPath = path.join(process.cwd(), "data", "tender-imports.json");
 
 export const metadata: Metadata = {
   title: "案件候補確認｜官公庁案件サーチ",
@@ -41,19 +39,33 @@ export const metadata: Metadata = {
 export default async function TenderCandidatesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const admin = await getCurrentAdmin();
   const params = await searchParams;
-  const status = params.status ?? "pending";
-  const [candidates, allCandidates] = await Promise.all([getTenderCandidates(status), getTenderCandidates("all")]);
-  const publishedTenders = readJson<Tender[]>(tenderImportPath, []).map(normalizeDefenseTender).filter((tender) => tender.status === "published");
-  const metrics = countDefenseMetrics(allCandidates, publishedTenders);
-  const pendingCandidates = candidates.filter((candidate) => candidate.review_status === "pending");
-  const currentPage = Math.max(1, Number(params.page ?? "1") || 1);
-  const totalPages = Math.max(1, Math.ceil(candidates.length / PAGE_SIZE));
-  const pageCandidates = candidates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const status = normalizeStatus(params.status);
+  const requestedPage = positiveInt(params.page, 1);
+  const requestedPerPage = positiveInt(params.perPage, PAGE_SIZE);
+  let pageResult: TenderCandidatePageResult = emptyPageResult(requestedPage, requestedPerPage);
+  let metrics: TenderCandidateMetrics = emptyMetrics();
+  let bulkCounts: TenderCandidateBulkCounts = emptyBulkCounts();
+  let loadError: string | null = null;
+
+  try {
+    pageResult = await getTenderCandidatesPage({ status, page: requestedPage, perPage: requestedPerPage });
+    const [metricsResult, bulkCountsResult] = await Promise.all([
+      getTenderCandidateMetrics(),
+      getTenderCandidateBulkCounts(pageResult.candidates.filter((candidate) => candidate.review_status === "pending"))
+    ]);
+    metrics = metricsResult;
+    bulkCounts = bulkCountsResult;
+    loadError = [pageResult.error, metrics.error, bulkCounts.error].filter(Boolean).join(" / ") || null;
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : "案件候補の取得に失敗しました。時間をおいて再度お試しください。";
+  }
+
+  const currentPage = pageResult.page;
+  const totalPages = pageResult.totalPages;
+  const pageCandidates = pageResult.candidates;
   const pagePendingCandidates = pageCandidates.filter((candidate) => candidate.review_status === "pending");
-  const bulkCounts = {
-    ...countBulkApprovable(pendingCandidates),
-    visible: countBulkApprovable(pagePendingCandidates).visible
-  };
+  const displayStart = pageResult.total > 0 ? (currentPage - 1) * pageResult.perPage + 1 : 0;
+  const displayEnd = Math.min(currentPage * pageResult.perPage, pageResult.total);
 
   const content = (
     <>
@@ -79,11 +91,18 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
 
       {params.bulkApproved || params.bulkSkipped ? (
         <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
-          一括承認: {params.bulkApproved ?? 0}件を公開登録、{params.bulkSkipped ?? 0}件をスキップしました。
+          一括承認（{bulkScopeLabel(params.bulkScope)}）: {params.bulkApproved ?? 0}件を公開登録、{params.bulkSkipped ?? 0}件をスキップしました。
+        </div>
+      ) : null}
+
+      {loadError ? (
+        <div className="mb-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold leading-6 text-rose-900">
+          案件候補の一部取得に失敗しました。ページを再読み込みしてください。詳細: {loadError}
         </div>
       ) : null}
 
       <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <Metric label="全候補件数" value={metrics.totalCandidates} />
         <Metric label="防衛系候補件数" value={metrics.defenseCandidates} />
         <Metric label="防衛系公開済み件数" value={metrics.defensePublished} />
         <Metric label="九州の防衛系候補件数" value={metrics.kyushuDefenseCandidates} />
@@ -96,20 +115,27 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
         <Metric label="duplicate 件数" value={metrics.duplicate} />
       </div>
 
-      {pendingCandidates.length ? (
+      {metrics.pending > 0 ? (
         <div className="mb-4">
-          <BulkApproveForm action={bulkApproveTenderCandidatesAction} candidateIds={pagePendingCandidates.map((candidate) => candidate.id)} counts={bulkCounts} />
+          <BulkApproveForm
+            action={bulkApproveTenderCandidatesAction}
+            candidateIds={pagePendingCandidates.map((candidate) => candidate.id)}
+            counts={bulkCounts}
+            status={status}
+            page={currentPage}
+            perPage={pageResult.perPage}
+          />
         </div>
       ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
-        <span>{candidates.length}件中 {(currentPage - 1) * PAGE_SIZE + 1}〜{Math.min(currentPage * PAGE_SIZE, candidates.length)}件を表示</span>
+        <span>{pageResult.total}件中 {displayStart}〜{displayEnd}件を表示（1ページ{pageResult.perPage}件）</span>
         <div className="flex gap-2">
-          <Link href={`/admin/tender-candidates?status=${status}&page=${Math.max(1, currentPage - 1)}`} className={`rounded border px-3 py-1.5 ${currentPage <= 1 ? "pointer-events-none border-slate-200 text-slate-300" : "border-slate-300 bg-white text-slate-700"}`}>
+          <Link href={candidatePageHref(status, Math.max(1, currentPage - 1), pageResult.perPage)} className={`rounded border px-3 py-1.5 ${currentPage <= 1 ? "pointer-events-none border-slate-200 text-slate-300" : "border-slate-300 bg-white text-slate-700"}`}>
             前へ
           </Link>
           <span className="px-2 py-1.5">{currentPage} / {totalPages}</span>
-          <Link href={`/admin/tender-candidates?status=${status}&page=${Math.min(totalPages, currentPage + 1)}`} className={`rounded border px-3 py-1.5 ${currentPage >= totalPages ? "pointer-events-none border-slate-200 text-slate-300" : "border-slate-300 bg-white text-slate-700"}`}>
+          <Link href={candidatePageHref(status, Math.min(totalPages, currentPage + 1), pageResult.perPage)} className={`rounded border px-3 py-1.5 ${currentPage >= totalPages ? "pointer-events-none border-slate-200 text-slate-300" : "border-slate-300 bg-white text-slate-700"}`}>
             次へ
           </Link>
         </div>
@@ -119,7 +145,7 @@ export default async function TenderCandidatesPage({ searchParams }: { searchPar
         {pageCandidates.map((candidate) => (
           <CandidateReview key={candidate.id} candidate={candidate} />
         ))}
-        {candidates.length === 0 ? (
+        {pageResult.total === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
             対象の案件候補はありません。
           </div>
@@ -283,8 +309,65 @@ function organizationLabel(value?: string | null) {
   return TENDER_SOURCE_ORGANIZATION_TYPE_LABELS[value as keyof typeof TENDER_SOURCE_ORGANIZATION_TYPE_LABELS] ?? value;
 }
 
-function countBulkApprovable(candidates: TenderCandidate[]) {
-  const counts: Record<string, number> = {
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function normalizeStatus(status?: string) {
+  return status && ["pending", "all", "rejected", "duplicate", "approved"].includes(status) ? status : "pending";
+}
+
+function positiveInt(value: string | undefined, fallback: number) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? Math.floor(numberValue) : fallback;
+}
+
+function candidatePageHref(status: string, page: number, perPage: number) {
+  const params = new URLSearchParams({ status, page: String(page), perPage: String(perPage) });
+  return `/admin/tender-candidates?${params.toString()}`;
+}
+
+function bulkScopeLabel(scope?: string) {
+  if (scope === "visible") return "画面表示中";
+  if (scope) return "条件一致全件";
+  return "対象";
+}
+
+function emptyPageResult(page: number, perPage: number): TenderCandidatePageResult {
+  return {
+    candidates: [],
+    total: 0,
+    page,
+    perPage,
+    totalPages: 1,
+    error: null
+  };
+}
+
+function emptyMetrics(): TenderCandidateMetrics {
+  return {
+    defenseCandidates: 0,
+    defensePublished: 0,
+    kyushuDefenseCandidates: 0,
+    kyushuDefensePublished: 0,
+    westernCandidates: 0,
+    westernPublished: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    duplicate: 0,
+    totalCandidates: 0,
+    error: null
+  };
+}
+
+function emptyBulkCounts(): TenderCandidateBulkCounts {
+  return {
     visible: 0,
     defense: 0,
     gsdf: 0,
@@ -295,72 +378,7 @@ function countBulkApprovable(candidates: TenderCandidate[]) {
     kyushu_defense: 0,
     western_area: 0,
     kyushu_goods_services: 0,
-    kyushu_open_counter: 0
+    kyushu_open_counter: 0,
+    error: null
   };
-  for (const candidate of candidates) {
-    const normalized = normalizeDefenseTender(candidate);
-    if (!isBulkApprovable(normalized)) continue;
-    counts.visible += 1;
-    const isDefense = isDefenseLike(normalized);
-    const isKyushu = tenderRegion(normalized) === "九州";
-    const isOpenCounter = normalized.tender_type === "open_counter" || normalized.tender_type === "small_discretionary";
-    const isGoodsServices = normalized.tender_type === "goods" || normalized.tender_type === "services";
-    if (isDefense) counts.defense += 1;
-    if (normalized.organization_type === "ground_self_defense_force") counts.gsdf += 1;
-    if (normalized.organization_type === "maritime_self_defense_force") counts.msdf += 1;
-    if (normalized.organization_type === "air_self_defense_force") counts.asdf += 1;
-    if (isOpenCounter) counts.open_counter += 1;
-    if (isGoodsServices) counts.goods_services += 1;
-    if (isDefense && isKyushu) counts.kyushu_defense += 1;
-    if (isWesternAreaAccounting(normalized)) counts.western_area += 1;
-    if (isDefense && isKyushu && isGoodsServices) counts.kyushu_goods_services += 1;
-    if (isDefense && isKyushu && isOpenCounter) counts.kyushu_open_counter += 1;
-  }
-  return counts;
-}
-
-function isBulkApprovable(candidate: TenderCandidate) {
-  if (!candidate.title.trim()) return false;
-  if (!candidate.source_url && !candidate.pdf_url) return false;
-  if (!candidate.agency_name.trim()) return false;
-  if (candidate.review_status !== "pending") return false;
-  if (candidate.duplicate_candidate_id) return false;
-  if (candidate.tender_type === "unknown" || candidate.tender_type === "construction") return false;
-  const target = `${candidate.title} ${candidate.raw_text ?? ""} ${candidate.source_url}`;
-  if (/契約|調達|物件|公告|公募|公示|見積|オープンカウンタ|売払/.test(target)) return true;
-  return !/採用|広報|イベント|SNS|アクセス|お問い合わせ|部隊紹介|沿革|サイトマップ|プライバシーポリシー|オープンキャンパス|ポスター|リーフレット/.test(target);
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      <p className="text-xs font-bold text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function countDefenseMetrics(candidates: TenderCandidate[], tenders: Tender[]) {
-  const normalizedCandidates = candidates.map(normalizeDefenseTender);
-  const normalizedTenders = tenders.map(normalizeDefenseTender);
-  return {
-    defenseCandidates: normalizedCandidates.filter(isDefenseLike).length,
-    defensePublished: normalizedTenders.filter(isDefenseLike).length,
-    kyushuDefenseCandidates: normalizedCandidates.filter((candidate) => isDefenseLike(candidate) && tenderRegion(candidate) === "九州").length,
-    kyushuDefensePublished: normalizedTenders.filter((tender) => isDefenseLike(tender) && tenderRegion(tender) === "九州").length,
-    westernCandidates: normalizedCandidates.filter(isWesternAreaAccounting).length,
-    westernPublished: normalizedTenders.filter(isWesternAreaAccounting).length,
-    pending: normalizedCandidates.filter((candidate) => candidate.review_status === "pending").length,
-    approved: normalizedCandidates.filter((candidate) => candidate.review_status === "approved").length,
-    rejected: normalizedCandidates.filter((candidate) => candidate.review_status === "rejected").length,
-    duplicate: normalizedCandidates.filter((candidate) => candidate.review_status === "duplicate").length
-  };
-}
-
-function readJson<T>(filePath: string, fallback: T) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
-  } catch {
-    return fallback;
-  }
 }

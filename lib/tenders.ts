@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
-import { isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
+import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
 import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
@@ -44,6 +44,35 @@ export type TenderDatabaseDiagnostics = {
   } | null;
   errors: string[];
 };
+
+export type TenderCandidatePageResult = {
+  candidates: TenderCandidate[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+  error: string | null;
+};
+
+export type TenderCandidateMetrics = {
+  defenseCandidates: number;
+  defensePublished: number;
+  kyushuDefenseCandidates: number;
+  kyushuDefensePublished: number;
+  westernCandidates: number;
+  westernPublished: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  duplicate: number;
+  totalCandidates: number;
+  error: string | null;
+};
+
+export type TenderCandidateBulkCounts = Record<
+  "visible" | "defense" | "gsdf" | "msdf" | "asdf" | "open_counter" | "goods_services" | "kyushu_defense" | "western_area" | "kyushu_goods_services" | "kyushu_open_counter",
+  number
+> & { error: string | null };
 
 export async function getPublishedTenders(filters: TenderFilters = {}) {
   const supabase = await createTenderSupabaseServerClient();
@@ -141,6 +170,313 @@ export async function getTenderCandidates(status: string = "pending") {
   const { data, error } = await query;
   if (error) return fallbackCandidates;
   return (data ?? []) as TenderCandidate[];
+}
+
+export async function getTenderCandidatesPage({
+  status = "pending",
+  page = 1,
+  perPage = 50
+}: {
+  status?: string;
+  page?: number;
+  perPage?: number;
+}): Promise<TenderCandidatePageResult> {
+  const normalizedStatus = normalizeCandidateStatus(status);
+  const normalizedPage = Math.max(1, Math.floor(page));
+  const normalizedPerPage = normalizePerPage(perPage);
+  const fallbackCandidates = getFallbackTenderCandidates(normalizedStatus);
+  const fallbackResult = paginateCandidates(fallbackCandidates, normalizedPage, normalizedPerPage, null);
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) return fallbackResult;
+
+  const fetchPage = async (targetPage: number) => {
+    let query = supabase
+      .from("tender_candidates")
+      .select("*, tender_sources(name, source_name, organization_type, base_url)", { count: "exact" })
+      .order("fetched_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
+
+    if (normalizedStatus !== "all") query = query.eq("review_status", normalizedStatus);
+
+    const offset = (targetPage - 1) * normalizedPerPage;
+    return query.range(offset, offset + normalizedPerPage - 1);
+  };
+
+  const firstResult = await fetchPage(normalizedPage);
+  if (firstResult.error) {
+    return paginateCandidates(fallbackCandidates, normalizedPage, normalizedPerPage, firstResult.error.message);
+  }
+
+  const total = firstResult.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / normalizedPerPage));
+  if (total > 0 && normalizedPage > totalPages) {
+    const clampedResult = await fetchPage(totalPages);
+    if (clampedResult.error) {
+      return paginateCandidates(fallbackCandidates, totalPages, normalizedPerPage, clampedResult.error.message);
+    }
+    return {
+      candidates: ((clampedResult.data ?? []) as TenderCandidate[]).map(normalizeDefenseTender),
+      total,
+      page: totalPages,
+      perPage: normalizedPerPage,
+      totalPages,
+      error: null
+    };
+  }
+
+  return {
+    candidates: ((firstResult.data ?? []) as TenderCandidate[]).map(normalizeDefenseTender),
+    total,
+    page: normalizedPage,
+    perPage: normalizedPerPage,
+    totalPages,
+    error: null
+  };
+}
+
+export async function getTenderCandidateMetrics(): Promise<TenderCandidateMetrics> {
+  const fallbackCandidates = getFallbackTenderCandidates("all");
+  const fallbackTenders = getFallbackTenders();
+  const fallbackMetrics = {
+    ...countCandidateMetricsFromRows(fallbackCandidates, fallbackTenders),
+    error: null
+  };
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) return fallbackMetrics;
+
+  const errors: string[] = [];
+  const [
+    totalCandidates,
+    pending,
+    approved,
+    rejected,
+    duplicate,
+    defenseCandidates,
+    kyushuDefenseCandidates,
+    westernCandidates,
+    defensePublished,
+    kyushuDefensePublished,
+    westernPublished
+  ] = await Promise.all([
+    countCandidateRows(errors),
+    countCandidateRows(errors, [{ op: "eq", column: "review_status", value: "pending" }]),
+    countCandidateRows(errors, [{ op: "eq", column: "review_status", value: "approved" }]),
+    countCandidateRows(errors, [{ op: "eq", column: "review_status", value: "rejected" }]),
+    countCandidateRows(errors, [{ op: "eq", column: "review_status", value: "duplicate" }]),
+    countCandidateRows(errors, [{ op: "in", column: "organization_type", values: DEFENSE_ORGANIZATION_TYPE_VALUES }]),
+    countCandidateRows(errors, [{ op: "in", column: "organization_type", values: DEFENSE_ORGANIZATION_TYPE_VALUES }, { op: "eq", column: "region", value: "九州" }]),
+    countCandidateRows(errors, [{ op: "or", expression: WESTERN_AREA_OR_FILTER }]),
+    countTenderRows(errors, [{ op: "eq", column: "status", value: "published" }, { op: "eq", column: "is_defense", value: true }]),
+    countTenderRows(errors, [{ op: "eq", column: "status", value: "published" }, { op: "eq", column: "is_defense", value: true }, { op: "eq", column: "region", value: "九州" }]),
+    countTenderRows(errors, [{ op: "eq", column: "status", value: "published" }, { op: "or", expression: WESTERN_AREA_OR_FILTER }])
+  ]);
+
+  return {
+    defenseCandidates,
+    defensePublished,
+    kyushuDefenseCandidates,
+    kyushuDefensePublished,
+    westernCandidates,
+    westernPublished,
+    pending,
+    approved,
+    rejected,
+    duplicate,
+    totalCandidates,
+    error: errors.length ? errors.slice(0, 5).join(" / ") : null
+  };
+}
+
+export async function getTenderCandidateBulkCounts(visibleCandidates: TenderCandidate[]): Promise<TenderCandidateBulkCounts> {
+  const fallbackCounts = {
+    ...emptyBulkCounts(),
+    ...countBulkCandidatesFromRows(visibleCandidates, "visible"),
+    error: null
+  };
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) return fallbackCounts;
+
+  const errors: string[] = [];
+  const [
+    defense,
+    gsdf,
+    msdf,
+    asdf,
+    openCounter,
+    goodsServices,
+    kyushuDefense,
+    westernArea,
+    kyushuGoodsServices,
+    kyushuOpenCounter
+  ] = await Promise.all([
+    countCandidateRows(errors, pendingBulkFilters([{ op: "in", column: "organization_type", values: DEFENSE_ORGANIZATION_TYPE_VALUES }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "eq", column: "organization_type", value: "ground_self_defense_force" }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "eq", column: "organization_type", value: "maritime_self_defense_force" }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "eq", column: "organization_type", value: "air_self_defense_force" }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "in", column: "tender_type", values: ["open_counter", "small_discretionary"] }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "in", column: "tender_type", values: ["goods", "services"] }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "in", column: "organization_type", values: DEFENSE_ORGANIZATION_TYPE_VALUES }, { op: "eq", column: "region", value: "九州" }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "or", expression: WESTERN_AREA_OR_FILTER }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "in", column: "organization_type", values: DEFENSE_ORGANIZATION_TYPE_VALUES }, { op: "eq", column: "region", value: "九州" }, { op: "in", column: "tender_type", values: ["goods", "services"] }])),
+    countCandidateRows(errors, pendingBulkFilters([{ op: "in", column: "organization_type", values: DEFENSE_ORGANIZATION_TYPE_VALUES }, { op: "eq", column: "region", value: "九州" }, { op: "in", column: "tender_type", values: ["open_counter", "small_discretionary"] }]))
+  ]);
+
+  return {
+    visible: countBulkCandidatesFromRows(visibleCandidates, "visible").visible,
+    defense,
+    gsdf,
+    msdf,
+    asdf,
+    open_counter: openCounter,
+    goods_services: goodsServices,
+    kyushu_defense: kyushuDefense,
+    western_area: westernArea,
+    kyushu_goods_services: kyushuGoodsServices,
+    kyushu_open_counter: kyushuOpenCounter,
+    error: errors.length ? errors.slice(0, 5).join(" / ") : null
+  };
+}
+
+const DEFENSE_ORGANIZATION_TYPE_VALUES = Array.from(DEFENSE_ORGANIZATION_TYPES);
+const WESTERN_AREA_OR_FILTER = "source_name.ilike.%西部方面%,agency_name.ilike.%西部方面%,title.ilike.%西部方面%,source_url.ilike.%/gsdf/wae/%";
+
+type CountFilter =
+  | { op: "eq"; column: string; value: string | boolean }
+  | { op: "in"; column: string; values: string[] }
+  | { op: "or"; expression: string };
+
+function normalizeCandidateStatus(status: string) {
+  return ["pending", "approved", "rejected", "duplicate", "all"].includes(status) ? status : "pending";
+}
+
+function normalizePerPage(perPage: number) {
+  if (!Number.isFinite(perPage)) return 50;
+  return Math.min(100, Math.max(1, Math.floor(perPage)));
+}
+
+function paginateCandidates(candidates: TenderCandidate[], page: number, perPage: number, error: string | null): TenderCandidatePageResult {
+  const total = candidates.length;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  const offset = (clampedPage - 1) * perPage;
+  return {
+    candidates: candidates.slice(offset, offset + perPage).map(normalizeDefenseTender),
+    total,
+    page: clampedPage,
+    perPage,
+    totalPages,
+    error
+  };
+}
+
+function pendingBulkFilters(filters: CountFilter[]) {
+  return [{ op: "eq" as const, column: "review_status", value: "pending" }, ...filters];
+}
+
+async function countCandidateRows(errors: string[], filters: CountFilter[] = []) {
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) return 0;
+  let query = supabase.from("tender_candidates").select("id", { count: "exact", head: true });
+  for (const filter of filters) {
+    if (filter.op === "eq") query = query.eq(filter.column, filter.value);
+    if (filter.op === "in") query = query.in(filter.column, filter.values);
+    if (filter.op === "or") query = query.or(filter.expression);
+  }
+  const { count, error } = await query;
+  if (error) {
+    errors.push(`tender_candidates: ${error.message}`);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+async function countTenderRows(errors: string[], filters: CountFilter[] = []) {
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) return 0;
+  let query = supabase.from("tenders").select("id", { count: "exact", head: true });
+  for (const filter of filters) {
+    if (filter.op === "eq") query = query.eq(filter.column, filter.value);
+    if (filter.op === "in") query = query.in(filter.column, filter.values);
+    if (filter.op === "or") query = query.or(filter.expression);
+  }
+  const { count, error } = await query;
+  if (error) {
+    errors.push(`tenders: ${error.message}`);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+function emptyBulkCounts(): TenderCandidateBulkCounts {
+  return {
+    visible: 0,
+    defense: 0,
+    gsdf: 0,
+    msdf: 0,
+    asdf: 0,
+    open_counter: 0,
+    goods_services: 0,
+    kyushu_defense: 0,
+    western_area: 0,
+    kyushu_goods_services: 0,
+    kyushu_open_counter: 0,
+    error: null
+  };
+}
+
+function countBulkCandidatesFromRows(candidates: TenderCandidate[], target: keyof Omit<TenderCandidateBulkCounts, "error">) {
+  const counts = emptyBulkCounts();
+  for (const candidate of candidates.map(normalizeDefenseTender)) {
+    if (!isBulkApprovableCandidate(candidate)) continue;
+    const isDefense = isDefenseLike(candidate);
+    const isKyushu = tenderRegion(candidate) === "九州";
+    const isOpenCounter = candidate.tender_type === "open_counter" || candidate.tender_type === "small_discretionary";
+    const isGoodsServices = candidate.tender_type === "goods" || candidate.tender_type === "services";
+    counts.visible += 1;
+    if (isDefense) counts.defense += 1;
+    if (candidate.organization_type === "ground_self_defense_force") counts.gsdf += 1;
+    if (candidate.organization_type === "maritime_self_defense_force") counts.msdf += 1;
+    if (candidate.organization_type === "air_self_defense_force") counts.asdf += 1;
+    if (isOpenCounter) counts.open_counter += 1;
+    if (isGoodsServices) counts.goods_services += 1;
+    if (isDefense && isKyushu) counts.kyushu_defense += 1;
+    if (isWesternAreaCandidate(candidate)) counts.western_area += 1;
+    if (isDefense && isKyushu && isGoodsServices) counts.kyushu_goods_services += 1;
+    if (isDefense && isKyushu && isOpenCounter) counts.kyushu_open_counter += 1;
+  }
+  return { [target]: counts[target] } as Pick<TenderCandidateBulkCounts, typeof target>;
+}
+
+function countCandidateMetricsFromRows(candidates: TenderCandidate[], tenders: Tender[]) {
+  const normalizedCandidates = candidates.map(normalizeDefenseTender);
+  const normalizedTenders = tenders.map(normalizeDefenseTender);
+  return {
+    defenseCandidates: normalizedCandidates.filter(isDefenseLike).length,
+    defensePublished: normalizedTenders.filter(isDefenseLike).length,
+    kyushuDefenseCandidates: normalizedCandidates.filter((candidate) => isDefenseLike(candidate) && tenderRegion(candidate) === "九州").length,
+    kyushuDefensePublished: normalizedTenders.filter((tender) => isDefenseLike(tender) && tenderRegion(tender) === "九州").length,
+    westernCandidates: normalizedCandidates.filter(isWesternAreaCandidate).length,
+    westernPublished: normalizedTenders.filter(isWesternAreaCandidate).length,
+    pending: normalizedCandidates.filter((candidate) => candidate.review_status === "pending").length,
+    approved: normalizedCandidates.filter((candidate) => candidate.review_status === "approved").length,
+    rejected: normalizedCandidates.filter((candidate) => candidate.review_status === "rejected").length,
+    duplicate: normalizedCandidates.filter((candidate) => candidate.review_status === "duplicate").length,
+    totalCandidates: normalizedCandidates.length
+  };
+}
+
+function isBulkApprovableCandidate(candidate: TenderCandidate) {
+  if (!candidate.title.trim()) return false;
+  if (!candidate.source_url && !candidate.pdf_url) return false;
+  if (!candidate.agency_name.trim()) return false;
+  if (candidate.review_status !== "pending") return false;
+  if (candidate.duplicate_candidate_id) return false;
+  return candidate.tender_type !== "unknown" && candidate.tender_type !== "construction";
+}
+
+function isWesternAreaCandidate(candidate: TenderCandidate | Tender) {
+  const target = `${candidate.source_name ?? ""} ${candidate.agency_name} ${candidate.title} ${candidate.source_url}`;
+  return target.includes("/gsdf/wae/") || target.includes("西部方面") || target.includes("西部方面会計隊");
 }
 
 export async function getTenderCrawlLogs(limit: number = 20) {

@@ -6,12 +6,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
-import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
+import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import type { Tender, TenderCandidate, TenderCandidateReviewStatus, TenderCandidateType, TenderType } from "@/lib/types";
 
 const candidatePath = path.join(process.cwd(), "data", "defense-candidates.json");
 const tenderImportPath = path.join(process.cwd(), "data", "tender-imports.json");
 type LocalTenderPayload = Omit<Tender, "id" | "created_at" | "updated_at" | "tender_sources">;
+type TenderSupabaseServiceClient = NonNullable<ReturnType<typeof createTenderSupabaseServiceRoleClient>>;
+const DEFENSE_ORGANIZATION_TYPE_VALUES = Array.from(DEFENSE_ORGANIZATION_TYPES);
+const WESTERN_AREA_OR_FILTER = "source_name.ilike.%西部方面%,agency_name.ilike.%西部方面%,title.ilike.%西部方面%,source_url.ilike.%/gsdf/wae/%";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -120,9 +123,20 @@ export async function updateTenderCandidateReviewAction(formData: FormData) {
 }
 
 export async function bulkApproveTenderCandidatesAction(formData: FormData) {
-  await ensureAdminOrLocalFallback();
+  const admin = await ensureAdminOrLocalFallback();
   const scope = requiredString(formData, "scope");
   const visibleIds = new Set(formData.getAll("candidate_id").map((value) => String(value)));
+  const returnStatus = optionalString(formData, "status") ?? "pending";
+  const returnPage = optionalString(formData, "page") ?? "1";
+  const returnPerPage = optionalString(formData, "perPage") ?? "50";
+  const supabase = admin ? createTenderSupabaseServiceRoleClient() : null;
+
+  if (supabase) {
+    const result = await bulkApproveSupabaseCandidates(supabase, scope, visibleIds);
+    revalidateTenderPaths();
+    redirect(bulkResultPath(returnStatus, returnPage, returnPerPage, scope, result.approved, result.skipped));
+  }
+
   const candidates = readLocalCandidates();
   const tenders = readImportedTenders();
   let approved = 0;
@@ -147,7 +161,7 @@ export async function bulkApproveTenderCandidatesAction(formData: FormData) {
   writeJson(candidatePath, nextCandidates);
   writeJson(tenderImportPath, tenders);
   revalidateTenderPaths();
-  redirect(`/admin/tender-candidates?status=pending&bulkApproved=${approved}&bulkSkipped=${skipped}`);
+  redirect(bulkResultPath(returnStatus, returnPage, returnPerPage, scope, approved, skipped));
 }
 
 function isDeadlineSoon(value: string | null) {
@@ -198,6 +212,138 @@ function updateLocalCandidateStatus(id: string, status: TenderCandidateReviewSta
     updated_at: now
   } : candidate);
   writeJson(candidatePath, candidates);
+}
+
+async function bulkApproveSupabaseCandidates(supabase: TenderSupabaseServiceClient, scope: string, visibleIds: Set<string>) {
+  const candidates = await readSupabaseBulkCandidates(supabase, scope, visibleIds);
+  const now = new Date().toISOString();
+  const sourceUrls = [...new Set(candidates.map((candidate) => candidate.source_url).filter(Boolean))];
+  const existingSourceUrls = await readExistingTenderSourceUrls(supabase, sourceUrls);
+  const approvedIds: string[] = [];
+  const duplicateIds: string[] = [];
+  const rows: LocalTenderPayload[] = [];
+  let skipped = 0;
+
+  for (const candidate of candidates.map(normalizeDefenseTender)) {
+    if (!isBulkScopeMatch(candidate, scope, visibleIds) || !isBulkApprovable(candidate)) {
+      skipped += 1;
+      continue;
+    }
+    if (existingSourceUrls.has(candidate.source_url)) {
+      duplicateIds.push(candidate.id);
+      skipped += 1;
+      continue;
+    }
+    rows.push(tenderPayloadFromCandidate(candidate, now));
+    approvedIds.push(candidate.id);
+    existingSourceUrls.add(candidate.source_url);
+  }
+
+  let approved = 0;
+  if (rows.length) {
+    const { error } = await supabase.from("tenders").insert(rows);
+    if (error) throw new Error(error.message);
+    approved = rows.length;
+  }
+
+  await updateSupabaseCandidateStatuses(supabase, approvedIds, "approved");
+  await updateSupabaseCandidateStatuses(supabase, duplicateIds, "duplicate");
+
+  return { approved, skipped };
+}
+
+async function readSupabaseBulkCandidates(supabase: TenderSupabaseServiceClient, scope: string, visibleIds: Set<string>) {
+  let query = supabase
+    .from("tender_candidates")
+    .select("*, tender_sources(name, source_name, organization_type, base_url)")
+    .eq("review_status", "pending")
+    .order("fetched_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(5000);
+
+  if (scope === "visible") {
+    const ids = [...visibleIds];
+    if (!ids.length) return [] as TenderCandidate[];
+    query = query.in("id", ids);
+  } else if (scope === "defense") {
+    query = query.in("organization_type", DEFENSE_ORGANIZATION_TYPE_VALUES);
+  } else if (scope === "gsdf") {
+    query = query.eq("organization_type", "ground_self_defense_force");
+  } else if (scope === "msdf") {
+    query = query.eq("organization_type", "maritime_self_defense_force");
+  } else if (scope === "asdf") {
+    query = query.eq("organization_type", "air_self_defense_force");
+  } else if (scope === "open_counter") {
+    query = query.in("tender_type", ["open_counter", "small_discretionary"]);
+  } else if (scope === "goods_services") {
+    query = query.in("tender_type", ["goods", "services"]);
+  } else if (scope === "kyushu_defense") {
+    query = query.in("organization_type", DEFENSE_ORGANIZATION_TYPE_VALUES).eq("region", "九州");
+  } else if (scope === "western_area") {
+    query = query.or(WESTERN_AREA_OR_FILTER);
+  } else if (scope === "kyushu_goods_services") {
+    query = query.in("organization_type", DEFENSE_ORGANIZATION_TYPE_VALUES).eq("region", "九州").in("tender_type", ["goods", "services"]);
+  } else if (scope === "kyushu_open_counter") {
+    query = query.in("organization_type", DEFENSE_ORGANIZATION_TYPE_VALUES).eq("region", "九州").in("tender_type", ["open_counter", "small_discretionary"]);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as TenderCandidate[];
+}
+
+async function readExistingTenderSourceUrls(supabase: TenderSupabaseServiceClient, sourceUrls: string[]) {
+  const existing = new Set<string>();
+  for (const chunk of chunks(sourceUrls, 200)) {
+    const { data, error } = await supabase.from("tenders").select("source_url").in("source_url", chunk);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      if (row.source_url) existing.add(row.source_url);
+    }
+  }
+  return existing;
+}
+
+async function updateSupabaseCandidateStatuses(supabase: TenderSupabaseServiceClient, ids: string[], status: TenderCandidateReviewStatus) {
+  for (const chunk of chunks(ids, 200)) {
+    const { error } = await supabase.from("tender_candidates").update({
+      review_status: status,
+      updated_at: new Date().toISOString()
+    }).in("id", chunk);
+    if (error) throw new Error(error.message);
+  }
+}
+
+function tenderPayloadFromCandidate(candidate: TenderCandidate, now: string) {
+  const tender = tenderFromCandidate(candidate, now);
+  return {
+    source_id: tender.source_id,
+    source_name: tender.source_name,
+    organization_type: tender.organization_type,
+    title: tender.title,
+    agency_name: tender.agency_name,
+    tender_type: tender.tender_type,
+    region: tender.region,
+    prefecture: tender.prefecture,
+    base_location: tender.base_location,
+    published_at: tender.published_at,
+    deadline_at: tender.deadline_at,
+    bid_at: tender.bid_at,
+    qualification_required: tender.qualification_required,
+    required_qualification: tender.required_qualification,
+    source_url: tender.source_url,
+    pdf_url: tender.pdf_url,
+    attachments: tender.attachments ?? [],
+    raw_text: tender.raw_text,
+    detail_memo: tender.detail_memo,
+    original_label: tender.original_label,
+    is_admin_verified: tender.is_admin_verified ?? true,
+    is_new: tender.is_new,
+    is_deadline_soon: tender.is_deadline_soon,
+    is_defense: tender.is_defense,
+    status: tender.status,
+    fetched_at: tender.fetched_at
+  } satisfies LocalTenderPayload;
 }
 
 function readLocalCandidates() {
@@ -345,6 +491,26 @@ function hasDuplicateTender(tenders: Tender[], tender: Tender) {
     && (existing.published_at ?? null) === (tender.published_at ?? null)
     && (existing.bid_at ?? null) === (tender.bid_at ?? null)
   ));
+}
+
+function bulkResultPath(status: string, page: string, perPage: string, scope: string, approved: number, skipped: number) {
+  const params = new URLSearchParams({
+    status,
+    page,
+    perPage,
+    bulkScope: scope,
+    bulkApproved: String(approved),
+    bulkSkipped: String(skipped)
+  });
+  return `/admin/tender-candidates?${params.toString()}`;
+}
+
+function chunks<T>(values: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    result.push(values.slice(index, index + size));
+  }
+  return result;
 }
 
 function stableHash(value: string) {

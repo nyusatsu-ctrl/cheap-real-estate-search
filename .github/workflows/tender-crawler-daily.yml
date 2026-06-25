@@ -41,7 +41,9 @@ jobs:
           fi
 
       - name: Crawl procurement portal tenders
+        continue-on-error: true
         run: npm run crawl:tenders -- --limit=300
 
       - name: Crawl defense tender candidates
+        if: always()
         run: npm run crawl:defense

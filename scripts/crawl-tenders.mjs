@@ -148,8 +148,31 @@ function absoluteUrl(href) {
   return new URL(decodeHtml(href), PORTAL_ORIGIN).toString();
 }
 
+class PortalCrawlError extends Error {
+  constructor(message, options = {}) {
+    super(message);
+    this.name = "PortalCrawlError";
+    this.errorType = options.errorType ?? "portal_crawl_error";
+    this.statusCode = options.statusCode ?? null;
+    this.sourceUrl = options.sourceUrl ?? `${PORTAL_ORIGIN}${SEARCH_PATH}`;
+  }
+}
+
 function extractCsrf(html) {
-  return html.match(/name="_csrf"\s+value="([^"]+)"/)?.[1] ?? "";
+  const patterns = [
+    /<input[^>]+name=["']_csrf["'][^>]*value=["']([^"']+)["']/i,
+    /<input[^>]+value=["']([^"']+)["'][^>]*name=["']_csrf["']/i,
+    /<meta[^>]+name=["']_csrf["'][^>]*content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]*name=["']_csrf["']/i,
+    /name=["']_csrf["'][\s\S]{0,240}?value=["']([^"']+)["']/i,
+    /["']_csrf["']\s*:\s*["']([^"']+)["']/i,
+    /csrfToken["']?\s*[:=]\s*["']([^"']+)["']/i
+  ];
+  for (const pattern of patterns) {
+    const token = html.match(pattern)?.[1];
+    if (token) return decodeHtml(token);
+  }
+  return "";
 }
 
 function extractCookies(response) {
@@ -178,7 +201,13 @@ async function searchPortal(keyword) {
   const initial = await portalFetch(SEARCH_PATH);
   const csrf = extractCsrf(initial.text);
   const cookie = extractCookies(initial.response);
-  if (!csrf) throw new Error("Could not find CSRF token on procurement portal search page.");
+  if (!csrf) {
+    throw new PortalCrawlError("Could not find CSRF token on procurement portal search page.", {
+      errorType: "csrf_missing",
+      statusCode: initial.response.status,
+      sourceUrl: `${PORTAL_ORIGIN}${SEARCH_PATH}`
+    });
+  }
 
   const params = new URLSearchParams();
   params.set("_csrf", csrf);
@@ -451,15 +480,9 @@ async function saveLocal(tenders) {
   await fs.writeFile(OUTPUT_PATH, JSON.stringify(tenders, null, 2));
 }
 
-async function saveSupabase(tenders) {
-  await loadEnv();
-  const url = process.env.TENDER_SUPABASE_URL;
-  const key = process.env.TENDER_SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return { saved: 0, skipped: true };
-
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
-  const startedAt = new Date().toISOString();
-  const sourcePayload = {
+function portalSourcePayload() {
+  const now = new Date().toISOString();
+  return {
     name: "調達ポータル",
     url: PORTAL_ORIGIN,
     source_type: "p_portal",
@@ -476,8 +499,12 @@ async function saveSupabase(tenders) {
     is_active: true,
     crawl_ready: true,
     crawl_frequency: "daily",
-    last_crawled_at: new Date().toISOString()
+    last_crawled_at: now
   };
+}
+
+async function upsertPortalSource(supabase, extraPayload = {}) {
+  const payload = { ...portalSourcePayload(), ...extraPayload };
   const { data: existingSource, error: findSourceError } = await supabase
     .from("tender_sources")
     .select("id")
@@ -486,15 +513,45 @@ async function saveSupabase(tenders) {
   if (findSourceError) throw new Error(findSourceError.message);
 
   const sourceResult = existingSource
-    ? await supabase.from("tender_sources").update(sourcePayload).eq("id", existingSource.id).select("id").single()
-    : await supabase.from("tender_sources").insert(sourcePayload).select("id").single();
+    ? await supabase.from("tender_sources").update(payload).eq("id", existingSource.id).select("id").single()
+    : await supabase.from("tender_sources").insert(payload).select("id").single();
   if (sourceResult.error) throw new Error(sourceResult.error.message);
-  const source = sourceResult.data;
+  return sourceResult.data;
+}
+
+function formatCrawlIssue(issue) {
+  const label = issue.keyword ? `keyword=${issue.keyword}` : "keyword=all";
+  return `${label}: ${issue.message}`;
+}
+
+async function insertSourceErrors(supabase, sourceId, crawlLogId, issues) {
+  if (!issues.length) return;
+  const rows = issues.map((issue) => ({
+    source_id: sourceId,
+    crawl_log_id: crawlLogId,
+    source_url: issue.sourceUrl ?? `${PORTAL_ORIGIN}${SEARCH_PATH}`,
+    error_type: issue.errorType ?? "crawl_error",
+    error_message: formatCrawlIssue(issue),
+    status_code: issue.statusCode ?? null
+  }));
+  const { error } = await supabase.from("tender_source_errors").insert(rows);
+  if (error) console.error(`Failed to record tender_source_errors: ${error.message}`);
+}
+
+async function saveSupabase(tenders, crawlIssues = []) {
+  await loadEnv();
+  const url = process.env.TENDER_SUPABASE_URL;
+  const key = process.env.TENDER_SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { saved: 0, skipped: true };
+
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const startedAt = new Date().toISOString();
+  const source = await upsertPortalSource(supabase);
 
   let saved = 0;
   let created = 0;
   let updated = 0;
-  const errors = [];
+  const issues = [...crawlIssues];
   for (const tender of tenders) {
     const payload = { ...tender, source_id: source.id };
     delete payload.id;
@@ -511,7 +568,12 @@ async function saveSupabase(tenders) {
       ? await supabase.from("tenders").update(payload).eq("id", existing.id)
       : await supabase.from("tenders").insert(payload);
     if (result.error) {
-      errors.push(result.error.message);
+      issues.push({
+        keyword: null,
+        message: result.error.message,
+        errorType: "tender_upsert_error",
+        sourceUrl: tender.source_url
+      });
       continue;
     }
     saved += 1;
@@ -519,10 +581,10 @@ async function saveSupabase(tenders) {
     else created += 1;
   }
 
-  const status = errors.length
+  const status = issues.length
     ? saved > 0 ? "partial_success" : "failed"
     : "success";
-  await supabase.from("tender_crawl_logs").insert({
+  const logResult = await supabase.from("tender_crawl_logs").insert({
     source_id: source.id,
     started_at: startedAt,
     finished_at: new Date().toISOString(),
@@ -530,18 +592,22 @@ async function saveSupabase(tenders) {
     fetched_count: tenders.length,
     created_count: created,
     duplicate_count: updated,
-    skipped_count: errors.length,
-    error_message: errors.length ? errors.slice(0, 5).join(" / ") : null
-  });
+    skipped_count: issues.length,
+    error_count: issues.length,
+    error_message: issues.length ? issues.slice(0, 5).map(formatCrawlIssue).join(" / ") : null
+  }).select("id").single();
+  if (logResult.error) console.error(`Failed to record tender_crawl_logs: ${logResult.error.message}`);
+
+  await insertSourceErrors(supabase, source.id, logResult.data?.id ?? null, issues);
 
   await supabase.from("tender_sources").update({
     last_crawled_at: new Date().toISOString(),
     last_success_at: status === "failed" ? null : new Date().toISOString(),
-    last_error_at: errors.length ? new Date().toISOString() : null,
-    last_error_message: errors.length ? errors.slice(0, 3).join(" / ") : null
+    last_error_at: issues.length ? new Date().toISOString() : null,
+    last_error_message: issues.length ? issues.slice(0, 3).map(formatCrawlIssue).join(" / ") : null
   }).eq("id", source.id);
 
-  return { saved, created, updated, errors: errors.length, skipped: false };
+  return { saved, created, updated, errors: issues.length, skipped: false };
 }
 
 async function loadEnv() {
@@ -568,18 +634,45 @@ async function main() {
   const limit = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? "80");
 
   const collected = [];
+  const crawlIssues = [];
   for (const keyword of keywords) {
-    const tenders = await searchPortal(keyword);
-    collected.push(...tenders);
+    try {
+      const tenders = await searchPortal(keyword);
+      collected.push(...tenders);
+    } catch (error) {
+      const issue = {
+        keyword: keyword || null,
+        message: error instanceof Error ? error.message : String(error),
+        errorType: error?.errorType ?? "portal_crawl_error",
+        statusCode: error?.statusCode ?? null,
+        sourceUrl: error?.sourceUrl ?? `${PORTAL_ORIGIN}${SEARCH_PATH}`
+      };
+      crawlIssues.push(issue);
+      console.error(`Procurement portal crawl failed: ${formatCrawlIssue(issue)}`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 700));
   }
 
   const tenders = uniqueBySourceUrl(collected).slice(0, limit);
   await saveLocal(tenders);
-  const supabaseResult = args.has("--no-db") ? { saved: 0, skipped: true } : await saveSupabase(tenders);
+  let supabaseResult = args.has("--no-db") ? { saved: 0, skipped: true } : null;
+  if (!supabaseResult) {
+    try {
+      supabaseResult = await saveSupabase(tenders, crawlIssues);
+    } catch (error) {
+      supabaseResult = {
+        saved: 0,
+        skipped: false,
+        failed: true,
+        error: error instanceof Error ? error.message : String(error)
+      };
+      console.error(`Failed to record procurement portal crawl result: ${supabaseResult.error}`);
+    }
+  }
 
   console.log(JSON.stringify({
     collected: tenders.length,
+    crawl_errors: crawlIssues.length,
     output: OUTPUT_PATH,
     supabase: supabaseResult,
     titles: tenders.slice(0, 10).map((tender) => tender.title)
@@ -588,5 +681,5 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 0;
 });

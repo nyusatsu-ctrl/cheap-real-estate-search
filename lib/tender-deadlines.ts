@@ -242,8 +242,13 @@ function isDateCloseToLabel(context: string, label: string, matchedText: string)
   if (labelIndex < 0 || dateIndex < 0) return false;
   const between = context.slice(labelIndex + label.length, dateIndex);
   if (between.length > 70) return false;
+  if (containsDateLike(between)) return false;
   if (/までの期間|から|以降|停止等措置|要領|制定|付け|平成\d/.test(between)) return false;
   return true;
+}
+
+function containsDateLike(text: string) {
+  return /令\s*和\s*(?:元|\d{1,2})\s*年\s*\d{1,2}\s*月\s*\d{1,2}|平成\s*(?:元|\d{1,2})\s*年\s*\d{1,2}\s*月\s*\d{1,2}|\bR\s*\d{1,2}[.\/\-年\s]+\d{1,2}[.\/\-月\s]+\d{1,2}\b|20\d{2}\s*年\s*\d{1,2}\s*月\s*\d{1,2}|20\d{2}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{1,2}\s*月\s*\d{1,2}\s*日|\d{1,2}[\/.]\d{1,2}/i.test(text);
 }
 
 function nearDeadlineWordCandidates(text: string, referenceDate: string | null) {

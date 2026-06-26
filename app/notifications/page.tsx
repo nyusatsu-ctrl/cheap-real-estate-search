@@ -17,7 +17,8 @@ import {
   getTenderNotificationRules,
   notificationDeadlineLabel
 } from "@/lib/tender-notifications";
-import { requireActiveMember } from "@/lib/user";
+import { requireUsableTenderMember } from "@/lib/tender-access";
+import { tenderMetadata } from "@/lib/tender-metadata";
 import type { TenderNotificationRule } from "@/lib/types";
 
 type SearchParams = {
@@ -28,24 +29,19 @@ type SearchParams = {
   error?: string;
 };
 
-export const metadata: Metadata = {
-  title: "案件通知｜官公庁案件サーチ",
-  description: "官公庁案件サーチの通知条件と新着案件通知を管理します。",
-  openGraph: {
-    title: "案件通知｜官公庁案件サーチ",
-    description: "希望条件に合う新着の官公庁案件をアプリ内で確認できます。",
-    siteName: "官公庁案件サーチ"
-  }
-};
+export const metadata: Metadata = tenderMetadata(
+  "案件通知｜官公庁案件サーチ",
+  "官公庁案件サーチの通知条件と新着案件通知を管理します。"
+);
 
 export default async function NotificationsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const member = await requireActiveMember();
+  const access = await requireUsableTenderMember();
   const params = await searchParams;
   const unreadOnly = params.unread === "1";
   const selectedRuleId = params.ruleId || undefined;
   const [rulesResult, eventsResult] = await Promise.all([
-    getTenderNotificationRules(member.id),
-    getTenderNotificationEvents(member.id, { unreadOnly, ruleId: selectedRuleId })
+    getTenderNotificationRules(access.userId),
+    getTenderNotificationEvents(access.userId, { unreadOnly, ruleId: selectedRuleId })
   ]);
   const previewCounts = await getNotificationRulePreviewCounts(rulesResult.data);
   const unreadCount = eventsResult.data.filter((event) => !event.is_read).length;

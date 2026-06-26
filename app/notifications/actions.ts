@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
-import { canUseMemberFeatures } from "@/lib/tenders";
-import { requireMember } from "@/lib/user";
+import { requireUsableTenderMember } from "@/lib/tender-access";
 
 function optionalString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim() || null;
@@ -21,9 +20,7 @@ function nonNegativeInt(formData: FormData, key: string) {
 }
 
 async function requireUsableMember() {
-  const member = await requireMember();
-  if (!canUseMemberFeatures(member)) redirect("/billing?trial=expired");
-  return member;
+  return requireUsableTenderMember();
 }
 
 export async function saveTenderNotificationRuleAction(formData: FormData) {
@@ -33,7 +30,7 @@ export async function saveTenderNotificationRuleAction(formData: FormData) {
 
   const id = optionalString(formData, "id");
   const payload = {
-    user_id: member.id,
+    user_id: member.userId,
     name: optionalString(formData, "name") ?? "通知条件",
     keyword: optionalString(formData, "keyword"),
     exclude_keyword: optionalString(formData, "exclude_keyword"),
@@ -55,7 +52,7 @@ export async function saveTenderNotificationRuleAction(formData: FormData) {
   };
 
   const result = id
-    ? await supabase.from("tender_notifications").update(payload).eq("id", id).eq("user_id", member.id)
+    ? await supabase.from("tender_notifications").update(payload).eq("id", id).eq("user_id", member.userId)
     : await supabase.from("tender_notifications").insert(payload);
 
   if (result.error) redirect(`/notifications?error=${encodeURIComponent(result.error.message)}`);
@@ -75,7 +72,7 @@ export async function toggleTenderNotificationRuleAction(formData: FormData) {
     .from("tender_notifications")
     .update({ is_active: checkbox(formData, "is_active") })
     .eq("id", id)
-    .eq("user_id", member.id);
+    .eq("user_id", member.userId);
 
   if (error) redirect(`/notifications?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/notifications");
@@ -94,7 +91,7 @@ export async function deleteTenderNotificationRuleAction(formData: FormData) {
     .from("tender_notifications")
     .update({ deleted_at: new Date().toISOString(), is_active: false })
     .eq("id", id)
-    .eq("user_id", member.id);
+    .eq("user_id", member.userId);
 
   if (error) redirect(`/notifications?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/notifications");
@@ -112,7 +109,7 @@ export async function markTenderNotificationReadAction(formData: FormData) {
     .from("tender_notification_events")
     .update({ is_read: true, read_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", member.id);
+    .eq("user_id", member.userId);
 
   if (error) redirect(`/notifications?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/notifications");
@@ -127,7 +124,7 @@ export async function markAllTenderNotificationsReadAction() {
   const { error } = await supabase
     .from("tender_notification_events")
     .update({ is_read: true, read_at: new Date().toISOString() })
-    .eq("user_id", member.id)
+    .eq("user_id", member.userId)
     .eq("is_read", false)
     .is("deleted_at", null);
 
@@ -147,7 +144,7 @@ export async function deleteTenderNotificationEventAction(formData: FormData) {
     .from("tender_notification_events")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", member.id);
+    .eq("user_id", member.userId);
 
   if (error) redirect(`/notifications?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/notifications");

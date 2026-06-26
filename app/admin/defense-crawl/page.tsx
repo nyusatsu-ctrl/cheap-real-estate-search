@@ -6,6 +6,7 @@ import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAc
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
+import { getTenderAccessDiagnostics } from "@/lib/tender-access";
 import { getTenderNotificationDiagnostics } from "@/lib/tender-notifications";
 import { assessTenderDeadline, assessTenderSourceAvailability } from "@/lib/tender-deadlines";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
@@ -38,9 +39,9 @@ export default async function DefenseCrawlPage() {
   const localCandidates = readJson<TenderCandidate[]>(candidatePath, []);
   const localTenders = readJson<Tender[]>(tenderImportPath, []);
   const crawlSummary = readJson<DefenseCrawlSummary>(summaryPath, null);
-  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics] = admin
-    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20), getTenderNotificationDiagnostics()])
-    : [[], [], [], [] as TenderCrawlLog[], null];
+  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics, accessDiagnostics] = admin
+    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20), getTenderNotificationDiagnostics(), getTenderAccessDiagnostics()])
+    : [[], [], [], [] as TenderCrawlLog[], null, null];
   const dbDiagnostics = admin ? await getTenderDatabaseDiagnostics() : null;
   const sources = admin && dbSources.length ? dbSources : localSources;
   const candidates = (admin ? dbCandidates : localCandidates).map(normalizeDefenseTender);
@@ -98,6 +99,10 @@ export default async function DefenseCrawlPage() {
 
       {admin ? (
         <TenderNotificationStatus diagnostics={notificationDiagnostics} summary={pipelineSummary} />
+      ) : null}
+
+      {admin ? (
+        <TenderAccessStatus diagnostics={accessDiagnostics} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -454,6 +459,40 @@ function TenderNotificationStatus({
         <StatusItem label="メール送信待ち数" value={String(diagnostics?.emailPendingCount ?? summary?.email_outbox_pending_count ?? "-")} />
         <StatusItem label="最終通知処理日時" value={diagnostics?.latestProcessedAt ? formatDateTime(diagnostics.latestProcessedAt) : "-"} />
         <StatusItem label="実メール送信" value="無効" />
+      </div>
+      {diagnostics?.error ? (
+        <p className="mt-3 break-all text-xs text-amber-800">確認事項: {diagnostics.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function TenderAccessStatus({
+  diagnostics
+}: {
+  diagnostics: Awaited<ReturnType<typeof getTenderAccessDiagnostics>> | null;
+}) {
+  return (
+    <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-slate-950">会員登録・利用期限 診断</h3>
+          <p className="mt-1 text-slate-600">官公庁案件サーチ専用の無料体験、契約状態、期限切れ件数を確認します。個人情報や決済IDは表示しません。</p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${diagnostics?.error ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {diagnostics?.error ? "確認が必要" : "確認OK"}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="総登録数" value={formatNullableCount(diagnostics?.total ?? null)} />
+        <StatusItem label="無料体験中" value={formatNullableCount(diagnostics?.trialing ?? null)} />
+        <StatusItem label="有料利用中" value={formatNullableCount(diagnostics?.active ?? null)} />
+        <StatusItem label="支払い確認中" value={formatNullableCount(diagnostics?.pastDue ?? null)} />
+        <StatusItem label="解約済み" value={formatNullableCount(diagnostics?.canceled ?? null)} />
+        <StatusItem label="無料体験終了" value={formatNullableCount(diagnostics?.expired ?? null)} />
+        <StatusItem label="管理者" value={formatNullableCount(diagnostics?.admin ?? null)} />
+        <StatusItem label="3日以内に体験終了" value={formatNullableCount(diagnostics?.trialEndsWithin3Days ?? null)} />
+        <StatusItem label="期限超過trialing" value={formatNullableCount(diagnostics?.trialAlreadyEnded ?? null)} />
       </div>
       {diagnostics?.error ? (
         <p className="mt-3 break-all text-xs text-amber-800">確認事項: {diagnostics.error}</p>

@@ -41,6 +41,7 @@
     "portal:tender-availability": "node scripts/procurement-portal-availability.mjs",
     "notify:tenders": "node scripts/match-tender-notifications.mjs",
     "e2e:tender-notifications": "node scripts/e2e-tender-notifications.mjs",
+    "e2e:tender-access": "node scripts/e2e-tender-access.mjs",
     "summary:tender-pipeline": "node scripts/tender-pipeline-summary.mjs",
     "normalize:defense-tenders": "node scripts/normalize-defense-tenders.mjs",
     "gps:tcp": "node server/mv930g/tcp-server.mjs",

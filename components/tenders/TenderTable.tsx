@@ -39,7 +39,7 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                     {tender.tender_type === "open_counter" ? <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">オープンカウンター</span> : null}
                     {tender.is_admin_verified ? <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">管理者確認済み</span> : null}
                   </div>
-                  <Link href={restricted ? "/billing?trial=expired" : `/tenders/${tender.id}`} className="mt-2 block font-black leading-6 text-slate-950 hover:text-brand-700">
+                  <Link href={restricted ? "/tenders/billing?trial=expired" : `/tenders/${tender.id}`} className="mt-2 block font-black leading-6 text-slate-950 hover:text-brand-700">
                     {tender.title}
                   </Link>
                   {tender.original_label ? <p className="mt-1 text-xs font-semibold text-slate-500">元ラベル: {tender.original_label}</p> : null}
@@ -73,13 +73,13 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
-                    <Link href={restricted ? "/billing?trial=expired" : `/tenders/${tender.id}`} className="rounded border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus-ring">
+                    <Link href={restricted ? "/tenders/billing?trial=expired" : `/tenders/${tender.id}`} className="rounded border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus-ring">
                       詳細
                     </Link>
                     <a href={tender.source_url} target="_blank" rel="noreferrer" className="rounded border border-slate-300 bg-white p-2 text-slate-700 focus-ring" aria-label="公式ページを開く">
                       <ExternalLink className="h-4 w-4" />
                     </a>
-                    <Link href={restricted ? "/billing?trial=expired" : `/tenders/${tender.id}#favorite`} className="rounded border border-slate-300 bg-white p-2 text-slate-700 focus-ring" aria-label="お気に入り">
+                    <Link href={restricted ? "/tenders/billing?trial=expired" : `/tenders/${tender.id}#favorite`} className="rounded border border-slate-300 bg-white p-2 text-slate-700 focus-ring" aria-label="お気に入り">
                       <Star className="h-4 w-4" />
                     </Link>
                   </div>

@@ -7,50 +7,47 @@ import { FAVORITE_TENDER_STATUS_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS, 
 import { formatDate } from "@/lib/format";
 import { getSimilarPastAwardResults, summarizePastAwards } from "@/lib/past-awards";
 import { assessTenderDeadline, assessTenderSourceAvailability, deadlineStatusBadgeClass, sourceAvailabilityBadgeClass, sourceAvailabilityLabel } from "@/lib/tender-deadlines";
-import { canUseMemberFeatures, getPublishedTender } from "@/lib/tenders";
-import { getCurrentMember } from "@/lib/user";
+import { canUseTenderAccess, getCurrentTenderAccess, requireUsableTenderMember } from "@/lib/tender-access";
+import { tenderMetadata } from "@/lib/tender-metadata";
+import { getPublishedTender } from "@/lib/tenders";
 import type { SimilarPastAwardResult } from "@/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const tender = await getPublishedTender(id);
-  if (!tender) {
-    return {
-      title: "官公庁案件詳細｜株式会社エコループ",
-      description: "官公庁案件サーチの案件詳細ページです。"
-    };
+  const access = await getCurrentTenderAccess();
+  if (!canUseTenderAccess(access)) {
+    return tenderMetadata("官公庁案件詳細｜株式会社エコループ", "官公庁案件サーチの案件詳細ページです。");
   }
 
+  const tender = await getPublishedTender(id);
+  if (!tender) {
+    return tenderMetadata("官公庁案件詳細｜株式会社エコループ", "官公庁案件サーチの案件詳細ページです。");
+  }
+
+  const title = `${tender.title}｜官公庁案件サーチ`;
+  const description = `${tender.agency_name}の官公庁案件詳細です。参加前に公式公告・仕様書・参加条件をご確認ください。`;
   return {
-    title: `${tender.title}｜官公庁案件サーチ`,
-    description: `${tender.agency_name}の官公庁案件詳細です。参加前に公式公告・仕様書・参加条件をご確認ください。`,
+    title,
+    description,
     openGraph: {
-      title: `${tender.title}｜官公庁案件サーチ`,
-      description: `${tender.agency_name}の官公庁案件詳細です。`,
+      title,
+      description,
+      siteName: "官公庁案件サーチ",
       type: "article"
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description
     }
   };
 }
 
 export default async function TenderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [member, tender] = await Promise.all([getCurrentMember(), getPublishedTender(id)]);
+  await requireUsableTenderMember();
+  const tender = await getPublishedTender(id);
   if (!tender) notFound();
-
-  const usable = canUseMemberFeatures(member);
-  if (member && !usable) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-          <h1 className="text-xl font-black text-amber-950">詳細閲覧には有料プランが必要です</h1>
-          <p className="mt-2 text-sm leading-6 text-amber-900">14日間の無料トライアル終了後は、案件詳細・お気に入り・通知機能を制限しています。</p>
-          <Link href="/billing?trial=expired" className="mt-5 inline-block rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring">
-            課金管理へ
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const similarAwards = await getSimilarPastAwardResults(tender, 10);
   const similarAwardStats = summarizePastAwards(similarAwards);

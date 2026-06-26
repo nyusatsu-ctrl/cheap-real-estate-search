@@ -2,8 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { TenderSearchFilters } from "@/components/tenders/TenderSearchFilters";
 import { TenderTable } from "@/components/tenders/TenderTable";
-import { canUseMemberFeatures, getPublishedTenders, parseTenderFilters } from "@/lib/tenders";
-import { getCurrentMember } from "@/lib/user";
+import { requireUsableTenderMember, tenderAccessNotice } from "@/lib/tender-access";
+import { tenderMetadata } from "@/lib/tender-metadata";
+import { getPublishedTenders, parseTenderFilters } from "@/lib/tenders";
 
 type SearchParams = {
   region?: string;
@@ -17,20 +18,12 @@ type SearchParams = {
   openCounterOnly?: string;
 };
 
-export const metadata: Metadata = {
-  title: "官公庁案件サーチ｜株式会社エコループ",
-  description: "物品・役務・オープンカウンター・全省庁統一資格対象の官公庁案件を検索できる案件収集アプリです。",
-  openGraph: {
-    title: "官公庁案件サーチ｜株式会社エコループ",
-    description: "物品・役務・オープンカウンター・全省庁統一資格対象の官公庁案件を検索できる案件収集アプリです。",
-    siteName: "官公庁案件サーチ"
-  }
-};
+export const metadata: Metadata = tenderMetadata("官公庁案件サーチ｜株式会社エコループ");
 
 export default async function TendersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
-  const [member, tenders] = await Promise.all([getCurrentMember(), getPublishedTenders(parseTenderFilters(params))]);
-  const restricted = Boolean(member && !canUseMemberFeatures(member));
+  const access = await requireUsableTenderMember();
+  const tenders = await getPublishedTenders(parseTenderFilters(params));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -43,11 +36,9 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
           資格ガイドを見る
         </Link>
       </div>
-      {restricted ? (
-        <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900">
-          無料トライアル終了後は、詳細閲覧・お気に入り・通知機能が制限されます。継続する場合は有料プランに申し込んでください。
-        </div>
-      ) : null}
+      <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold leading-6 text-emerald-900">
+        {tenderAccessNotice(access)}
+      </div>
       <TenderSearchFilters {...params} />
       <div className="mt-5 flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-700">{tenders.length}件</p>
@@ -55,7 +46,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
       </div>
       <p className="mt-2 text-xs text-slate-500">掲載情報は公式情報をもとにした案件候補です。参加前に必ず公式公告・仕様書・参加条件をご確認ください。</p>
       <div className="mt-4">
-        <TenderTable tenders={tenders} restricted={restricted} />
+        <TenderTable tenders={tenders} restricted={false} />
       </div>
       {tenders.length === 0 ? (
         <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">

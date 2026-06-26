@@ -3,16 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
-import { canUseMemberFeatures, normalizeFavoriteStatus } from "@/lib/tenders";
-import { requireMember } from "@/lib/user";
+import { requireUsableTenderMember } from "@/lib/tender-access";
+import { normalizeFavoriteStatus } from "@/lib/tenders";
 
 function optionalString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim() || null;
 }
 
 export async function saveFavoriteTenderAction(formData: FormData) {
-  const member = await requireMember();
-  if (!canUseMemberFeatures(member)) redirect("/billing?trial=expired");
+  const access = await requireUsableTenderMember();
 
   const tenderId = String(formData.get("tender_id") ?? "").trim();
   if (!tenderId) throw new Error("tender_id is required");
@@ -25,7 +24,7 @@ export async function saveFavoriteTenderAction(formData: FormData) {
 
   const { error } = await supabase.from("tender_favorites").upsert(
     {
-      user_id: member.id,
+      user_id: access.userId,
       tender_id: tenderId,
       memo: optionalString(formData, "memo"),
       status: normalizeFavoriteStatus(formData.get("status"))
@@ -41,8 +40,7 @@ export async function saveFavoriteTenderAction(formData: FormData) {
 }
 
 export async function saveNotificationAction(formData: FormData) {
-  const member = await requireMember();
-  if (!canUseMemberFeatures(member)) redirect("/billing?trial=expired");
+  const access = await requireUsableTenderMember();
 
   const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) {
@@ -51,7 +49,7 @@ export async function saveNotificationAction(formData: FormData) {
   }
 
   const { error } = await supabase.from("tender_notifications").insert({
-    user_id: member.id,
+    user_id: access.userId,
     name: optionalString(formData, "name") ?? "案件詳細から作成した通知条件",
     region: optionalString(formData, "region"),
     prefecture: optionalString(formData, "prefecture"),

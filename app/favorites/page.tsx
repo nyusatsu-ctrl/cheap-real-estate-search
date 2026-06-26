@@ -5,36 +5,18 @@ import { saveFavoriteTenderAction } from "@/app/tenders/actions";
 import { FAVORITE_TENDER_STATUS_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { assessTenderDeadline, assessTenderSourceAvailability, sourceAvailabilityLabel } from "@/lib/tender-deadlines";
-import { canUseMemberFeatures, getFavoriteTenders } from "@/lib/tenders";
-import { requireMember } from "@/lib/user";
+import { requireUsableTenderMember } from "@/lib/tender-access";
+import { tenderMetadata } from "@/lib/tender-metadata";
+import { getFavoriteTenders } from "@/lib/tenders";
 
-export const metadata: Metadata = {
-  title: "お気に入り案件｜官公庁案件サーチ",
-  description: "官公庁案件サーチで保存した案件を確認し、対応状況を管理します。",
-  openGraph: {
-    title: "お気に入り案件｜官公庁案件サーチ",
-    description: "気になる官公庁案件を保存し、見積準備や参加予定を整理できます。",
-    siteName: "官公庁案件サーチ"
-  }
-};
+export const metadata: Metadata = tenderMetadata(
+  "お気に入り案件｜官公庁案件サーチ",
+  "官公庁案件サーチで保存した案件を確認し、対応状況を管理します。"
+);
 
 export default async function FavoritesPage() {
-  const member = await requireMember();
-  if (!canUseMemberFeatures(member)) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-          <h1 className="text-xl font-black text-amber-950">お気に入り機能には有料プランが必要です</h1>
-          <p className="mt-2 text-sm leading-6 text-amber-900">14日間の無料トライアル終了後は、案件詳細・お気に入り・通知機能を制限しています。</p>
-          <Link href="/billing?trial=expired" className="mt-5 inline-block rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring">
-            課金管理へ
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const favorites = await getFavoriteTenders(member.id);
+  const access = await requireUsableTenderMember();
+  const favorites = await getFavoriteTenders(access.userId);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">

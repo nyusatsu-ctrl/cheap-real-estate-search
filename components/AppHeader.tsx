@@ -85,7 +85,7 @@ function TenderHeader() {
           <Link href="/qualification" className="hover:text-brand-700">
             資格ガイド
           </Link>
-          <Link href="/plans" className="hover:text-brand-700">
+          <Link href="/tenders/pricing" className="hover:text-brand-700">
             料金
           </Link>
           <Link href="/admin/login?next=/admin/tenders" className="hover:text-brand-700">

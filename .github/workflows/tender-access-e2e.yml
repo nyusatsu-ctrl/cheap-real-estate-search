@@ -1,0 +1,46 @@
+name: Tender access billing E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Create temporary E2E rows/users and clean them up"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tender-access-e2e
+  cancel-in-progress: false
+
+jobs:
+  tender-access-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify tender access billing
+        run: |
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            npm run e2e:tender-access -- --apply
+          else
+            npm run e2e:tender-access
+          fi

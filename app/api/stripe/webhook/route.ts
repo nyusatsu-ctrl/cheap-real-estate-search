@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import type Stripe from "stripe";
 import { createStripeClient } from "@/lib/billing/stripe";
+import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
+import { TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
 
 export async function POST(request: NextRequest) {
   const stripe = createStripeClient();
@@ -24,6 +27,9 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const tenderHandled = await handleTenderStripeEvent(event);
+  if (tenderHandled) return NextResponse.json({ received: true });
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
@@ -53,4 +59,155 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+async function handleTenderStripeEvent(event: Stripe.Event) {
+  const productCode = stripeEventProductCode(event);
+  if (productCode !== TENDER_PRODUCT_CODE) return false;
+
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) {
+    console.error("[tender-stripe-webhook] TENDER_SUPABASE_SERVICE_ROLE_KEY is not configured.");
+    return true;
+  }
+
+  const paymentEvent = {
+    event_id: event.id,
+    event_type: event.type,
+    payload: event as unknown as Record<string, unknown>
+  };
+  const inserted = await supabase.from("tender_payment_events").insert(paymentEvent);
+  if (inserted.error) {
+    if (isUniqueViolation(inserted.error.code)) return true;
+    console.error("[tender-stripe-webhook] failed to save payment event", {
+      eventType: event.type,
+      code: inserted.error.code,
+      message: inserted.error.message
+    });
+    return true;
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const userId = session.metadata?.user_id;
+    if (!userId) return true;
+
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+    const currentPeriodEnd = subscriptionId ? await fetchSubscriptionPeriodEnd(subscriptionId) : null;
+    const { error } = await supabase
+      .from("tender_user_access")
+      .update({
+        subscription_status: "active",
+        payment_customer_id: typeof session.customer === "string" ? session.customer : null,
+        payment_subscription_id: subscriptionId,
+        current_period_end: currentPeriodEnd,
+        cancel_at_period_end: false
+      })
+      .eq("user_id", userId)
+      .eq("product_code", TENDER_PRODUCT_CODE);
+    if (error) logTenderWebhookUpdateError(event.type, error);
+    return true;
+  }
+
+  if (
+    event.type === "customer.subscription.created"
+    || event.type === "customer.subscription.updated"
+    || event.type === "customer.subscription.deleted"
+  ) {
+    const subscription = event.data.object;
+    const userId = subscription.metadata?.user_id;
+    if (!userId) return true;
+
+    const { error } = await supabase
+      .from("tender_user_access")
+      .update({
+        subscription_status: mapTenderSubscriptionStatus(subscription.status),
+        payment_customer_id: typeof subscription.customer === "string" ? subscription.customer : null,
+        payment_subscription_id: subscription.id,
+        current_period_end: subscriptionPeriodEnd(subscription),
+        cancel_at_period_end: Boolean(subscription.cancel_at_period_end)
+      })
+      .eq("user_id", userId)
+      .eq("product_code", TENDER_PRODUCT_CODE);
+    if (error) logTenderWebhookUpdateError(event.type, error);
+    return true;
+  }
+
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+    const invoice = event.data.object;
+    const subscriptionId = invoiceSubscriptionId(invoice);
+    if (!subscriptionId) return true;
+
+    const { error } = await supabase
+      .from("tender_user_access")
+      .update({
+        subscription_status: event.type === "invoice.paid" ? "active" : "past_due"
+      })
+      .eq("payment_subscription_id", subscriptionId)
+      .eq("product_code", TENDER_PRODUCT_CODE);
+    if (error) logTenderWebhookUpdateError(event.type, error);
+    return true;
+  }
+
+  return true;
+}
+
+function stripeEventProductCode(event: Stripe.Event) {
+  const object = event.data.object;
+  if ("metadata" in object && object.metadata?.product_code) return object.metadata.product_code;
+  const subscriptionDetails = "subscription_details" in object ? object.subscription_details : null;
+  if (subscriptionDetails && typeof subscriptionDetails === "object" && "metadata" in subscriptionDetails) {
+    const metadata = (subscriptionDetails as { metadata?: Stripe.Metadata | null }).metadata;
+    if (metadata?.product_code) return metadata.product_code;
+  }
+  return null;
+}
+
+async function fetchSubscriptionPeriodEnd(subscriptionId: string) {
+  const stripe = createStripeClient();
+  if (!stripe) return null;
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    return subscriptionPeriodEnd(subscription);
+  } catch (error) {
+    console.error("[tender-stripe-webhook] failed to retrieve subscription", {
+      subscriptionId,
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return null;
+  }
+}
+
+function subscriptionPeriodEnd(subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>) {
+  const value = (subscription as unknown as { current_period_end?: number | null }).current_period_end;
+  return value ? new Date(value * 1000).toISOString() : null;
+}
+
+function invoiceSubscriptionId(invoice: Stripe.Invoice) {
+  const direct = (invoice as unknown as { subscription?: string | { id?: string } | null }).subscription;
+  if (typeof direct === "string") return direct;
+  if (direct?.id) return direct.id;
+
+  const lineSubscription = (invoice as unknown as {
+    lines?: { data?: Array<{ parent?: { subscription_item_details?: { subscription?: string | null } } }> };
+  }).lines?.data?.find((line) => line.parent?.subscription_item_details?.subscription)?.parent?.subscription_item_details?.subscription;
+  return lineSubscription ?? null;
+}
+
+function mapTenderSubscriptionStatus(status: Stripe.Subscription.Status) {
+  if (status === "active" || status === "trialing") return "active";
+  if (status === "canceled") return "canceled";
+  return "past_due";
+}
+
+function isUniqueViolation(code?: string) {
+  return code === "23505";
+}
+
+function logTenderWebhookUpdateError(eventType: string, error: { code?: string; message: string }) {
+  console.error("[tender-stripe-webhook] failed to update tender access", {
+    eventType,
+    code: error.code,
+    message: error.message
+  });
 }

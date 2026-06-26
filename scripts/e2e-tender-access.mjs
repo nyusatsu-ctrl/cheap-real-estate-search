@@ -147,7 +147,7 @@ async function verifyMigrationShape() {
       "tender_user_access",
       "id,user_id,email,email_hash,product_code,subscription_status,trial_started_at,trial_ends_at,current_period_end,cancel_at_period_end,payment_customer_id,payment_subscription_id,created_at,updated_at"
     ],
-    ["tender_payment_events", "id,event_id,event_type,user_id,payment_customer_id,payment_subscription_id,payload,processed_at,created_at"]
+    ["tender_payment_events", "id,event_id,event_type,user_id,payment_customer_id,payment_subscription_id,payload,processed_at"]
   ];
 
   for (const [table, columns] of tableChecks) {

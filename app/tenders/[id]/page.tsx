@@ -65,6 +65,9 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
             ["期限ステータス", deadline.label],
             ["期限判定元", deadline.source ?? "-"],
             ["期限判定理由", deadline.reason ?? deadline.failureReason ?? "-"],
+            ["期限判定種別", deadline.kind ?? "-"],
+            ["期限信頼度", deadline.confidence ?? "-"],
+            ["期限根拠文言", deadline.evidence ?? "-"],
             ["参加条件", tender.qualification_required ? "条件あり" : "資格不要・オープンカウンター"],
             ["必要な参加資格", tender.required_qualification ?? "-"],
             ["取得日時", formatDate(tender.fetched_at)]

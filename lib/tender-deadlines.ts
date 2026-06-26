@@ -10,6 +10,9 @@ export type TenderDeadlineAssessment = {
   reason: string | null;
   failureReason: string | null;
   isEstimated: boolean;
+  confidence: "high" | "medium" | "low" | null;
+  kind: string | null;
+  evidence: string | null;
 };
 
 type TenderDeadlineInput = {
@@ -38,32 +41,36 @@ type DeadlineCandidate = {
   reason: string;
   score: number;
   isEstimated: boolean;
+  confidence: "high" | "medium" | "low";
+  kind: string;
+  evidence: string;
 };
 
 const CLOSING_SOON_DAYS = 7;
-const DEADLINE_LABELS = [
-  "見積書提出期限",
-  "見積提出期限",
-  "提出期限",
-  "参加申請期限",
-  "申込期限",
-  "申込み期限",
-  "受付期限",
-  "受付期間",
-  "入札日時",
-  "開札日時",
-  "見積日時",
-  "見積期限",
-  "入札年月日",
-  "入札日",
-  "開札日",
-  "納入期限",
-  "履行期限",
-  "納期",
-  "履行期間"
+const DEADLINE_LABELS: Array<{ label: string; score: number; confidence: "high" | "medium"; kind: string }> = [
+  { label: "競争参加資格確認申請書提出期限", score: 420, confidence: "high", kind: "participation_application_deadline" },
+  { label: "競争参加資格確認資料提出期限", score: 420, confidence: "high", kind: "participation_application_deadline" },
+  { label: "競争参加資格確認申請期限", score: 415, confidence: "high", kind: "participation_application_deadline" },
+  { label: "参加資格確認申請書提出期限", score: 410, confidence: "high", kind: "participation_application_deadline" },
+  { label: "参加申請期限", score: 405, confidence: "high", kind: "participation_application_deadline" },
+  { label: "参加表明書提出期限", score: 405, confidence: "high", kind: "participation_application_deadline" },
+  { label: "入札書提出期限", score: 360, confidence: "high", kind: "bid_submission_deadline" },
+  { label: "見積書提出期限", score: 360, confidence: "high", kind: "quote_submission_deadline" },
+  { label: "見積提出期限", score: 355, confidence: "high", kind: "quote_submission_deadline" },
+  { label: "企画提案書提出期限", score: 350, confidence: "high", kind: "proposal_submission_deadline" },
+  { label: "提案書提出期限", score: 345, confidence: "high", kind: "proposal_submission_deadline" },
+  { label: "応募締切", score: 335, confidence: "high", kind: "application_deadline" },
+  { label: "申込期限", score: 330, confidence: "high", kind: "application_deadline" },
+  { label: "申込み期限", score: 330, confidence: "high", kind: "application_deadline" },
+  { label: "受付期限", score: 320, confidence: "high", kind: "reception_deadline" },
+  { label: "提出期限", score: 300, confidence: "high", kind: "submission_deadline" },
+  { label: "入札日時", score: 220, confidence: "medium", kind: "bid_datetime" },
+  { label: "見積合わせ日時", score: 215, confidence: "medium", kind: "quote_matching_datetime" },
+  { label: "見積日時", score: 210, confidence: "medium", kind: "quote_datetime" },
+  { label: "開札日時", score: 160, confidence: "medium", kind: "opening_datetime" }
 ];
 
-const PUBLISHED_LABELS = ["公告日", "公示日", "掲載日", "公開日"];
+const FORBIDDEN_DEADLINE_CONTEXT = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切/;
 
 export function assessTenderDeadline(input: TenderDeadlineInput, now: Date = new Date()): TenderDeadlineAssessment {
   if (input.status === "archived") {
@@ -76,7 +83,10 @@ export function assessTenderDeadline(input: TenderDeadlineInput, now: Date = new
       source: "status",
       reason: "案件自体が archived です。",
       failureReason: null,
-      isEstimated: false
+      isEstimated: false,
+      confidence: null,
+      kind: "archived",
+      evidence: null
     };
   }
 
@@ -91,7 +101,10 @@ export function assessTenderDeadline(input: TenderDeadlineInput, now: Date = new
       source: null,
       reason: null,
       failureReason: "deadline_at / bid_at / 公告テキストから参加期限を特定できませんでした。",
-      isEstimated: false
+      isEstimated: false,
+      confidence: null,
+      kind: null,
+      evidence: null
     };
   }
 
@@ -107,7 +120,10 @@ export function assessTenderDeadline(input: TenderDeadlineInput, now: Date = new
     source: extracted.source,
     reason: extracted.reason,
     failureReason: null,
-    isEstimated: extracted.isEstimated
+    isEstimated: extracted.isEstimated,
+    confidence: extracted.confidence,
+    kind: extracted.kind,
+    evidence: extracted.evidence
   };
 }
 
@@ -119,7 +135,10 @@ export function extractTenderDeadline(input: TenderDeadlineInput): DeadlineCandi
       source: "deadline_at",
       reason: "DBの締切日を使用しました。",
       score: 120,
-      isEstimated: false
+      isEstimated: false,
+      confidence: "high",
+      kind: "existing_deadline_at",
+      evidence: input.deadline_at ?? ""
     };
   }
 
@@ -130,7 +149,10 @@ export function extractTenderDeadline(input: TenderDeadlineInput): DeadlineCandi
       source: "bid_at",
       reason: "DBの入札日・見積期限を使用しました。",
       score: 110,
-      isEstimated: false
+      isEstimated: false,
+      confidence: "medium",
+      kind: "existing_bid_at",
+      evidence: input.bid_at ?? ""
     };
   }
 
@@ -191,31 +213,20 @@ export function dateOnly(value?: string | null) {
 
 function labeledDateCandidates(text: string, referenceDate: string | null) {
   const candidates: DeadlineCandidate[] = [];
-  for (const label of DEADLINE_LABELS) {
-    for (const index of allIndexes(text, label)) {
+  for (const definition of DEADLINE_LABELS) {
+    for (const index of allIndexes(text, definition.label)) {
       const windowText = text.slice(index, index + 140);
+      if (FORBIDDEN_DEADLINE_CONTEXT.test(windowText)) continue;
       for (const date of parseDates(windowText, referenceDate)) {
         candidates.push({
           iso: date.iso,
-          source: `text:${label}`,
-          reason: `${label} の近くから期限日を抽出しました。`,
-          score: label.includes("履行") || label.includes("納入") || label === "納期" ? 70 : 100,
-          isEstimated: date.isEstimated
-        });
-      }
-    }
-  }
-
-  for (const label of PUBLISHED_LABELS) {
-    for (const index of allIndexes(text, label)) {
-      const windowText = text.slice(index, index + 100);
-      for (const date of parseDates(windowText, referenceDate)) {
-        candidates.push({
-          iso: date.iso,
-          source: `text:${label}`,
-          reason: `${label} は期限ではなく参考日付のため、他に期限がない場合のみ使います。`,
-          score: 10,
-          isEstimated: date.isEstimated
+          source: `text:${definition.label}`,
+          reason: `${definition.label} の近くから期限日を抽出しました。`,
+          score: definition.score,
+          isEstimated: date.isEstimated,
+          confidence: definition.confidence,
+          kind: definition.kind,
+          evidence: trimEvidence(windowText)
         });
       }
     }
@@ -229,17 +240,24 @@ function nearDeadlineWordCandidates(text: string, referenceDate: string | null) 
   for (const date of dateMatches) {
     const index = text.indexOf(date.matchedText);
     const nearby = text.slice(Math.max(0, index - 35), Math.min(text.length, index + date.matchedText.length + 35));
-    if (!/期限|締切|入札|開札|見積|提出|申込|受付|まで/.test(nearby)) continue;
-    if (/公告日|掲載日|公開日|公示日/.test(nearby) && !/期限|締切|入札|開札|見積|提出|申込|受付/.test(nearby)) continue;
+    if (FORBIDDEN_DEADLINE_CONTEXT.test(nearby)) continue;
+    if (!/入札書|見積書|提案書|参加申請|資格確認|応募|申込|受付|提出期限|締切/.test(nearby)) continue;
     candidates.push({
       iso: date.iso,
       source: "text:near_deadline_word",
-      reason: "期限・締切・入札・見積などの語の近くから日付を抽出しました。",
-      score: 60,
-      isEstimated: date.isEstimated
+      reason: "参加・入札書・見積書・提出期限などの語の近くから日付を抽出しました。",
+      score: 80,
+      isEstimated: date.isEstimated,
+      confidence: "low",
+      kind: "near_deadline_word",
+      evidence: trimEvidence(nearby)
     });
   }
   return candidates;
+}
+
+function trimEvidence(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
 function parseDates(text: string, referenceDate: string | null) {

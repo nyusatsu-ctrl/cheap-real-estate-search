@@ -197,54 +197,42 @@ function extractTenderDeadline(input) {
 }
 
 const DEADLINE_LABELS = [
+  "競争参加資格確認申請書提出期限",
+  "競争参加資格確認資料提出期限",
+  "競争参加資格確認申請期限",
+  "参加資格確認申請書提出期限",
+  "参加申請期限",
+  "参加表明書提出期限",
+  "入札書提出期限",
   "見積書提出期限",
   "見積提出期限",
-  "提出期限",
-  "参加申請期限",
+  "企画提案書提出期限",
+  "提案書提出期限",
+  "応募締切",
   "申込期限",
   "申込み期限",
   "受付期限",
-  "受付期間",
+  "提出期限",
   "入札日時",
-  "開札日時",
+  "見積合わせ日時",
   "見積日時",
-  "見積期限",
-  "入札年月日",
-  "入札日",
-  "開札日",
-  "納入期限",
-  "履行期限",
-  "納期",
-  "履行期間"
+  "開札日時"
 ];
 
-const PUBLISHED_LABELS = ["公告日", "公示日", "掲載日", "公開日"];
+const FORBIDDEN_DEADLINE_CONTEXT = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切/;
 
 function labeledDateCandidates(text, referenceDate) {
   const candidates = [];
   for (const label of DEADLINE_LABELS) {
     for (const index of allIndexes(text, label)) {
       const windowText = text.slice(index, index + 140);
+      if (FORBIDDEN_DEADLINE_CONTEXT.test(windowText)) continue;
       for (const date of parseDates(windowText, referenceDate)) {
         candidates.push({
           iso: date.iso,
           source: `text:${label}`,
           reason: `${label} の近くから期限日を抽出しました。`,
-          score: label.includes("履行") || label.includes("納入") || label === "納期" ? 70 : 100
-        });
-      }
-    }
-  }
-
-  for (const label of PUBLISHED_LABELS) {
-    for (const index of allIndexes(text, label)) {
-      const windowText = text.slice(index, index + 100);
-      for (const date of parseDates(windowText, referenceDate)) {
-        candidates.push({
-          iso: date.iso,
-          source: `text:${label}`,
-          reason: `${label} は期限ではなく参考日付のため、他に期限がない場合のみ使います。`,
-          score: 10
+          score: label.includes("開札") ? 80 : label.includes("入札日時") || label.includes("見積合わせ日時") || label.includes("見積日時") ? 90 : 120
         });
       }
     }
@@ -257,12 +245,12 @@ function nearDeadlineWordCandidates(text, referenceDate) {
   for (const date of parseDates(text, referenceDate)) {
     const index = text.indexOf(date.matchedText);
     const nearby = text.slice(Math.max(0, index - 35), Math.min(text.length, index + date.matchedText.length + 35));
-    if (!/期限|締切|入札|開札|見積|提出|申込|受付|まで/.test(nearby)) continue;
-    if (/公告日|掲載日|公開日|公示日/.test(nearby) && !/期限|締切|入札|開札|見積|提出|申込|受付/.test(nearby)) continue;
+    if (FORBIDDEN_DEADLINE_CONTEXT.test(nearby)) continue;
+    if (!/入札書|見積書|提案書|参加申請|資格確認|応募|申込|受付|提出期限|締切/.test(nearby)) continue;
     candidates.push({
       iso: date.iso,
       source: "text:near_deadline_word",
-      reason: "期限・締切・入札・見積などの語の近くから日付を抽出しました。",
+      reason: "参加・入札書・見積書・提出期限などの語の近くから日付を抽出しました。",
       score: 60
     });
   }

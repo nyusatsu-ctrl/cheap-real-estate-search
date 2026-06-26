@@ -773,6 +773,7 @@ function extractWesternAreaCandidates(html, pageUrl, sourceInfo, yearContext) {
 
     const location = westernAreaLocation(rowText);
     const dates = parseDates(rowText, yearContext);
+    const safeDeadline = pickSafeParticipationDeadline(rowText, yearContext);
     const classification = classify(`${title} ${rowText}`);
     const primaryLink = noticeLinks.find((link) => link.file_type === "pdf") ?? noticeLinks[0];
     const attachments = noticeLinks.map((link) => ({
@@ -796,8 +797,8 @@ function extractWesternAreaCandidates(html, pageUrl, sourceInfo, yearContext) {
       prefecture: location.prefecture ?? sourceInfo.prefecture ?? "未設定",
       base_location: location.baseLocation ?? sourceInfo.prefecture ?? sourceInfo.region ?? null,
       published_at: dates[0] ?? null,
-      deadline_at: dates[1] ?? null,
-      bid_at: dates[1] ?? null,
+      deadline_at: safeDeadline,
+      bid_at: safeDeadline,
       qualification_required: /全省庁統一資格|競争参加資格|資格審査|防衛省競争参加資格/.test(rowText),
       required_qualification: /全省庁統一資格|競争参加資格|資格審査|防衛省競争参加資格/.test(rowText) ? "防衛省または全省庁統一資格等。公式公告を確認してください。" : null,
       source_url: primaryLink.url,
@@ -891,6 +892,7 @@ function pickFrameRowTitle(cells, links, rowText) {
 }
 
 function pickFrameRowDates(cells, rowText, yearContext) {
+  const safeDeadline = pickSafeParticipationDeadline(`${rowText} ${cells.join(" ")}`, yearContext);
   const orderedDates = [];
   for (const cell of cells) {
     for (const date of parseDates(cell, yearContext)) {
@@ -900,7 +902,7 @@ function pickFrameRowDates(cells, rowText, yearContext) {
 
   if (orderedDates.length >= 2) {
     return {
-      bid_at: orderedDates[orderedDates.length - 2] ?? null,
+      bid_at: safeDeadline,
       published_at: orderedDates[orderedDates.length - 1] ?? null
     };
   }
@@ -908,7 +910,7 @@ function pickFrameRowDates(cells, rowText, yearContext) {
   const dates = parseDates(rowText, yearContext);
   return {
     published_at: orderedDates[0] ?? dates[0] ?? null,
-    bid_at: dates.find((date) => date !== (orderedDates[0] ?? dates[0])) ?? null
+    bid_at: safeDeadline
   };
 }
 
@@ -917,6 +919,7 @@ function candidateFromText(text, links, sourceInfo, pageUrl, yearContext) {
   if (!isQualityTenderTitle(title, text) || isExcluded(title)) return null;
   const classification = classify(title + " " + text);
   const dates = parseDates(text, yearContext);
+  const safeDeadline = pickSafeParticipationDeadline(text, yearContext);
   const primaryLink = links.find((link) => link.file_type !== "unknown") ?? links[0] ?? { url: pageUrl, file_type: "html", text: title, source_text: text };
   const titleHasHtmlCandidateWord = HTML_CANDIDATE_KEYWORDS.some((keyword) => title.includes(keyword));
   if (!dates.length && LISTING_OR_NOTICE_WORDS.some((word) => title.includes(word))) return null;
@@ -942,8 +945,8 @@ function candidateFromText(text, links, sourceInfo, pageUrl, yearContext) {
     prefecture: sourceInfo.prefecture ?? prefectureFromText(text + pageUrl, "未設定"),
     base_location: sourceInfo.prefecture ?? sourceInfo.region ?? null,
     published_at: dates[0] ?? null,
-    deadline_at: dates[1] ?? null,
-    bid_at: dates[1] ?? null,
+    deadline_at: safeDeadline,
+    bid_at: safeDeadline,
     qualification_required: /全省庁統一資格|競争参加資格|資格審査|防衛省競争参加資格/.test(text),
     required_qualification: /全省庁統一資格|競争参加資格|資格審査|防衛省競争参加資格/.test(text) ? "防衛省または全省庁統一資格等。公式公告を確認してください。" : null,
     source_url: primaryLink.url,
@@ -1160,6 +1163,56 @@ function parseDates(text, contextYear) {
 
   return uniqueBy(dates, (date) => date).sort();
 }
+
+function pickSafeParticipationDeadline(text, contextYear) {
+  const normalized = cleanText(text);
+  if (!normalized) return null;
+  const contexts = deadlineContextWindows(normalized);
+  const candidates = [];
+  for (const context of contexts) {
+    if (FORBIDDEN_DEADLINE_CONTEXT.test(context)) continue;
+    for (const definition of SAFE_DEADLINE_LABELS) {
+      const index = context.indexOf(definition.label);
+      if (index < 0) continue;
+      const dates = parseDates(context.slice(index), contextYear);
+      for (const date of dates) {
+        candidates.push({ date, priority: definition.priority });
+      }
+    }
+  }
+  return candidates.sort((left, right) => right.priority - left.priority || String(right.date).localeCompare(String(left.date)))[0]?.date ?? null;
+}
+
+function deadlineContextWindows(text) {
+  const lines = text.split(/\n|。|；|;/).map((line) => cleanText(line)).filter(Boolean);
+  const contexts = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    contexts.push(lines[index]);
+    if (index + 1 < lines.length) contexts.push(`${lines[index]} ${lines[index + 1]}`);
+  }
+  return contexts.filter((context) => /\d|令和|平成|R\s*\d/i.test(context));
+}
+
+const SAFE_DEADLINE_LABELS = [
+  { label: "競争参加資格確認申請書提出期限", priority: 400 },
+  { label: "競争参加資格確認資料提出期限", priority: 400 },
+  { label: "競争参加資格確認申請期限", priority: 395 },
+  { label: "参加資格確認申請書提出期限", priority: 390 },
+  { label: "参加申請期限", priority: 380 },
+  { label: "参加表明書提出期限", priority: 380 },
+  { label: "入札書提出期限", priority: 330 },
+  { label: "見積書提出期限", priority: 330 },
+  { label: "見積提出期限", priority: 325 },
+  { label: "企画提案書提出期限", priority: 320 },
+  { label: "提案書提出期限", priority: 315 },
+  { label: "応募締切", priority: 300 },
+  { label: "申込期限", priority: 295 },
+  { label: "申込み期限", priority: 295 },
+  { label: "受付期限", priority: 285 },
+  { label: "提出期限", priority: 260 }
+];
+
+const FORBIDDEN_DEADLINE_CONTEXT = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切/;
 
 function yearContextFrom(text) {
   const reiwa = text.match(/R\s*(\d{1,2})|令和\s*(\d{1,2})/i);

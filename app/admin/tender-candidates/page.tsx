@@ -249,6 +249,9 @@ function CandidateReview({ candidate }: { candidate: TenderCandidate }) {
               <p><span className="font-black text-slate-900">期限判定理由:</span> {deadline.reason ?? "-"}</p>
               <p className="mt-1"><span className="font-black text-rose-700">期限抽出失敗理由:</span> {deadline.failureReason ?? "-"}</p>
               <p className="mt-1"><span className="font-black text-slate-700">推定:</span> {deadline.isEstimated ? "年推定あり" : "なし"}</p>
+              <p className="mt-1"><span className="font-black text-slate-700">判定種別:</span> {deadline.kind ?? "-"}</p>
+              <p className="mt-1"><span className="font-black text-slate-700">信頼度:</span> {deadline.confidence ?? "-"}</p>
+              <p className="mt-1"><span className="font-black text-slate-700">根拠文言:</span> {deadline.evidence ?? "-"}</p>
             </div>
           </div>
         </div>

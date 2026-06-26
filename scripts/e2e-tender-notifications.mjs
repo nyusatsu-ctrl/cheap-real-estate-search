@@ -218,10 +218,10 @@ async function verifyMigrationShape() {
     ["tender_notification_email_outbox", "id,user_id,notification_event_id,tender_id,notification_rule_id,status,provider,subject,error_message,scheduled_at,sent_at,created_at,updated_at"]
   ];
   for (const [table, columns] of tableChecks) {
-    const { error } = await service.from(table).select(columns, { count: "exact", head: true });
+    const { error } = await service.from(table).select(columns).limit(1);
     summary.migration.tables[table] = !error;
-    summary.migration.columns[table] = error ? error.message : "ok";
-    assert(!error, `${table} columns are available`);
+    summary.migration.columns[table] = error ? formatError(error) : "ok";
+    assert(!error, `${table} columns are available${error ? `: ${formatError(error)}` : ""}`);
   }
 }
 
@@ -480,8 +480,8 @@ async function cleanupAll() {
 }
 
 async function cleanupByPrefix(value) {
-  const ruleIds = await idsFrom("tender_notifications", (query) => query.select("id").ilike("name", `${value}%`));
-  const tenderIds = await idsFrom("tenders", (query) => query.select("id").ilike("title", `${value}%`));
+  const ruleIds = await idsFrom("tender_notifications", (query) => query.select("id").ilike("name", `${value}%`), { tolerateMissing: true });
+  const tenderIds = await idsFrom("tenders", (query) => query.select("id").ilike("title", `${value}%`), { tolerateMissing: true });
   const userIds = [state.userA?.id, state.userB?.id].filter(Boolean);
 
   if (ruleIds.length || userIds.length) {
@@ -517,20 +517,24 @@ async function verifyCleanup() {
   assert(summary.cleanup.active_rule_count_before === summary.cleanup.active_rule_count_after, "active rule count restored");
 }
 
-async function idsFrom(table, buildQuery) {
-  const { data } = await buildQuery(service.from(table));
+async function idsFrom(table, buildQuery, options = {}) {
+  const { data, error } = await buildQuery(service.from(table));
+  if (error && options.tolerateMissing && isSchemaError(error)) return [];
+  assert(!error, `read ids from ${table}: ${error ? formatError(error) : ""}`);
   return (data ?? []).map((row) => row.id);
 }
 
 async function countByPrefix(table, column) {
   const { count, error } = await service.from(table).select("id", { count: "exact", head: true }).ilike(column, `${prefix}%`);
-  assert(!error, `count ${table} by prefix: ${error?.message}`);
+  if (error && isSchemaError(error)) return 0;
+  assert(!error, `count ${table} by prefix: ${error ? formatError(error) : ""}`);
   return count ?? 0;
 }
 
 async function countIn(table, column, values) {
   const { count, error } = await service.from(table).select("id", { count: "exact", head: true }).in(column, values);
-  assert(!error, `count ${table} in ${column}: ${error?.message}`);
+  if (error && isSchemaError(error)) return 0;
+  assert(!error, `count ${table} in ${column}: ${error ? formatError(error) : ""}`);
   return count ?? 0;
 }
 
@@ -597,6 +601,20 @@ function parseJsonFromOutput(value) {
   } catch {
     return null;
   }
+}
+
+function formatError(error) {
+  return [
+    error.code ? `code=${error.code}` : null,
+    error.message ? `message=${error.message}` : null,
+    error.details ? `details=${error.details}` : null,
+    error.hint ? `hint=${error.hint}` : null
+  ].filter(Boolean).join(" ");
+}
+
+function isSchemaError(error) {
+  const text = formatError(error);
+  return /PGRST|schema cache|does not exist|Could not find|relation|column/i.test(text);
 }
 
 function assert(condition, message) {

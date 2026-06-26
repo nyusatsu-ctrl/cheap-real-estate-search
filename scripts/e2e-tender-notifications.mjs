@@ -105,7 +105,7 @@ async function main() {
 
   const rule = await createRuleAsOwner(owner, tender, {
     name: `${prefix}_MAIN`,
-    keyword: tender.title,
+    keyword: matchKeywordForTender(tender),
     email_enabled: true,
     is_active: true
   });
@@ -173,8 +173,8 @@ async function main() {
 
   const excludeRule = await createRuleAsOwner(owner, tender, {
     name: `${prefix}_EXCLUDE`,
-    keyword: tender.title,
-    exclude_keyword: tender.title,
+    keyword: matchKeywordForTender(tender),
+    exclude_keyword: matchKeywordForTender(tender),
     email_enabled: false,
     is_active: true
   });
@@ -268,14 +268,14 @@ async function createRuleAsOwner(client, tender, overrides) {
     name: overrides.name,
     keyword: overrides.keyword,
     exclude_keyword: overrides.exclude_keyword ?? null,
-    agency_name: tender.agency_name,
-    region: tender.region,
-    prefecture: tender.prefecture,
-    tender_type: tender.tender_type,
-    participation_condition: tender.qualification_required ? "other_conditions" : "not_required",
-    defense_only: Boolean(tender.is_defense),
-    open_counter_only: tender.tender_type === "open_counter",
-    qualification_required_only: false,
+    agency_name: overrides.agency_name ?? null,
+    region: overrides.region ?? null,
+    prefecture: overrides.prefecture ?? null,
+    tender_type: overrides.tender_type ?? null,
+    participation_condition: overrides.participation_condition ?? null,
+    defense_only: Boolean(overrides.defense_only),
+    open_counter_only: Boolean(overrides.open_counter_only),
+    qualification_required_only: Boolean(overrides.qualification_required_only),
     deadline_soon_only: false,
     min_days_until_deadline: 0,
     include_unknown_deadline: true,
@@ -573,6 +573,15 @@ function isQualityNg(tender) {
     /様式|書式|記入例|リンク集|サイトマップ|お知らせ|説明|案内図/,
     /^(?:公表|掲載|案内|一覧)$/
   ].some((pattern) => pattern.test(title));
+}
+
+function matchKeywordForTender(tender) {
+  const text = String(tender.title ?? "").trim();
+  const keywords = text
+    .split(/[\s,、・･（）()「」【】［］\[\]／/]+/)
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 3);
+  return keywords[0] ?? text;
 }
 
 function normalizeIso(value) {

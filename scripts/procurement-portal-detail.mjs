@@ -29,40 +29,76 @@ export function classifyPortalUrl(value) {
 
 export async function fetchPortalDetailHtml(detailUrl, options = {}) {
   const timeoutMs = options.timeoutMs ?? 9000;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(detailUrl, {
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        "user-agent": "EcoLoopProcurementPortalDetailParser/1.0",
-        accept: "text/html,application/xhtml+xml",
-        ...(options.referer ? { referer: options.referer } : {})
-      }
-    });
-    const html = await response.text();
-    if (!response.ok) {
-      return {
+  const retries = Math.max(0, Number(options.retries ?? 0));
+  let lastResult = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(detailUrl, {
+        redirect: "follow",
+        signal: controller.signal,
+        headers: {
+          "user-agent": "EcoLoopProcurementPortalDetailParser/1.0",
+          accept: "text/html,application/xhtml+xml",
+          ...(options.referer ? { referer: options.referer } : {})
+        }
+      });
+      const html = await response.text();
+      if (response.ok) return { ok: true, status: response.status, url: response.url, html, error: null, attempts: attempt + 1 };
+      lastResult = {
         ok: false,
         status: response.status,
         url: response.url,
         html,
-        error: `HTTP ${response.status}`
+        error: `HTTP ${response.status}`,
+        attempts: attempt + 1
       };
+      if (!shouldRetryStatus(response.status) || attempt >= retries) {
+        return lastResult;
+      }
+    } catch (error) {
+      lastResult = {
+        ok: false,
+        status: null,
+        url: detailUrl,
+        html: "",
+        error: error?.name === "AbortError" ? `timeout_${timeoutMs}ms` : error instanceof Error ? error.message : String(error),
+        attempts: attempt + 1
+      };
+      if (attempt >= retries) {
+        return lastResult;
+      }
+    } finally {
+      clearTimeout(timeout);
     }
-    return { ok: true, status: response.status, url: response.url, html, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null,
-      url: detailUrl,
-      html: "",
-      error: error?.name === "AbortError" ? `timeout_${timeoutMs}ms` : error instanceof Error ? error.message : String(error)
-    };
-  } finally {
-    clearTimeout(timeout);
+    await sleep(Math.min(5000, 800 * 2 ** attempt));
   }
+  return lastResult ?? {
+    ok: false,
+    status: null,
+    url: detailUrl,
+    html: "",
+    error: "fetch_failed",
+    attempts: retries + 1
+  };
+}
+
+function shouldRetryStatus(status) {
+  return status === 409 || status === 429 || status >= 500;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function sourceAvailabilityFromPublicEnd(publicEndAt, now = new Date()) {
+  const publicEnd = dateOnly(publicEndAt);
+  if (!publicEnd) {
+    return { status: "source_unknown", publicEnd: null };
+  }
+  const today = dateOnly(now.toISOString());
+  return { status: publicEnd < today ? "source_closed" : "source_open", publicEnd };
 }
 
 export function parsePortalDetailHtml(html, detailUrl) {

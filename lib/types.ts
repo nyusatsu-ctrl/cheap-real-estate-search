@@ -314,7 +314,7 @@ export type TenderFilters = {
   prefecture?: string;
   tenderType?: TenderType;
   qualification?: "not_required" | "unified_qualification" | "area_specified" | "other_conditions";
-  deadlineStatus?: "available" | "closing_soon" | "unknown" | "expired" | "all";
+  deadlineStatus?: "available" | "closing_soon" | "unknown" | "source_closed" | "expired" | "all";
   defenseOnly?: boolean;
   openCounterOnly?: boolean;
   keyword?: string;

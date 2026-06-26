@@ -6,7 +6,7 @@ import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAc
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
-import { assessTenderDeadline } from "@/lib/tender-deadlines";
+import { assessTenderDeadline, assessTenderSourceAvailability } from "@/lib/tender-deadlines";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import type { Tender, TenderCandidate, TenderCrawlLog, TenderSource } from "@/lib/types";
@@ -97,6 +97,9 @@ export default async function DefenseCrawlPage() {
         <Metric label="closing_soon件数" value={deadlineMetrics.closingSoon} />
         <Metric label="expired件数" value={deadlineMetrics.expired} />
         <Metric label="unknown件数" value={deadlineMetrics.unknown} />
+        <Metric label="公式ページ掲載中" value={deadlineMetrics.sourceOpen} />
+        <Metric label="公式ページ掲載終了" value={deadlineMetrics.sourceClosed} />
+        <Metric label="掲載状態不明" value={deadlineMetrics.sourceUnknown} />
         <Metric label="直近7日取得件数" value={deadlineMetrics.recent7Days} />
         <Metric label="候補件数" value={candidates.length} />
         <Metric label="陸上自衛隊 取得元数" value={counts.ground_self_defense_force} />
@@ -225,6 +228,7 @@ export default async function DefenseCrawlPage() {
                       <td className="px-3 py-3 text-slate-700">
                         <p>期限あり: {deadline.known}</p>
                         <p>unknown: {deadline.unknown}</p>
+                        <p className="text-xs text-slate-500">掲載中: {deadline.sourceOpen} / 終了: {deadline.sourceClosed}</p>
                         <p className="text-xs font-bold text-slate-500">取得率: {rate}%</p>
                         <p className="mt-1 text-xs text-slate-500">最終期限更新: {deadline.lastDeadlineUpdatedAt ? formatDateTime(deadline.lastDeadlineUpdatedAt) : "-"}</p>
                       </td>
@@ -433,17 +437,24 @@ function countDeadlineMetrics(tenders: Tender[]) {
     expired: 0,
     unknown: 0,
     archived: 0,
+    sourceOpen: 0,
+    sourceClosed: 0,
+    sourceUnknown: 0,
     recent7Days: 0,
     defensePublished: 0
   };
 
   for (const tender of tenders) {
     const deadline = assessTenderDeadline(tender, now);
+    const availability = assessTenderSourceAvailability(tender, now);
     if (deadline.status === "active") counts.active += 1;
     if (deadline.status === "closing_soon") counts.closingSoon += 1;
     if (deadline.status === "expired") counts.expired += 1;
     if (deadline.status === "unknown") counts.unknown += 1;
     if (deadline.status === "archived") counts.archived += 1;
+    if (availability.status === "source_open") counts.sourceOpen += 1;
+    if (availability.status === "source_closed") counts.sourceClosed += 1;
+    if (availability.status === "source_unknown") counts.sourceUnknown += 1;
     if (isDefenseLike(tender)) counts.defensePublished += 1;
 
     const fetchedAt = new Date(tender.fetched_at ?? tender.created_at ?? 0).getTime();
@@ -461,12 +472,16 @@ function countDeadlineMetricsBySource(tenders: Tender[]) {
     const key = tenderSourceKey(tender);
     const current = map.get(key) ?? emptySourceDeadlineMetric();
     const deadline = assessTenderDeadline(tender, now);
+    const availability = assessTenderSourceAvailability(tender, now);
     current.published += 1;
     if (deadline.status === "unknown") current.unknown += 1;
     else current.known += 1;
     if (deadline.status === "active") current.active += 1;
     if (deadline.status === "closing_soon") current.closingSoon += 1;
     if (deadline.status === "expired") current.expired += 1;
+    if (availability.status === "source_open") current.sourceOpen += 1;
+    if (availability.status === "source_closed") current.sourceClosed += 1;
+    if (availability.status === "source_unknown") current.sourceUnknown += 1;
     if ((tender.deadline_at || tender.bid_at) && newerThan(current.lastDeadlineUpdatedAt, tender.updated_at)) {
       current.lastDeadlineUpdatedAt = tender.updated_at;
     }
@@ -484,6 +499,9 @@ function emptySourceDeadlineMetric(): SourceDeadlineMetric {
     active: 0,
     closingSoon: 0,
     expired: 0,
+    sourceOpen: 0,
+    sourceClosed: 0,
+    sourceUnknown: 0,
     lastDeadlineUpdatedAt: null
   };
 }
@@ -509,6 +527,9 @@ type SourceDeadlineMetric = {
   active: number;
   closingSoon: number;
   expired: number;
+  sourceOpen: number;
+  sourceClosed: number;
+  sourceUnknown: number;
   lastDeadlineUpdatedAt: string | null;
 };
 

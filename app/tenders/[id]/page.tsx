@@ -6,7 +6,7 @@ import { saveFavoriteTenderAction } from "@/app/tenders/actions";
 import { FAVORITE_TENDER_STATUS_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { getSimilarPastAwardResults, summarizePastAwards } from "@/lib/past-awards";
-import { assessTenderDeadline, deadlineStatusBadgeClass } from "@/lib/tender-deadlines";
+import { assessTenderDeadline, assessTenderSourceAvailability, deadlineStatusBadgeClass, sourceAvailabilityBadgeClass, sourceAvailabilityLabel } from "@/lib/tender-deadlines";
 import { canUseMemberFeatures, getPublishedTender } from "@/lib/tenders";
 import { getCurrentMember } from "@/lib/user";
 import type { SimilarPastAwardResult } from "@/lib/types";
@@ -55,6 +55,7 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
   const similarAwards = await getSimilarPastAwardResults(tender, 10);
   const similarAwardStats = summarizePastAwards(similarAwards);
   const deadline = assessTenderDeadline(tender);
+  const availability = assessTenderSourceAvailability(tender);
   const portalPublicEndDate = extractPortalPublicEndDate(tender.detail_memo);
   const detailRows = [
     ["案件区分", TENDER_TYPE_LABELS[tender.tender_type]],
@@ -66,8 +67,9 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
     ["公告日", formatDate(tender.published_at)],
     ["参加申請・証明書期限", formatDate(tender.deadline_at)],
     ["入札書・見積書提出期限", formatDate(tender.bid_at)],
-    ["締切日", deadline.deadlineAt ? formatDate(deadline.deadlineAt) : "期限不明"],
+    ["期限判定日", deadline.deadlineAt ? formatDate(deadline.deadlineAt) : "期限不明"],
     ...(portalPublicEndDate ? [["調達ポータル公開終了日", portalPublicEndDate]] : []),
+    ["公式ページ掲載状態", sourceAvailabilityLabel(availability, deadline.status)],
     ["期限ステータス", deadline.label],
     ["期限判定元", deadline.source ?? "-"],
     ["期限判定理由", deadline.reason ?? deadline.failureReason ?? "-"],
@@ -90,6 +92,7 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
           <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{TENDER_TYPE_LABELS[tender.tender_type]}</span>
           {tender.is_new ? <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">新着</span> : null}
           <span className={`rounded px-2 py-1 text-xs font-bold ${deadlineStatusBadgeClass(deadline.status)}`}>{deadline.label}</span>
+          <span className={`rounded px-2 py-1 text-xs font-bold ${sourceAvailabilityBadgeClass(availability.status)}`}>{sourceAvailabilityLabel(availability, deadline.status)}</span>
           {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-1 text-xs font-bold text-white">防衛省・自衛隊系</span> : null}
           {tender.is_admin_verified ? <span className="rounded bg-brand-100 px-2 py-1 text-xs font-bold text-brand-700">管理者確認済み</span> : null}
         </div>

@@ -49,12 +49,13 @@ export function TenderSearchFilters(props: Props) {
           label="期限"
           defaultValue={props.deadlineStatus ?? ""}
           options={[
-            ["", "参加可能・期限不明"],
-            ["available", "参加可能のみ"],
+            ["", "通常表示"],
+            ["available", "受付中と思われる案件"],
             ["closing_soon", "締切間近"],
             ["unknown", "期限不明"],
-            ["all", "期限切れも表示"],
-            ["expired", "期限切れのみ"]
+            ["source_closed", "掲載終了も表示"],
+            ["expired", "期限切れも表示"],
+            ["all", "すべて表示"]
           ]}
         />
         <Select

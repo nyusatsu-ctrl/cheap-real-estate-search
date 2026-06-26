@@ -51,7 +51,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
       <TenderSearchFilters {...params} />
       <div className="mt-5 flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-700">{tenders.length}件</p>
-        <p className="text-xs text-slate-500">期限切れは通常非表示です。期限不明の案件は公式公告で必ず締切を確認してください。</p>
+        <p className="text-xs text-slate-500">期限切れ・公式ページ掲載終了は通常非表示です。期限不明の案件は公式公告で必ず締切を確認してください。</p>
       </div>
       <p className="mt-2 text-xs text-slate-500">掲載情報は公式情報をもとにした案件候補です。参加前に必ず公式公告・仕様書・参加条件をご確認ください。</p>
       <div className="mt-4">

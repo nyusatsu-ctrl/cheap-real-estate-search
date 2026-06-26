@@ -1,0 +1,55 @@
+name: Procurement portal source availability parser
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry_run or apply"
+        required: true
+        default: "dry_run"
+        type: choice
+        options:
+          - dry_run
+          - apply
+      limit:
+        description: "Maximum published tenders to inspect"
+        required: true
+        default: "5000"
+      sample:
+        description: "Sample rows per group"
+        required: true
+        default: "10"
+      concurrency:
+        description: "Detail page fetch concurrency"
+        required: true
+        default: "4"
+      fetch_timeout_ms:
+        description: "Per-detail fetch timeout in milliseconds"
+        required: true
+        default: "9000"
+
+jobs:
+  portal-availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Parse procurement portal source availability
+        run: npm run portal:tender-availability -- --mode=${{ inputs.mode }} --limit=${{ inputs.limit }} --sample=${{ inputs.sample }} --concurrency=${{ inputs.concurrency }} --fetch-timeout-ms=${{ inputs.fetch_timeout_ms }}
+
+      - name: Tender DB summary
+        if: always()
+        run: node scripts/tender-db-summary.mjs

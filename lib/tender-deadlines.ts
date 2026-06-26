@@ -1,4 +1,5 @@
 export type TenderDeadlineStatus = "active" | "closing_soon" | "expired" | "unknown" | "archived";
+export type TenderSourceAvailabilityStatus = "source_open" | "source_closed" | "source_unknown";
 
 export type TenderDeadlineAssessment = {
   status: TenderDeadlineStatus;
@@ -13,6 +14,13 @@ export type TenderDeadlineAssessment = {
   confidence: "high" | "medium" | "low" | null;
   kind: string | null;
   evidence: string | null;
+};
+
+export type TenderSourceAvailabilityAssessment = {
+  status: TenderSourceAvailabilityStatus;
+  sourcePublishedUntil: string | null;
+  label: string;
+  reason: string | null;
 };
 
 type TenderDeadlineInput = {
@@ -211,9 +219,54 @@ export function deadlineStatusSortPriority(status: TenderDeadlineStatus) {
   return 4;
 }
 
+export function assessTenderSourceAvailability(input: TenderDeadlineInput, now: Date = new Date()): TenderSourceAvailabilityAssessment {
+  const sourcePublishedUntil = extractSourcePublishedUntil(input.detail_memo);
+  if (!sourcePublishedUntil) {
+    return {
+      status: "source_unknown",
+      sourcePublishedUntil: null,
+      label: "掲載状態不明",
+      reason: "公式ページの公開終了日を確認できませんでした。"
+    };
+  }
+
+  const status: TenderSourceAvailabilityStatus = sourcePublishedUntil < jstDateOnly(now) ? "source_closed" : "source_open";
+  return {
+    status,
+    sourcePublishedUntil,
+    label: status === "source_closed" ? "公式ページ掲載終了" : "公式ページ掲載中",
+    reason: `調達ポータル公開終了日: ${sourcePublishedUntil}`
+  };
+}
+
+export function sourceAvailabilityLabel(availability: TenderSourceAvailabilityAssessment, deadlineStatus: TenderDeadlineStatus) {
+  if (availability.status === "source_open" && deadlineStatus === "unknown") return "公式ページ掲載中・締切要確認";
+  return availability.label;
+}
+
+export function sourceAvailabilityBadgeClass(status: TenderSourceAvailabilityStatus) {
+  if (status === "source_open") return "bg-cyan-100 text-cyan-800";
+  if (status === "source_closed") return "bg-zinc-200 text-zinc-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+export function tenderDisplaySortPriority(deadlineStatus: TenderDeadlineStatus, sourceStatus: TenderSourceAvailabilityStatus) {
+  if (sourceStatus === "source_closed") return 5;
+  if (deadlineStatus === "closing_soon") return 0;
+  if (deadlineStatus === "active") return 1;
+  if (deadlineStatus === "unknown" && sourceStatus === "source_open") return 2;
+  if (deadlineStatus === "unknown" && sourceStatus === "source_unknown") return 3;
+  if (deadlineStatus === "expired") return 4;
+  return 6;
+}
+
 export function dateOnly(value?: string | null) {
   const iso = normalizeIso(value);
   return iso ? iso.slice(0, 10) : null;
+}
+
+export function extractSourcePublishedUntil(value?: string | null) {
+  return String(value ?? "").match(/調達ポータル公開終了日=(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
 }
 
 function labeledDateCandidates(text: string, referenceDate: string | null) {
@@ -365,6 +418,11 @@ function daysUntilDate(value: string, now: Date) {
 function jstDateOnlyTimestamp(date: Date) {
   const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
   return Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate());
+}
+
+function jstDateOnly(date: Date) {
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}-${String(jst.getUTCDate()).padStart(2, "0")}`;
 }
 
 function allIndexes(text: string, search: string) {

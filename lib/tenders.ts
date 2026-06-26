@@ -3,7 +3,7 @@ import path from "node:path";
 import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient, getTenderSupabaseConfigStatus } from "@/lib/supabase/tenders-server";
 import { DEFENSE_ORGANIZATION_TYPES, isDefenseLike, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
 import { isHighConfidenceTenderCandidate, isPublishableTenderRecord } from "@/lib/tender-candidate-quality";
-import { assessTenderDeadline, deadlineStatusSortPriority } from "@/lib/tender-deadlines";
+import { assessTenderDeadline, assessTenderSourceAvailability, tenderDisplaySortPriority } from "@/lib/tender-deadlines";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
 import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
@@ -699,7 +699,8 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
   const filtered = tenders.filter((tender) => {
     const normalized = normalizeDefenseTender(tender);
     const deadline = assessTenderDeadline(normalized);
-    if (!matchesDeadlineStatus(deadline.status, filters.deadlineStatus)) return false;
+    const availability = assessTenderSourceAvailability(normalized);
+    if (!matchesDeadlineStatus(deadline.status, availability.status, filters.deadlineStatus)) return false;
     if (filters.region && filters.region !== "全国" && tenderRegion(normalized) !== filters.region) return false;
     if (filters.prefecture && tender.prefecture !== filters.prefecture) return false;
     if (filters.tenderType && tender.tender_type !== filters.tenderType) return false;
@@ -716,22 +717,24 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
   return [...filtered].sort((a, b) => {
     const aDeadline = assessTenderDeadline(a);
     const bDeadline = assessTenderDeadline(b);
+    const aAvailability = assessTenderSourceAvailability(a);
+    const bAvailability = assessTenderSourceAvailability(b);
     if (filters.sort === "deadline") {
-      return deadlineStatusSortPriority(aDeadline.status) - deadlineStatusSortPriority(bDeadline.status)
+      return tenderDisplaySortPriority(aDeadline.status, aAvailability.status) - tenderDisplaySortPriority(bDeadline.status, bAvailability.status)
         || new Date(aDeadline.deadlineAt ?? "9999-12-31").getTime() - new Date(bDeadline.deadlineAt ?? "9999-12-31").getTime()
         || compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
     }
     if (filters.sort === "new") {
       return compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
     }
-    return deadlineStatusSortPriority(aDeadline.status) - deadlineStatusSortPriority(bDeadline.status)
+    return tenderDisplaySortPriority(aDeadline.status, aAvailability.status) - tenderDisplaySortPriority(bDeadline.status, bAvailability.status)
       || compareDeadlineAsc(aDeadline.deadlineAt, bDeadline.deadlineAt)
       || compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
   });
 }
 
 function normalizeDeadlineStatus(value: string | undefined): TenderFilters["deadlineStatus"] {
-  if (value === "available" || value === "closing_soon" || value === "unknown" || value === "expired" || value === "all") {
+  if (value === "available" || value === "closing_soon" || value === "unknown" || value === "source_closed" || value === "expired" || value === "all") {
     return value;
   }
   return undefined;
@@ -742,11 +745,18 @@ function normalizeTenderSort(value: string | undefined): NonNullable<TenderFilte
   return "recommended";
 }
 
-function matchesDeadlineStatus(status: ReturnType<typeof assessTenderDeadline>["status"], filter: TenderFilters["deadlineStatus"]) {
+function matchesDeadlineStatus(
+  status: ReturnType<typeof assessTenderDeadline>["status"],
+  sourceStatus: ReturnType<typeof assessTenderSourceAvailability>["status"],
+  filter: TenderFilters["deadlineStatus"]
+) {
   if (status === "archived") return false;
-  if (!filter) return status !== "expired";
+  if (!filter) return status !== "expired" && sourceStatus !== "source_closed";
   if (filter === "all") return true;
-  if (filter === "available") return status === "active" || status === "closing_soon";
+  if (filter === "available") return sourceStatus !== "source_closed" && (status === "active" || status === "closing_soon" || (status === "unknown" && sourceStatus === "source_open"));
+  if (filter === "source_closed") return status !== "expired" && (sourceStatus === "source_closed" || sourceStatus === "source_open" || sourceStatus === "source_unknown");
+  if (filter === "expired") return sourceStatus !== "source_closed";
+  if (filter === "unknown") return status === "unknown" && sourceStatus !== "source_closed";
   return status === filter;
 }
 

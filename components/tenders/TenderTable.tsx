@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ExternalLink, Star } from "lucide-react";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import { assessTenderDeadline, deadlineStatusBadgeClass } from "@/lib/tender-deadlines";
+import { assessTenderDeadline, assessTenderSourceAvailability, deadlineStatusBadgeClass, sourceAvailabilityBadgeClass, sourceAvailabilityLabel } from "@/lib/tender-deadlines";
 import type { Tender } from "@/lib/types";
 
 export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]; restricted?: boolean }) {
@@ -17,7 +17,7 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
               <th className="px-3 py-3">案件区分</th>
               <th className="px-3 py-3">地域</th>
               <th className="px-3 py-3">公告日</th>
-              <th className="px-3 py-3">締切</th>
+              <th className="px-3 py-3">入札/参加期限</th>
               <th className="px-3 py-3">参加条件</th>
               <th className="px-3 py-3">操作</th>
             </tr>
@@ -25,14 +25,16 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
           <tbody className="divide-y divide-slate-200">
             {tenders.map((tender) => {
               const deadline = assessTenderDeadline(tender);
+              const availability = assessTenderSourceAvailability(tender);
               return (
-              <tr key={tender.id} className={deadline.status === "closing_soon" ? "bg-amber-50/70" : undefined}>
+              <tr key={tender.id} className={deadline.status === "closing_soon" ? "bg-amber-50/70" : availability.status === "source_closed" ? "bg-zinc-50" : undefined}>
                 <td className="min-w-72 px-3 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     {tender.is_new ? <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">新着</span> : null}
                     {deadline.status === "closing_soon" ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">締切間近</span> : null}
                     {deadline.status === "unknown" ? <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-800">期限不明</span> : null}
                     {deadline.status === "expired" ? <span className="rounded bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">期限切れ</span> : null}
+                    {availability.status !== "source_unknown" ? <span className={`rounded px-2 py-0.5 text-xs font-bold ${sourceAvailabilityBadgeClass(availability.status)}`}>{sourceAvailabilityLabel(availability, deadline.status)}</span> : null}
                     {tender.is_defense ? <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">防衛省・自衛隊系</span> : null}
                     {tender.tender_type === "open_counter" ? <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">オープンカウンター</span> : null}
                     {tender.is_admin_verified ? <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">管理者確認済み</span> : null}
@@ -57,6 +59,10 @@ export function TenderTable({ tenders, restricted = false }: { tenders: Tender[]
                     <span className={`w-fit rounded px-2 py-0.5 text-xs font-bold ${deadlineStatusBadgeClass(deadline.status)}`}>
                       {deadline.label}
                     </span>
+                    <span className={`w-fit rounded px-2 py-0.5 text-xs font-bold ${sourceAvailabilityBadgeClass(availability.status)}`}>
+                      {sourceAvailabilityLabel(availability, deadline.status)}
+                    </span>
+                    {availability.sourcePublishedUntil ? <span className="text-xs font-semibold text-slate-500">公開終了 {availability.sourcePublishedUntil}</span> : null}
                     {deadline.isEstimated ? <span className="text-xs font-semibold text-slate-500">年推定</span> : null}
                   </div>
                 </td>

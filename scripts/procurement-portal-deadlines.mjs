@@ -175,7 +175,7 @@ async function analyzeTender(row) {
     return analysis;
   }
 
-  const fetched = await fetchPortalDetailHtml(detailUrl, { timeoutMs: fetchTimeoutMs, referer: row.source_url });
+  const fetched = await fetchPortalDetailHtml(detailUrl, { timeoutMs: fetchTimeoutMs, referer: row.source_url, retries: 3 });
   analysis.fetch = { ok: fetched.ok, status: fetched.status, error: fetched.error, finalUrl: fetched.url };
   if (!fetched.ok) {
     analysis.failureReason = "detail_fetch_failed";

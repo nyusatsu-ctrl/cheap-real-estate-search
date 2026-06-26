@@ -560,7 +560,11 @@ async function enrichPortalDetails(tenders) {
 
   await mapLimit(eligible, PORTAL_DETAIL_CONCURRENCY, async (tender) => {
     const detailUrl = normalizePortalDetailUrl(tender.source_url);
-    const fetched = await fetchPortalDetailHtml(detailUrl, { timeoutMs: PORTAL_DETAIL_FETCH_TIMEOUT_MS, referer: `${PORTAL_ORIGIN}${SEARCH_PATH}` });
+    const fetched = await fetchPortalDetailHtml(detailUrl, {
+      timeoutMs: PORTAL_DETAIL_FETCH_TIMEOUT_MS,
+      referer: `${PORTAL_ORIGIN}${SEARCH_PATH}`,
+      retries: 3
+    });
     if (!fetched.ok) {
       stats.failed += 1;
       return;
@@ -575,7 +579,6 @@ async function enrichPortalDetails(tenders) {
     if (parsed.certificateDeadline) stats.certificate_deadline_count += 1;
     if (parsed.bidDeadline) stats.bid_deadline_count += 1;
     if (parsed.publicEndOnly) stats.public_end_only_count += 1;
-    if (!parsed.certificateDeadline && !parsed.bidDeadline) return;
 
     tender.source_url = parsed.detailUrl;
     if (!tender.published_at && parsed.publicStartAt) tender.published_at = parsed.publicStartAt;

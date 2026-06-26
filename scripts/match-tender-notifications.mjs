@@ -10,6 +10,8 @@ const mode = argValue("--mode") ?? process.env.PIPELINE_MODE ?? "dry_run";
 const since = argValue("--since") ?? process.env.PIPELINE_STARTED_AT ?? hoursAgoIso(numberArg("--lookback-hours", 24));
 const limit = numberArg("--limit", 1000);
 const sampleSize = numberArg("--sample", 10);
+const targetTenderId = argValue("--tender-id");
+const shouldRecordLog = !process.argv.includes("--no-log");
 const startedAt = new Date().toISOString();
 
 if (!url || !serviceRoleKey) {
@@ -36,6 +38,7 @@ async function main() {
     email_outbox_pending_count: 0,
     error_count: 0,
     setup_required: false,
+    tender_id: targetTenderId ?? null,
     errors: [],
     samples: []
   };
@@ -60,7 +63,7 @@ async function main() {
   summary.active_rule_count = rules.length;
   summary.target_user_count = new Set(rules.map((rule) => rule.user_id)).size;
 
-  const tenders = await readNewPublishedTenders(since, limit);
+  const tenders = await readNewPublishedTenders(since, limit, targetTenderId);
   summary.eligible_tender_count = tenders.length;
 
   const matches = [];
@@ -159,14 +162,18 @@ async function readActiveRules() {
   };
 }
 
-async function readNewPublishedTenders(sinceIso, maxRows) {
-  const { data, error } = await supabase
+async function readNewPublishedTenders(sinceIso, maxRows, tenderId) {
+  let query = supabase
     .from("tenders")
     .select("*, tender_sources(name, url, source_name, organization_type, base_url)")
     .eq("status", "published")
-    .gte("created_at", sinceIso)
-    .order("created_at", { ascending: false })
-    .limit(maxRows);
+    .order("created_at", { ascending: false });
+
+  query = tenderId
+    ? query.eq("id", tenderId).limit(1)
+    : query.gte("created_at", sinceIso).limit(maxRows);
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`tenders: ${error.message}`);
   return (data ?? []).filter(isNotificationEligibleTender);
@@ -224,7 +231,7 @@ async function touchMatchedRules(insertedEvents) {
 }
 
 async function maybeRecordLog(summary) {
-  if (mode !== "apply") return;
+  if (mode !== "apply" || !shouldRecordLog) return;
   const { error } = await supabase.from("tender_crawl_logs").insert({
     source_id: null,
     started_at: summary.started_at,
@@ -505,6 +512,7 @@ main().catch(async (error) => {
     email_outbox_pending_count: 0,
     error_count: 1,
     setup_required: isSchemaError(error),
+    tender_id: targetTenderId ?? null,
     errors: [error.message],
     samples: []
   };

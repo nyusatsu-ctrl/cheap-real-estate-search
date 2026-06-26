@@ -1,0 +1,50 @@
+name: Tender notification E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry_run verifies schema shape only. apply runs temporary notification E2E and cleans up."
+        required: true
+        default: "dry_run"
+        type: choice
+        options:
+          - dry_run
+          - apply
+
+concurrency:
+  group: tender-notification-e2e
+  cancel-in-progress: false
+
+jobs:
+  tender-notification-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+      PRODUCTION_BASE_URL: https://cheap-real-estate-search.vercel.app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tender notification E2E
+        run: |
+          if [ "${{ inputs.mode }}" = "apply" ]; then
+            npm run e2e:tender-notifications -- --apply
+          else
+            npm run e2e:tender-notifications
+          fi

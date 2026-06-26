@@ -39,6 +39,7 @@
     "adapter:tender-deadlines": "node scripts/tender-deadline-source-adapters.mjs",
     "portal:tender-deadlines": "node scripts/procurement-portal-deadlines.mjs",
     "portal:tender-availability": "node scripts/procurement-portal-availability.mjs",
+    "summary:tender-pipeline": "node scripts/tender-pipeline-summary.mjs",
     "normalize:defense-tenders": "node scripts/normalize-defense-tenders.mjs",
     "gps:tcp": "node server/mv930g/tcp-server.mjs",
     "gps:test-send": "node server/mv930g/send-test.mjs"

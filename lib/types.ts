@@ -262,8 +262,10 @@ export type TenderCrawlLog = {
   status: TenderCrawlLogStatus;
   fetched_count: number;
   created_count: number;
+  updated_count?: number | null;
   duplicate_count: number;
   skipped_count: number;
+  error_count?: number | null;
   error_message: string | null;
   created_at: string;
   tender_sources?: Pick<TenderSource, "name" | "source_name" | "url"> | null;

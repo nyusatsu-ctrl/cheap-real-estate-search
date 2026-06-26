@@ -1,9 +1,7 @@
 name: Daily government tender crawler
 
 on:
-  schedule:
-    # 06:00 JST every day. GitHub Actions cron uses UTC.
-    - cron: "0 21 * * *"
+  # Daily scheduling moved to tender-pipeline-daily.yml to avoid duplicate DB updates.
   workflow_dispatch:
 
 concurrency:

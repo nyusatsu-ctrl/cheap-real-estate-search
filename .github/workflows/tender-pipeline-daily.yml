@@ -1,0 +1,203 @@
+name: Daily tender publishing pipeline
+
+on:
+  schedule:
+    # 05:00 JST every day. GitHub Actions cron uses UTC.
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry_run checks the pipeline without DB writes where supported. apply runs the daily production pipeline."
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - dry_run
+          - apply
+
+concurrency:
+  group: daily-tender-publishing-pipeline
+  cancel-in-progress: false
+
+jobs:
+  daily-tender-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+      TENDER_PORTAL_FETCH_TIMEOUT_MS: "15000"
+      TENDER_PORTAL_MAX_PAGES: "3"
+      TENDER_PORTAL_DETAIL_FETCH_TIMEOUT_MS: "9000"
+      TENDER_PORTAL_DETAIL_CONCURRENCY: "4"
+      TENDER_PORTAL_DETAIL_LIMIT: "300"
+      DEFENSE_CRAWLER_FETCH_TIMEOUT_MS: "8000"
+      DEFENSE_CRAWLER_DISABLE_PLAYWRIGHT: "1"
+      DEFENSE_CRAWLER_PLAYWRIGHT_TIMEOUT_MS: "15000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_MAX_WAIT_MS: "5000"
+      DEFENSE_CRAWLER_PLAYWRIGHT_TASK_TIMEOUT_MS: "15000"
+      DEFENSE_CRAWLER_SOURCE_TIMEOUT_MS: "30000"
+      DEFENSE_CRAWLER_TIME_BUDGET_MS: "480000"
+      DEFENSE_CRAWLER_MAX_SOURCES: "25"
+      DEFENSE_CRAWLER_FORCE_EXIT: "1"
+      PIPELINE_MODE: ${{ github.event_name == 'schedule' && 'apply' || inputs.mode }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capture pipeline start
+        id: pipeline_start
+        run: echo "PIPELINE_STARTED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
+      - name: Verify tender Supabase connection
+        id: verify_db
+        run: |
+          if [ -z "$TENDER_SUPABASE_URL" ] || [ -z "$TENDER_SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::TENDER_SUPABASE_URL and TENDER_SUPABASE_SERVICE_ROLE_KEY repository secrets are required."
+            exit 1
+          fi
+          node --input-type=module <<'NODE'
+          import { createClient } from "@supabase/supabase-js";
+          const url = process.env.TENDER_SUPABASE_URL;
+          const key = process.env.TENDER_SUPABASE_SERVICE_ROLE_KEY;
+          const projectRef = new URL(url).hostname.split(".")[0];
+          const supabase = createClient(url, key, { auth: { persistSession: false } });
+          const { error } = await supabase.from("tender_sources").select("id", { count: "exact", head: true });
+          if (error) {
+            console.error(`Tender DB connection failed: ${error.message}`);
+            process.exit(1);
+          }
+          console.log(`Tender DB connection OK: project_ref=${projectRef}`);
+          NODE
+
+      - name: Install PDF text extraction tools
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Crawl procurement portal tenders
+        id: crawl_portal
+        continue-on-error: true
+        timeout-minutes: 6
+        run: |
+          if [ "$PIPELINE_MODE" = "dry_run" ]; then
+            npm run crawl:tenders -- --limit=30 --no-db
+          else
+            npm run crawl:tenders -- --limit=300
+          fi
+
+      - name: Sync defense tender sources
+        id: discover_defense
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          if [ "$PIPELINE_MODE" = "dry_run" ]; then
+            npm run discover:defense -- --dry-run --max-sources=10
+          else
+            npm run discover:defense -- --max-sources=25
+          fi
+
+      - name: Crawl defense tender candidates
+        id: crawl_defense
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          if [ "$PIPELINE_MODE" = "dry_run" ]; then
+            npm run crawl:defense -- --dry-run --max-sources=5
+          else
+            npm run crawl:defense -- --max-sources=25
+          fi
+
+      - name: Classify and publish high-confidence candidates
+        id: classify_candidates
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          if [ "$PIPELINE_MODE" = "dry_run" ]; then
+            npm run classify:tender-candidates -- --limit=5000 --sample=10
+          else
+            npm run classify:tender-candidates -- --limit=5000 --sample=10 --commit
+          fi
+
+      - name: Parse procurement portal detail deadlines
+        id: portal_deadlines
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 20
+        run: npm run portal:tender-deadlines -- --mode="$PIPELINE_MODE" --limit=5000 --sample=10 --concurrency=4 --fetch-timeout-ms=9000
+
+      - name: Refetch unknown tender deadlines from HTML and PDF
+        id: refetch_deadlines
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 15
+        run: npm run refetch:tender-deadlines -- --mode="$PIPELINE_MODE" --limit=200 --sample=10 --max-links-per-tender=2
+
+      - name: Apply source-specific deadline adapters
+        id: source_deadline_adapters
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 20
+        run: npm run adapter:tender-deadlines -- --mode="$PIPELINE_MODE" --limit=500 --sample=10 --top-sources=20 --max-links-per-tender=4
+
+      - name: Classify tender deadline statuses
+        id: classify_deadlines
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 10
+        run: npm run classify:tender-deadlines -- --mode="$PIPELINE_MODE" --limit=5000 --sample=10
+
+      - name: Update procurement portal source availability
+        id: portal_availability
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 20
+        run: npm run portal:tender-availability -- --mode="$PIPELINE_MODE" --limit=5000 --sample=10 --concurrency=4 --fetch-timeout-ms=9000
+
+      - name: Summarize tender database
+        id: db_summary
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 2
+        run: node scripts/tender-db-summary.mjs
+
+      - name: Verify production tender URLs
+        id: http_check
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          for path in "/tenders" "/admin/tender-candidates?status=pending&page=1&perPage=50" "/admin/defense-crawl" "/properties" "/diagnosis?source=aidma"; do
+            status=$(curl -fsS -o /tmp/tender-pipeline-page.html -w "%{http_code}" "https://cheap-real-estate-search.vercel.app${path}")
+            echo "${path} -> HTTP ${status}"
+            if [ "$status" != "200" ]; then
+              exit 1
+            fi
+          done
+
+      - name: Record daily pipeline summary
+        id: pipeline_summary
+        if: always()
+        timeout-minutes: 5
+        env:
+          PIPELINE_STEP_STATUS_JSON: >-
+            {"crawl_portal":"${{ steps.crawl_portal.outcome }}","discover_defense":"${{ steps.discover_defense.outcome }}","crawl_defense":"${{ steps.crawl_defense.outcome }}","classify_candidates":"${{ steps.classify_candidates.outcome }}","portal_deadlines":"${{ steps.portal_deadlines.outcome }}","refetch_deadlines":"${{ steps.refetch_deadlines.outcome }}","source_deadline_adapters":"${{ steps.source_deadline_adapters.outcome }}","classify_deadlines":"${{ steps.classify_deadlines.outcome }}","portal_availability":"${{ steps.portal_availability.outcome }}","db_summary":"${{ steps.db_summary.outcome }}","http_check":"${{ steps.http_check.outcome }}"}
+        run: npm run summary:tender-pipeline -- --record --started-at="$PIPELINE_STARTED_AT" --mode="$PIPELINE_MODE"

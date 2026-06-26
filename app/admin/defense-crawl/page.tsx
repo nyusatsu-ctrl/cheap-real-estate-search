@@ -53,6 +53,8 @@ export default async function DefenseCrawlPage() {
   const counts = countSources(sources);
   const crawlReadyCount = sources.filter((source) => source.is_active && source.crawl_ready && source.crawler_type !== "manual_only").length;
   const latestLog = crawlLogs[0] ?? dbDiagnostics?.latestLog ?? null;
+  const pipelineLog = crawlLogs.find(isDailyPipelineLog) ?? null;
+  const pipelineSummary = parseDailyPipelineSummary(pipelineLog?.error_message);
   const sourceErrors = sources.filter((source) => source.last_error_message);
   const crawlErrors = crawlSummary?.errors ?? [];
   const errors = [...sourceErrors.map((source) => ({
@@ -87,6 +89,10 @@ export default async function DefenseCrawlPage() {
 
       {admin && dbDiagnostics ? (
         <TenderDatabaseStatus diagnostics={dbDiagnostics} displayedPublishedCount={publishedTenders.length} displayedCandidateCount={candidates.length} />
+      ) : null}
+
+      {admin ? (
+        <DailyPipelineStatus log={pipelineLog} summary={pipelineSummary} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -359,6 +365,63 @@ function TenderDatabaseStatus({
   );
 }
 
+function DailyPipelineStatus({
+  log,
+  summary
+}: {
+  log: TenderCrawlLog | null;
+  summary: DailyPipelineSummary | null;
+}) {
+  const status = summary ? crawlStatusLabel(summary.status) : log ? crawlStatusLabel(log.status) : "-";
+  const duration = summary?.duration_seconds !== undefined ? `${summary.duration_seconds}秒` : "-";
+  const warnings = summary?.warnings ?? [];
+
+  return (
+    <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-slate-950">日次パイプライン 最終実行状況</h3>
+          <p className="mt-1 text-slate-600">案件取得、品質判定、公開、期限更新、掲載状態更新をまとめて実行する日次処理です。</p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${summary?.status === "success" ? "bg-emerald-100 text-emerald-800" : summary ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}>
+          {status}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="最終日次実行日時" value={log?.started_at ? formatDateTime(log.started_at) : "-"} />
+        <StatusItem label="所要時間" value={duration} />
+        <StatusItem label="新規取得" value={String(summary?.created_count ?? log?.fetched_count ?? "-")} />
+        <StatusItem label="自動公開" value={String(summary?.auto_published_count ?? log?.created_count ?? "-")} />
+        <StatusItem label="pending" value={String(summary?.pending_candidates ?? "-")} />
+        <StatusItem label="エラー数" value={String(summary?.error_count ?? log?.error_count ?? "-")} />
+        <StatusItem label="最終成功日時" value={summary?.status === "success" && log?.finished_at ? formatDateTime(log.finished_at) : "-"} />
+        <StatusItem label="次回予定時刻" value={nextDailyPipelineRunLabel()} />
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <StatusItem label="公開案件" value={String(summary?.published_tenders ?? "-")} />
+        <StatusItem label="active" value={String(summary?.active ?? "-")} />
+        <StatusItem label="closing_soon" value={String(summary?.closing_soon ?? "-")} />
+        <StatusItem label="expired" value={String(summary?.expired ?? "-")} />
+        <StatusItem label="unknown" value={String(summary?.unknown ?? "-")} />
+        <StatusItem label="source_closed" value={String(summary?.source_closed ?? "-")} />
+      </div>
+
+      {warnings.length ? (
+        <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <p className="font-bold">警告</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-slate-500">警告: なし</p>
+      )}
+    </div>
+  );
+}
+
 function StatusItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-white/70 bg-white/70 p-3">
@@ -548,6 +611,28 @@ function formatNullableCount(value: number | null) {
   return value === null ? "-" : String(value);
 }
 
+function isDailyPipelineLog(log: TenderCrawlLog) {
+  return String(log.error_message ?? "").startsWith("daily_pipeline_summary:");
+}
+
+function parseDailyPipelineSummary(value?: string | null): DailyPipelineSummary | null {
+  const text = String(value ?? "");
+  if (!text.startsWith("daily_pipeline_summary:")) return null;
+  try {
+    return JSON.parse(text.slice("daily_pipeline_summary:".length)) as DailyPipelineSummary;
+  } catch {
+    return null;
+  }
+}
+
+function nextDailyPipelineRunLabel() {
+  const now = new Date();
+  const todayAtFiveJst = new Date(now);
+  todayAtFiveJst.setUTCHours(20, 0, 0, 0);
+  if (now >= todayAtFiveJst) todayAtFiveJst.setUTCDate(todayAtFiveJst.getUTCDate() + 1);
+  return formatDateTime(todayAtFiveJst.toISOString());
+}
+
 function formatKeyStatus(hasValue: boolean, format: string) {
   if (!hasValue) return "未設定";
   return `設定済み (${format})`;
@@ -567,6 +652,22 @@ type DefenseCrawlSummary = {
   error_count: number;
   errors: { source_name: string; url: string; error: string }[];
 } | null;
+
+type DailyPipelineSummary = {
+  status: TenderCrawlLog["status"];
+  duration_seconds: number;
+  created_count: number;
+  auto_published_count: number;
+  pending_candidates: number;
+  published_tenders: number;
+  active: number;
+  closing_soon: number;
+  expired: number;
+  unknown: number;
+  source_closed: number;
+  error_count: number;
+  warnings: string[];
+};
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {

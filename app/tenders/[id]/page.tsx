@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileText, Star } from "lucide-react";
 import { saveFavoriteTenderAction } from "@/app/tenders/actions";
@@ -9,6 +10,27 @@ import { assessTenderDeadline, deadlineStatusBadgeClass } from "@/lib/tender-dea
 import { canUseMemberFeatures, getPublishedTender } from "@/lib/tenders";
 import { getCurrentMember } from "@/lib/user";
 import type { SimilarPastAwardResult } from "@/lib/types";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const tender = await getPublishedTender(id);
+  if (!tender) {
+    return {
+      title: "官公庁案件詳細｜株式会社エコループ",
+      description: "官公庁案件サーチの案件詳細ページです。"
+    };
+  }
+
+  return {
+    title: `${tender.title}｜官公庁案件サーチ`,
+    description: `${tender.agency_name}の官公庁案件詳細です。参加前に公式公告・仕様書・参加条件をご確認ください。`,
+    openGraph: {
+      title: `${tender.title}｜官公庁案件サーチ`,
+      description: `${tender.agency_name}の官公庁案件詳細です。`,
+      type: "article"
+    }
+  };
+}
 
 export default async function TenderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

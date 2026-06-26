@@ -61,6 +61,8 @@ async function main() {
 
   let updatedTenders = 0;
   let updatedCandidates = 0;
+  const tenderUpdateErrors = [];
+  const candidateUpdateErrors = [];
   for (const { row, deadline } of tendersToUpdate) {
     const patch = {};
     if (!row.deadline_at && deadline.deadlineAt) patch.deadline_at = deadline.deadlineAt;
@@ -68,13 +70,29 @@ async function main() {
     if (Boolean(row.is_deadline_soon) !== shouldBeSoon) patch.is_deadline_soon = shouldBeSoon;
     if (!Object.keys(patch).length) continue;
     const { error } = await supabase.from("tenders").update(patch).eq("id", row.id);
-    if (error) throw new Error(`tenders update ${row.id}: ${error.message}`);
+    if (error) {
+      tenderUpdateErrors.push({
+        id: row.id,
+        title: row.title,
+        message: error.message,
+        code: error.code ?? null
+      });
+      continue;
+    }
     updatedTenders += 1;
   }
 
   for (const { row, deadline } of candidatesToUpdate) {
     const { error } = await supabase.from("tender_candidates").update({ deadline_at: deadline.deadlineAt }).eq("id", row.id);
-    if (error) throw new Error(`tender_candidates update ${row.id}: ${error.message}`);
+    if (error) {
+      candidateUpdateErrors.push({
+        id: row.id,
+        title: row.title,
+        message: error.message,
+        code: error.code ?? null
+      });
+      continue;
+    }
     updatedCandidates += 1;
   }
 
@@ -83,8 +101,15 @@ async function main() {
     project_ref: projectRef(url),
     updated_tenders: updatedTenders,
     updated_candidates: updatedCandidates,
+    skipped_tender_updates: tenderUpdateErrors.length,
+    skipped_candidate_updates: candidateUpdateErrors.length,
+    update_error_count: tenderUpdateErrors.length + candidateUpdateErrors.length,
+    update_errors: {
+      tenders: tenderUpdateErrors.slice(0, sampleSize),
+      candidates: candidateUpdateErrors.slice(0, sampleSize)
+    },
     archived_tenders: 0,
-    note: "期限切れでもstatus変更やarchived化は行っていません。"
+    note: "期限切れでもstatus変更やarchived化は行っていません。DB制約により更新できない行はスキップし、日次処理は継続します。"
   }, null, 2));
 }
 

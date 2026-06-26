@@ -33,6 +33,29 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
   const similarAwards = await getSimilarPastAwardResults(tender, 10);
   const similarAwardStats = summarizePastAwards(similarAwards);
   const deadline = assessTenderDeadline(tender);
+  const portalPublicEndDate = extractPortalPublicEndDate(tender.detail_memo);
+  const detailRows = [
+    ["案件区分", TENDER_TYPE_LABELS[tender.tender_type]],
+    ["組織区分", organizationLabel(tender.tender_sources?.organization_type)],
+    ["取得元", tender.tender_sources?.source_name ?? tender.tender_sources?.name ?? "-"],
+    ["オープンカウンター", tender.tender_type === "open_counter" ? "対象" : "-"],
+    ["original_label", tender.original_label ?? "-"],
+    ["地域", `${tender.region} / ${tender.prefecture}`],
+    ["公告日", formatDate(tender.published_at)],
+    ["参加申請・証明書期限", formatDate(tender.deadline_at)],
+    ["入札書・見積書提出期限", formatDate(tender.bid_at)],
+    ["締切日", deadline.deadlineAt ? formatDate(deadline.deadlineAt) : "期限不明"],
+    ...(portalPublicEndDate ? [["調達ポータル公開終了日", portalPublicEndDate]] : []),
+    ["期限ステータス", deadline.label],
+    ["期限判定元", deadline.source ?? "-"],
+    ["期限判定理由", deadline.reason ?? deadline.failureReason ?? "-"],
+    ["期限判定種別", deadline.kind ?? "-"],
+    ["期限信頼度", deadline.confidence ?? "-"],
+    ["期限根拠文言", deadline.evidence ?? "-"],
+    ["参加条件", tender.qualification_required ? "条件あり" : "資格不要・オープンカウンター"],
+    ["必要な参加資格", tender.required_qualification ?? "-"],
+    ["取得日時", formatDate(tender.fetched_at)]
+  ];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -52,26 +75,7 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
         <p className="mt-2 text-sm font-semibold text-slate-600">{tender.agency_name}</p>
 
         <dl className="mt-6 grid overflow-hidden rounded border border-slate-200 sm:grid-cols-2">
-          {[
-            ["案件区分", TENDER_TYPE_LABELS[tender.tender_type]],
-            ["組織区分", organizationLabel(tender.tender_sources?.organization_type)],
-            ["取得元", tender.tender_sources?.source_name ?? tender.tender_sources?.name ?? "-"],
-            ["オープンカウンター", tender.tender_type === "open_counter" ? "対象" : "-"],
-            ["original_label", tender.original_label ?? "-"],
-            ["地域", `${tender.region} / ${tender.prefecture}`],
-            ["公告日", formatDate(tender.published_at)],
-            ["締切日", deadline.deadlineAt ? formatDate(deadline.deadlineAt) : "期限不明"],
-            ["見積期限", formatDate(tender.bid_at)],
-            ["期限ステータス", deadline.label],
-            ["期限判定元", deadline.source ?? "-"],
-            ["期限判定理由", deadline.reason ?? deadline.failureReason ?? "-"],
-            ["期限判定種別", deadline.kind ?? "-"],
-            ["期限信頼度", deadline.confidence ?? "-"],
-            ["期限根拠文言", deadline.evidence ?? "-"],
-            ["参加条件", tender.qualification_required ? "条件あり" : "資格不要・オープンカウンター"],
-            ["必要な参加資格", tender.required_qualification ?? "-"],
-            ["取得日時", formatDate(tender.fetched_at)]
-          ].map(([label, value]) => (
+          {detailRows.map(([label, value]) => (
             <div key={label} className="grid grid-cols-[9rem_1fr] border-b border-slate-200 sm:border-r">
               <dt className="bg-slate-50 px-3 py-3 text-sm font-bold text-slate-600">{label}</dt>
               <dd className="px-3 py-3 text-sm text-slate-900">{value}</dd>
@@ -179,6 +183,10 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
 function organizationLabel(value?: string | null) {
   if (!value) return "-";
   return TENDER_SOURCE_ORGANIZATION_TYPE_LABELS[value as keyof typeof TENDER_SOURCE_ORGANIZATION_TYPE_LABELS] ?? value;
+}
+
+function extractPortalPublicEndDate(value?: string | null) {
+  return String(value ?? "").match(/調達ポータル公開終了日=(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
 }
 
 function SimilarAwardRow({ award }: { award: SimilarPastAwardResult }) {

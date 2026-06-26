@@ -1,6 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import {
+  fetchPortalDetailHtml,
+  normalizePortalDetailUrl,
+  parsePortalDetailHtml,
+  portalDetailMatch,
+  portalDetailSummary
+} from "./procurement-portal-detail.mjs";
 
 const APP_ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const OUTPUT_PATH = path.join(APP_ROOT, "data", "tender-imports.json");
@@ -9,6 +16,9 @@ const SEARCH_PATH = "/pps-web-biz/UAA01/OAA0101";
 const POST_PATH = "/pps-web-biz/UAA01/OAA0100";
 const PORTAL_FETCH_TIMEOUT_MS = numberEnv("TENDER_PORTAL_FETCH_TIMEOUT_MS", 15000);
 const PORTAL_MAX_PAGES = numberEnv("TENDER_PORTAL_MAX_PAGES", 3);
+const PORTAL_DETAIL_FETCH_TIMEOUT_MS = numberEnv("TENDER_PORTAL_DETAIL_FETCH_TIMEOUT_MS", 9000);
+const PORTAL_DETAIL_CONCURRENCY = numberEnv("TENDER_PORTAL_DETAIL_CONCURRENCY", 4);
+const PORTAL_DETAIL_LIMIT = numberEnv("TENDER_PORTAL_DETAIL_LIMIT", 300);
 
 const DEFAULT_KEYWORDS = [
   "清掃",
@@ -534,6 +544,99 @@ function uniqueBySourceUrl(tenders) {
   return [...map.values()];
 }
 
+async function enrichPortalDetails(tenders) {
+  const stats = {
+    attempted: 0,
+    fetched: 0,
+    enriched: 0,
+    certificate_deadline_count: 0,
+    bid_deadline_count: 0,
+    public_end_only_count: 0,
+    failed: 0,
+    skipped_match: 0
+  };
+  const eligible = tenders.filter((tender) => normalizePortalDetailUrl(tender.source_url)).slice(0, PORTAL_DETAIL_LIMIT);
+  stats.attempted = eligible.length;
+
+  await mapLimit(eligible, PORTAL_DETAIL_CONCURRENCY, async (tender) => {
+    const detailUrl = normalizePortalDetailUrl(tender.source_url);
+    const fetched = await fetchPortalDetailHtml(detailUrl, { timeoutMs: PORTAL_DETAIL_FETCH_TIMEOUT_MS, referer: `${PORTAL_ORIGIN}${SEARCH_PATH}` });
+    if (!fetched.ok) {
+      stats.failed += 1;
+      return;
+    }
+    stats.fetched += 1;
+    const parsed = parsePortalDetailHtml(fetched.html, detailUrl);
+    const match = portalDetailMatch(parsed, tender);
+    if (match.confidence !== "high") {
+      stats.skipped_match += 1;
+      return;
+    }
+    if (parsed.certificateDeadline) stats.certificate_deadline_count += 1;
+    if (parsed.bidDeadline) stats.bid_deadline_count += 1;
+    if (parsed.publicEndOnly) stats.public_end_only_count += 1;
+    if (!parsed.certificateDeadline && !parsed.bidDeadline) return;
+
+    tender.source_url = parsed.detailUrl;
+    if (!tender.published_at && parsed.publicStartAt) tender.published_at = parsed.publicStartAt;
+    if (parsed.certificateDeadline?.iso) tender.deadline_at = parsed.certificateDeadline.iso;
+    if (parsed.bidDeadline?.iso) tender.bid_at = parsed.bidDeadline.iso;
+    tender.is_deadline_soon = isDeadlineSoon(tender.deadline_at ?? tender.bid_at);
+    tender.attachments = mergePortalDocuments(tender.attachments, parsed.documents);
+    tender.detail_memo = appendPortalDetailMemo(tender.detail_memo, parsed);
+    stats.enriched += 1;
+  });
+
+  console.log(JSON.stringify({ event: "portal_detail_enrichment_summary", ...stats }));
+  return stats;
+}
+
+function mergePortalDocuments(existing, documents) {
+  const rows = Array.isArray(existing) ? existing : [];
+  const map = new Map(rows.filter((item) => item?.url).map((item) => [item.url, item]));
+  for (const document of documents ?? []) {
+    if (!document.url || map.has(document.url)) continue;
+    map.set(document.url, {
+      title: document.title,
+      url: document.url,
+      file_type: fileType(document.url),
+      label: document.label,
+      source_text: "調達ポータル詳細ページ"
+    });
+  }
+  return [...map.values()];
+}
+
+function appendPortalDetailMemo(existing, parsed) {
+  const summary = portalDetailSummary(parsed);
+  if (!summary) return existing ?? null;
+  const current = String(existing ?? "").trim();
+  const line = `調達ポータル詳細解析: ${summary}`;
+  if (current.includes("調達ポータル詳細解析:")) return current;
+  return current ? `${current}\n\n${line}` : line;
+}
+
+function fileType(value) {
+  const lower = String(value ?? "").toLowerCase().split("?")[0];
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "excel";
+  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "word";
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
+  return "unknown";
+}
+
+async function mapLimit(items, limitCount, worker) {
+  let index = 0;
+  const workers = Array.from({ length: Math.min(limitCount, items.length) }, async () => {
+    while (index < items.length) {
+      const currentIndex = index;
+      index += 1;
+      await worker(items[currentIndex], currentIndex);
+    }
+  });
+  await Promise.all(workers);
+}
+
 async function saveLocal(tenders) {
   await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
   await fs.writeFile(OUTPUT_PATH, JSON.stringify(tenders, null, 2));
@@ -787,6 +890,7 @@ async function main() {
   }
 
   const tenders = uniqueBySourceUrl(collected).slice(0, limit);
+  await enrichPortalDetails(tenders);
   await saveLocal(tenders);
   let supabaseResult = args.has("--no-db") ? { saved: 0, skipped: true } : null;
   if (!supabaseResult) {

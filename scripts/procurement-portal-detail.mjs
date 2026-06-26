@@ -394,6 +394,7 @@ function agencyCompatibility(left, right) {
 
 function normalizeComparable(value) {
   return cleanText(value)
+    .replace(/^[【［\[].+?[】］\]]/, "")
     .replace(/[【】「」『』（）()\[\]\s・、，,。.\-－_]/g, "")
     .replace(/^(.+?省)(.+)$/g, "$1$2")
     .toLowerCase();

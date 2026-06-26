@@ -94,7 +94,7 @@ async function main() {
     timeout_count: aggregate.timeout_count,
     step_statuses: stepStatuses,
     warnings,
-    top_errors: topErrors(nonPipelineLogs),
+    top_errors: topErrors(activityLogs),
     safety_checks: {
       high_confidence_only_auto_publish: true,
       medium_low_candidates_stay_pending: true,

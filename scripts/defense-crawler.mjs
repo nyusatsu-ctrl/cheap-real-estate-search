@@ -1174,13 +1174,26 @@ function pickSafeParticipationDeadline(text, contextYear) {
     for (const definition of SAFE_DEADLINE_LABELS) {
       const index = context.indexOf(definition.label);
       if (index < 0) continue;
-      const dates = parseDates(context.slice(index), contextYear);
+      const searchText = context.slice(index);
+      if (definition.requiredContext && !definition.requiredContext.test(searchText)) continue;
+      const dates = parseDates(searchText, contextYear);
       for (const date of dates) {
+        if (!isDateCloseToSafeLabel(searchText, definition.label, date)) continue;
         candidates.push({ date, priority: definition.priority });
       }
     }
   }
   return candidates.sort((left, right) => right.priority - left.priority || String(right.date).localeCompare(String(left.date)))[0]?.date ?? null;
+}
+
+function isDateCloseToSafeLabel(context, label, matchedText) {
+  const labelIndex = context.indexOf(label);
+  const dateIndex = context.indexOf(matchedText, Math.max(0, labelIndex));
+  if (labelIndex < 0 || dateIndex < 0) return false;
+  const between = context.slice(labelIndex + label.length, dateIndex);
+  if (between.length > 70) return false;
+  if (/までの期間|から|以降|停止等措置|要領|制定|付け|平成\d/.test(between)) return false;
+  return true;
 }
 
 function deadlineContextWindows(text) {
@@ -1209,7 +1222,7 @@ const SAFE_DEADLINE_LABELS = [
   { label: "申込期限", priority: 295 },
   { label: "申込み期限", priority: 295 },
   { label: "受付期限", priority: 285 },
-  { label: "提出期限", priority: 260 }
+  { label: "提出期限", priority: 260, requiredContext: /入札書|見積書|見積書等|提案書|企画提案|参加|資格|証明書|申請|応募|提出書類/ }
 ];
 
 const FORBIDDEN_DEADLINE_CONTEXT = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切/;

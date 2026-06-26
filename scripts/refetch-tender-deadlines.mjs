@@ -239,7 +239,9 @@ function extractDeadlineCandidates(text, referenceDate, sourceUrl, sourceType) {
       const labelIndex = context.indexOf(definition.label);
       if (labelIndex < 0) continue;
       const searchText = context.slice(labelIndex);
+      if (definition.requiredContext && !definition.requiredContext.test(searchText)) continue;
       for (const date of parseDates(searchText, referenceDate)) {
+        if (!isDateCloseToLabel(searchText, definition.label, date.matchedText)) continue;
         candidates.push({
           deadlineAt: date.iso,
           sourceUrl,
@@ -273,7 +275,7 @@ const DEADLINE_DEFINITIONS = [
   { label: "申込期限", priority: 295, confidence: "high", kind: "application_deadline" },
   { label: "申込み期限", priority: 295, confidence: "high", kind: "application_deadline" },
   { label: "受付期限", priority: 285, confidence: "high", kind: "reception_deadline" },
-  { label: "提出期限", priority: 260, confidence: "high", kind: "submission_deadline" },
+  { label: "提出期限", priority: 260, confidence: "high", kind: "submission_deadline", requiredContext: /入札書|見積書|見積書等|提案書|企画提案|参加|資格|証明書|申請|応募|提出書類/ },
   { label: "入札日時", priority: 180, confidence: "medium", kind: "bid_datetime" },
   { label: "見積合わせ日時", priority: 175, confidence: "medium", kind: "quote_matching_datetime" },
   { label: "見積日時", priority: 170, confidence: "medium", kind: "quote_datetime" },
@@ -281,6 +283,17 @@ const DEADLINE_DEFINITIONS = [
 ];
 
 const FORBIDDEN_CONTEXT = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切/;
+
+function isDateCloseToLabel(context, label, matchedText) {
+  const labelIndex = context.indexOf(label);
+  const dateIndex = context.indexOf(matchedText, Math.max(0, labelIndex));
+  if (labelIndex < 0 || dateIndex < 0) return false;
+  const between = context.slice(labelIndex + label.length, dateIndex);
+  if (between.length > 70) return false;
+  if (/までの期間|から|以降|停止等措置|要領|制定|付け|平成\d/.test(between)) return false;
+  return true;
+}
+
 function collectForbiddenContexts(text, sourceUrl) {
   const normalized = cleanText(text);
   const rows = [];

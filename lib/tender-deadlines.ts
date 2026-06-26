@@ -47,7 +47,7 @@ type DeadlineCandidate = {
 };
 
 const CLOSING_SOON_DAYS = 7;
-const DEADLINE_LABELS: Array<{ label: string; score: number; confidence: "high" | "medium"; kind: string }> = [
+const DEADLINE_LABELS: Array<{ label: string; score: number; confidence: "high" | "medium"; kind: string; requiredContext?: RegExp }> = [
   { label: "競争参加資格確認申請書提出期限", score: 420, confidence: "high", kind: "participation_application_deadline" },
   { label: "競争参加資格確認資料提出期限", score: 420, confidence: "high", kind: "participation_application_deadline" },
   { label: "競争参加資格確認申請期限", score: 415, confidence: "high", kind: "participation_application_deadline" },
@@ -63,7 +63,7 @@ const DEADLINE_LABELS: Array<{ label: string; score: number; confidence: "high" 
   { label: "申込期限", score: 330, confidence: "high", kind: "application_deadline" },
   { label: "申込み期限", score: 330, confidence: "high", kind: "application_deadline" },
   { label: "受付期限", score: 320, confidence: "high", kind: "reception_deadline" },
-  { label: "提出期限", score: 300, confidence: "high", kind: "submission_deadline" },
+  { label: "提出期限", score: 300, confidence: "high", kind: "submission_deadline", requiredContext: /入札書|見積書|見積書等|提案書|企画提案|参加|資格|証明書|申請|応募|提出書類/ },
   { label: "入札日時", score: 220, confidence: "medium", kind: "bid_datetime" },
   { label: "見積合わせ日時", score: 215, confidence: "medium", kind: "quote_matching_datetime" },
   { label: "見積日時", score: 210, confidence: "medium", kind: "quote_datetime" },
@@ -216,8 +216,10 @@ function labeledDateCandidates(text: string, referenceDate: string | null) {
   for (const definition of DEADLINE_LABELS) {
     for (const index of allIndexes(text, definition.label)) {
       const windowText = text.slice(index, index + 140);
+      if (definition.requiredContext && !definition.requiredContext.test(windowText)) continue;
       if (FORBIDDEN_DEADLINE_CONTEXT.test(windowText)) continue;
       for (const date of parseDates(windowText, referenceDate)) {
+        if (!isDateCloseToLabel(windowText, definition.label, date.matchedText)) continue;
         candidates.push({
           iso: date.iso,
           source: `text:${definition.label}`,
@@ -232,6 +234,16 @@ function labeledDateCandidates(text: string, referenceDate: string | null) {
     }
   }
   return candidates;
+}
+
+function isDateCloseToLabel(context: string, label: string, matchedText: string) {
+  const labelIndex = context.indexOf(label);
+  const dateIndex = context.indexOf(matchedText, Math.max(0, labelIndex));
+  if (labelIndex < 0 || dateIndex < 0) return false;
+  const between = context.slice(labelIndex + label.length, dateIndex);
+  if (between.length > 70) return false;
+  if (/までの期間|から|以降|停止等措置|要領|制定|付け|平成\d/.test(between)) return false;
+  return true;
 }
 
 function nearDeadlineWordCandidates(text: string, referenceDate: string | null) {

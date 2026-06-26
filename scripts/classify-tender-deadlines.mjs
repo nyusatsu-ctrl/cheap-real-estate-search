@@ -197,47 +197,59 @@ function extractTenderDeadline(input) {
 }
 
 const DEADLINE_LABELS = [
-  "競争参加資格確認申請書提出期限",
-  "競争参加資格確認資料提出期限",
-  "競争参加資格確認申請期限",
-  "参加資格確認申請書提出期限",
-  "参加申請期限",
-  "参加表明書提出期限",
-  "入札書提出期限",
-  "見積書提出期限",
-  "見積提出期限",
-  "企画提案書提出期限",
-  "提案書提出期限",
-  "応募締切",
-  "申込期限",
-  "申込み期限",
-  "受付期限",
-  "提出期限",
-  "入札日時",
-  "見積合わせ日時",
-  "見積日時",
-  "開札日時"
+  { label: "競争参加資格確認申請書提出期限" },
+  { label: "競争参加資格確認資料提出期限" },
+  { label: "競争参加資格確認申請期限" },
+  { label: "参加資格確認申請書提出期限" },
+  { label: "参加申請期限" },
+  { label: "参加表明書提出期限" },
+  { label: "入札書提出期限" },
+  { label: "見積書提出期限" },
+  { label: "見積提出期限" },
+  { label: "企画提案書提出期限" },
+  { label: "提案書提出期限" },
+  { label: "応募締切" },
+  { label: "申込期限" },
+  { label: "申込み期限" },
+  { label: "受付期限" },
+  { label: "提出期限", requiredContext: /入札書|見積書|見積書等|提案書|企画提案|参加|資格|証明書|申請|応募|提出書類/ },
+  { label: "入札日時" },
+  { label: "見積合わせ日時" },
+  { label: "見積日時" },
+  { label: "開札日時" }
 ];
 
 const FORBIDDEN_DEADLINE_CONTEXT = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切/;
 
 function labeledDateCandidates(text, referenceDate) {
   const candidates = [];
-  for (const label of DEADLINE_LABELS) {
-    for (const index of allIndexes(text, label)) {
+  for (const definition of DEADLINE_LABELS) {
+    for (const index of allIndexes(text, definition.label)) {
       const windowText = text.slice(index, index + 140);
+      if (definition.requiredContext && !definition.requiredContext.test(windowText)) continue;
       if (FORBIDDEN_DEADLINE_CONTEXT.test(windowText)) continue;
       for (const date of parseDates(windowText, referenceDate)) {
+        if (!isDateCloseToLabel(windowText, definition.label, date.matchedText)) continue;
         candidates.push({
           iso: date.iso,
-          source: `text:${label}`,
-          reason: `${label} の近くから期限日を抽出しました。`,
-          score: label.includes("開札") ? 80 : label.includes("入札日時") || label.includes("見積合わせ日時") || label.includes("見積日時") ? 90 : 120
+          source: `text:${definition.label}`,
+          reason: `${definition.label} の近くから期限日を抽出しました。`,
+          score: definition.label.includes("開札") ? 80 : definition.label.includes("入札日時") || definition.label.includes("見積合わせ日時") || definition.label.includes("見積日時") ? 90 : 120
         });
       }
     }
   }
   return candidates;
+}
+
+function isDateCloseToLabel(context, label, matchedText) {
+  const labelIndex = context.indexOf(label);
+  const dateIndex = context.indexOf(matchedText, Math.max(0, labelIndex));
+  if (labelIndex < 0 || dateIndex < 0) return false;
+  const between = context.slice(labelIndex + label.length, dateIndex);
+  if (between.length > 70) return false;
+  if (/までの期間|から|以降|停止等措置|要領|制定|付け|平成\d/.test(between)) return false;
+  return true;
 }
 
 function nearDeadlineWordCandidates(text, referenceDate) {

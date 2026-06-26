@@ -430,11 +430,36 @@ function formatPortalDate(date) {
 
 function findDeadline(cells) {
   const joined = cells.join(" ");
-  const labels = ["提出期限", "公開終了日", "入札日", "見積書"];
+  const labels = [
+    "競争参加資格確認申請書提出期限",
+    "競争参加資格確認資料提出期限",
+    "競争参加資格確認申請期限",
+    "参加資格確認申請書提出期限",
+    "資格・実績証明書等の提出期限",
+    "証明書等の提出期限",
+    "証明書等提出期限",
+    "参加申請期限",
+    "参加表明書提出期限",
+    "入札書提出期限",
+    "見積書提出期限",
+    "見積書等の提出期限",
+    "見積書等提出期限",
+    "見積提出期限",
+    "企画提案書提出期限",
+    "提案書提出期限",
+    "申込期限",
+    "申込み期限",
+    "受付期限",
+    "提出期限"
+  ];
+  const forbidden = /履行期限|履行期間|納入期限|納期|納入期間|契約期間|公告日|公示日|掲載日|公開日|更新日|質問書|質問期限|質問受付|質問回答|質問締切|説明会日時|現場説明/;
   for (const label of labels) {
     const index = joined.indexOf(label);
     if (index >= 0) {
-      const date = findJapaneseDate(joined.slice(index, index + 80));
+      const context = joined.slice(index, index + 140);
+      if (forbidden.test(context)) continue;
+      if (label === "提出期限" && !/入札書|見積書|見積書等|提案書|企画提案|参加|資格|証明書|申請|応募|提出書類/.test(context)) continue;
+      const date = findJapaneseDate(context);
       if (date) return date;
     }
   }

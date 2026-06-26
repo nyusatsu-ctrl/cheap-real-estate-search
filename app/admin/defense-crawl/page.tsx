@@ -49,6 +49,7 @@ export default async function DefenseCrawlPage() {
   const publicDefenseTenderCount = publishedTenders.filter(isDefenseLike).length;
   const defenseMetrics = countDefenseMetrics(candidates, publishedTenders);
   const deadlineMetrics = countDeadlineMetrics(publishedTenders);
+  const sourceDeadlineMetrics = countDeadlineMetricsBySource(publishedTenders);
   const counts = countSources(sources);
   const crawlReadyCount = sources.filter((source) => source.is_active && source.crawl_ready && source.crawler_type !== "manual_only").length;
   const latestLog = crawlLogs[0] ?? dbDiagnostics?.latestLog ?? null;
@@ -191,35 +192,51 @@ export default async function DefenseCrawlPage() {
                   <th className="px-3 py-3">組織/状態</th>
                   <th className="px-3 py-3">最終取得</th>
                   <th className="px-3 py-3">件数</th>
+                  <th className="px-3 py-3">期限取得</th>
                   <th className="px-3 py-3">直近エラー</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {sources.slice(0, 120).map((source) => (
-                  <tr key={source.tender_list_url ?? source.url}>
-                    <td className="px-3 py-3">
-                      <a href={source.tender_list_url ?? source.url} target="_blank" rel="noreferrer" className="font-bold text-slate-950 hover:text-brand-700">{source.source_name ?? source.name}</a>
-                      <p className="mt-1 break-all text-xs text-slate-500">{source.tender_list_url ?? source.url}</p>
-                    </td>
-                    <td className="px-3 py-3 text-slate-700">
-                      <p>{organizationLabel(source.organization_type)}</p>
-                      <div className="mt-2 flex flex-wrap gap-1 text-xs font-bold">
-                        <span className={source.is_active ? "rounded bg-sky-100 px-2 py-0.5 text-sky-700" : "rounded bg-slate-200 px-2 py-0.5 text-slate-600"}>
-                          {source.is_active ? "有効" : "無効"}
-                        </span>
-                        <span className={source.crawl_ready ? "rounded bg-emerald-100 px-2 py-0.5 text-emerald-700" : "rounded bg-amber-100 px-2 py-0.5 text-amber-800"}>
-                          {source.crawl_ready ? "自動取得対象" : "手動確認"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">{source.last_crawled_at ? formatDateTime(source.last_crawled_at) : "-"}</td>
-                    <td className="px-3 py-3 text-slate-700">
-                      <p>公開: {source.tender_count ?? 0}</p>
-                      <p className="text-xs text-slate-500">候補: {candidates.filter((candidate) => candidate.source_name === (source.source_name ?? source.name)).length}</p>
-                    </td>
-                    <td className="max-w-sm px-3 py-3 text-xs text-rose-700">{source.latest_error ?? source.last_error_message ?? "-"}</td>
-                  </tr>
-                ))}
+                {sources.slice(0, 120).map((source) => {
+                  const deadline = sourceDeadlineMetrics.get(sourceKey(source)) ?? emptySourceDeadlineMetric();
+                  const rate = deadline.published ? Math.round((deadline.known / deadline.published) * 100) : 0;
+                  return (
+                    <tr key={source.tender_list_url ?? source.url}>
+                      <td className="px-3 py-3">
+                        <a href={source.tender_list_url ?? source.url} target="_blank" rel="noreferrer" className="font-bold text-slate-950 hover:text-brand-700">{source.source_name ?? source.name}</a>
+                        <p className="mt-1 break-all text-xs text-slate-500">{source.tender_list_url ?? source.url}</p>
+                      </td>
+                      <td className="px-3 py-3 text-slate-700">
+                        <p>{organizationLabel(source.organization_type)}</p>
+                        <div className="mt-2 flex flex-wrap gap-1 text-xs font-bold">
+                          <span className={source.is_active ? "rounded bg-sky-100 px-2 py-0.5 text-sky-700" : "rounded bg-slate-200 px-2 py-0.5 text-slate-600"}>
+                            {source.is_active ? "有効" : "無効"}
+                          </span>
+                          <span className={source.crawl_ready ? "rounded bg-emerald-100 px-2 py-0.5 text-emerald-700" : "rounded bg-amber-100 px-2 py-0.5 text-amber-800"}>
+                            {source.crawl_ready ? "自動取得対象" : "手動確認"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-slate-700">{source.last_crawled_at ? formatDateTime(source.last_crawled_at) : "-"}</td>
+                      <td className="px-3 py-3 text-slate-700">
+                        <p>公開: {deadline.published || source.tender_count || 0}</p>
+                        <p className="text-xs text-slate-500">候補: {candidates.filter((candidate) => candidate.source_name === (source.source_name ?? source.name)).length}</p>
+                      </td>
+                      <td className="px-3 py-3 text-slate-700">
+                        <p>期限あり: {deadline.known}</p>
+                        <p>unknown: {deadline.unknown}</p>
+                        <p className="text-xs font-bold text-slate-500">取得率: {rate}%</p>
+                        <p className="mt-1 text-xs text-slate-500">最終期限更新: {deadline.lastDeadlineUpdatedAt ? formatDateTime(deadline.lastDeadlineUpdatedAt) : "-"}</p>
+                      </td>
+                      <td className="max-w-sm px-3 py-3 text-xs text-rose-700">
+                        {source.latest_error ?? source.last_error_message ?? "-"}
+                        {source.last_error_message && /pdf|html|HTTP|timeout|fetch/i.test(source.last_error_message) ? (
+                          <p className="mt-1 font-bold">HTML/PDF取得エラーあり</p>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -435,6 +452,65 @@ function countDeadlineMetrics(tenders: Tender[]) {
 
   return counts;
 }
+
+function countDeadlineMetricsBySource(tenders: Tender[]) {
+  const now = new Date();
+  const map = new Map<string, SourceDeadlineMetric>();
+
+  for (const tender of tenders) {
+    const key = tenderSourceKey(tender);
+    const current = map.get(key) ?? emptySourceDeadlineMetric();
+    const deadline = assessTenderDeadline(tender, now);
+    current.published += 1;
+    if (deadline.status === "unknown") current.unknown += 1;
+    else current.known += 1;
+    if (deadline.status === "active") current.active += 1;
+    if (deadline.status === "closing_soon") current.closingSoon += 1;
+    if (deadline.status === "expired") current.expired += 1;
+    if ((tender.deadline_at || tender.bid_at) && newerThan(current.lastDeadlineUpdatedAt, tender.updated_at)) {
+      current.lastDeadlineUpdatedAt = tender.updated_at;
+    }
+    map.set(key, current);
+  }
+
+  return map;
+}
+
+function emptySourceDeadlineMetric(): SourceDeadlineMetric {
+  return {
+    published: 0,
+    known: 0,
+    unknown: 0,
+    active: 0,
+    closingSoon: 0,
+    expired: 0,
+    lastDeadlineUpdatedAt: null
+  };
+}
+
+function sourceKey(source: TenderSource) {
+  return source.source_name ?? source.name ?? source.url;
+}
+
+function tenderSourceKey(tender: Tender) {
+  return tender.source_name ?? tender.tender_sources?.source_name ?? tender.tender_sources?.name ?? "unknown";
+}
+
+function newerThan(current: string | null, candidate: string | null) {
+  if (!candidate) return false;
+  if (!current) return true;
+  return new Date(candidate).getTime() > new Date(current).getTime();
+}
+
+type SourceDeadlineMetric = {
+  published: number;
+  known: number;
+  unknown: number;
+  active: number;
+  closingSoon: number;
+  expired: number;
+  lastDeadlineUpdatedAt: string | null;
+};
 
 function organizationLabel(value: TenderSource["organization_type"]) {
   if (!value) return "-";

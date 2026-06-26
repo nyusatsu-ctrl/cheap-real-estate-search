@@ -323,6 +323,63 @@ export type TenderFilters = {
   sort?: "recommended" | "new" | "deadline";
 };
 
+export type TenderNotificationRule = {
+  id: string;
+  user_id: string;
+  name: string | null;
+  region: string | null;
+  prefecture: string | null;
+  tender_type: TenderType | null;
+  participation_condition: "not_required" | "unified_qualification" | "area_specified" | "other_conditions" | null;
+  keyword: string | null;
+  exclude_keyword: string | null;
+  agency_name: string | null;
+  defense_only: boolean;
+  open_counter_only: boolean;
+  qualification_required_only: boolean;
+  deadline_soon_only: boolean;
+  min_days_until_deadline: number | null;
+  include_unknown_deadline: boolean;
+  email_enabled: boolean;
+  app_enabled: boolean;
+  is_active: boolean;
+  last_matched_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenderNotificationEvent = {
+  id: string;
+  user_id: string;
+  notification_rule_id: string;
+  tender_id: string;
+  match_reason: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  tender_notifications?: Pick<TenderNotificationRule, "id" | "name"> | null;
+  tenders?: Tender | null;
+};
+
+export type TenderEmailOutbox = {
+  id: string;
+  user_id: string;
+  notification_event_id: string | null;
+  tender_id: string | null;
+  notification_rule_id: string | null;
+  status: "pending" | "disabled" | "sent" | "failed" | "cancelled";
+  provider: string | null;
+  subject: string | null;
+  error_message: string | null;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type UserFavoriteTender = {
   id: string;
   user_id: string;

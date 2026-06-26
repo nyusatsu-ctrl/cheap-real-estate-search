@@ -172,6 +172,13 @@ jobs:
         timeout-minutes: 20
         run: npm run portal:tender-availability -- --mode="$PIPELINE_MODE" --limit=5000 --sample=10 --concurrency=4 --fetch-timeout-ms=9000
 
+      - name: Match tender notifications
+        id: match_notifications
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        run: npm run notify:tenders -- --mode="$PIPELINE_MODE" --since="$PIPELINE_STARTED_AT" --limit=1000 --sample=10
+
       - name: Summarize tender database
         id: db_summary
         if: always()
@@ -199,5 +206,5 @@ jobs:
         timeout-minutes: 5
         env:
           PIPELINE_STEP_STATUS_JSON: >-
-            {"crawl_portal":"${{ steps.crawl_portal.outcome }}","discover_defense":"${{ steps.discover_defense.outcome }}","crawl_defense":"${{ steps.crawl_defense.outcome }}","classify_candidates":"${{ steps.classify_candidates.outcome }}","portal_deadlines":"${{ steps.portal_deadlines.outcome }}","refetch_deadlines":"${{ steps.refetch_deadlines.outcome }}","source_deadline_adapters":"${{ steps.source_deadline_adapters.outcome }}","classify_deadlines":"${{ steps.classify_deadlines.outcome }}","portal_availability":"${{ steps.portal_availability.outcome }}","db_summary":"${{ steps.db_summary.outcome }}","http_check":"${{ steps.http_check.outcome }}"}
+            {"crawl_portal":"${{ steps.crawl_portal.outcome }}","discover_defense":"${{ steps.discover_defense.outcome }}","crawl_defense":"${{ steps.crawl_defense.outcome }}","classify_candidates":"${{ steps.classify_candidates.outcome }}","portal_deadlines":"${{ steps.portal_deadlines.outcome }}","refetch_deadlines":"${{ steps.refetch_deadlines.outcome }}","source_deadline_adapters":"${{ steps.source_deadline_adapters.outcome }}","classify_deadlines":"${{ steps.classify_deadlines.outcome }}","portal_availability":"${{ steps.portal_availability.outcome }}","match_notifications":"${{ steps.match_notifications.outcome }}","db_summary":"${{ steps.db_summary.outcome }}","http_check":"${{ steps.http_check.outcome }}"}
         run: npm run summary:tender-pipeline -- --record --started-at="$PIPELINE_STARTED_AT" --mode="$PIPELINE_MODE"

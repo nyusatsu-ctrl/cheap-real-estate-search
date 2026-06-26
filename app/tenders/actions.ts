@@ -52,16 +52,23 @@ export async function saveNotificationAction(formData: FormData) {
 
   const { error } = await supabase.from("tender_notifications").insert({
     user_id: member.id,
+    name: optionalString(formData, "name") ?? "案件詳細から作成した通知条件",
     region: optionalString(formData, "region"),
     prefecture: optionalString(formData, "prefecture"),
     tender_type: optionalString(formData, "tender_type"),
+    participation_condition: optionalString(formData, "participation_condition"),
     keyword: optionalString(formData, "keyword"),
+    exclude_keyword: optionalString(formData, "exclude_keyword"),
+    agency_name: optionalString(formData, "agency_name"),
     defense_only: formData.get("defense_only") === "on",
     open_counter_only: formData.get("open_counter_only") === "on",
     qualification_required_only: formData.get("qualification_required_only") === "on",
     deadline_soon_only: formData.get("deadline_soon_only") === "on",
+    min_days_until_deadline: Number(formData.get("min_days_until_deadline") ?? 0) || 0,
+    include_unknown_deadline: formData.get("include_unknown_deadline") === "on",
     email_enabled: formData.get("email_enabled") === "on",
-    app_enabled: formData.get("app_enabled") === "on"
+    app_enabled: formData.get("app_enabled") === "on",
+    is_active: formData.get("is_active") !== "off"
   });
 
   if (error) throw new Error(error.message);

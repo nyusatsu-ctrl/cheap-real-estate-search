@@ -6,7 +6,7 @@ import { isHighConfidenceTenderCandidate, isPublishableTenderRecord } from "@/li
 import { assessTenderDeadline, assessTenderSourceAvailability, tenderDisplaySortPriority } from "@/lib/tender-deadlines";
 import { TENDER_SOURCE_SEEDS } from "@/lib/tender-source-seeds";
 import { sampleFavorites, sampleTenderSources, sampleTenders } from "@/lib/tenders/sample-data";
-import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
+import type { FavoriteTenderStatus, ScrivenerInquiry, Tender, TenderCandidate, TenderCrawlLog, TenderFilters, TenderNotificationRule, TenderSource, TenderType, UserFavoriteTender } from "@/lib/types";
 
 export function canUseMemberFeatures(member: { role: string; subscriptionStatus: string; isTrialExpired: boolean } | null) {
   if (!member) return false;
@@ -698,20 +698,7 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
   const keyword = filters.keyword?.toLowerCase();
   const filtered = tenders.filter((tender) => {
     const normalized = normalizeDefenseTender(tender);
-    const deadline = assessTenderDeadline(normalized);
-    const availability = assessTenderSourceAvailability(normalized);
-    if (!matchesDeadlineStatus(deadline.status, availability.status, filters.deadlineStatus)) return false;
-    if (filters.region && filters.region !== "全国" && tenderRegion(normalized) !== filters.region) return false;
-    if (filters.prefecture && tender.prefecture !== filters.prefecture) return false;
-    if (filters.tenderType && tender.tender_type !== filters.tenderType) return false;
-    if (filters.qualification && !matchesParticipationCondition(tender, filters.qualification)) return false;
-    if (filters.defenseOnly && !isDefenseLike(normalized)) return false;
-    if (filters.openCounterOnly && tender.tender_type !== "open_counter") return false;
-    if (keyword) {
-      const haystack = `${tender.title} ${tender.agency_name} ${tender.detail_memo ?? ""} ${tender.required_qualification ?? ""} ${tender.source_name ?? ""} ${tender.tender_sources?.source_name ?? ""}`.toLowerCase();
-      if (!haystack.includes(keyword)) return false;
-    }
-    return true;
+    return tenderMatchesFilters(normalized, { ...filters, keyword });
   });
 
   return [...filtered].sort((a, b) => {
@@ -731,6 +718,105 @@ function filterTenders(tenders: Tender[], filters: TenderFilters) {
       || compareDeadlineAsc(aDeadline.deadlineAt, bDeadline.deadlineAt)
       || compareDateDesc(a.published_at ?? a.created_at, b.published_at ?? b.created_at);
   });
+}
+
+export function tenderMatchesFilters(tender: Tender, filters: TenderFilters & { keyword?: string }) {
+  const deadline = assessTenderDeadline(tender);
+  const availability = assessTenderSourceAvailability(tender);
+  if (!matchesDeadlineStatus(deadline.status, availability.status, filters.deadlineStatus)) return false;
+  if (filters.region && filters.region !== "全国" && tenderRegion(tender) !== filters.region) return false;
+  if (filters.prefecture && tender.prefecture !== filters.prefecture) return false;
+  if (filters.tenderType && tender.tender_type !== filters.tenderType) return false;
+  if (filters.qualification && !matchesParticipationCondition(tender, filters.qualification)) return false;
+  if (filters.defenseOnly && !isDefenseLike(tender)) return false;
+  if (filters.openCounterOnly && tender.tender_type !== "open_counter") return false;
+  if (filters.keyword) {
+    const haystack = tenderSearchHaystack(tender).toLowerCase();
+    if (!haystack.includes(filters.keyword.toLowerCase())) return false;
+  }
+  return true;
+}
+
+export function tenderMatchesNotificationRule(tenderInput: Tender, rule: TenderNotificationRule, options: { ignoreActive?: boolean } = {}) {
+  if (!options.ignoreActive && (!rule.is_active || rule.deleted_at)) return false;
+  if (!rule.app_enabled && !rule.email_enabled) return false;
+
+  const tender = normalizeDefenseTender(tenderInput);
+  if (tender.status !== "published") return false;
+  if (!isPublishableTenderRecord(tender)) return false;
+
+  const deadline = assessTenderDeadline(tender);
+  const availability = assessTenderSourceAvailability(tender);
+  if (deadline.status === "archived" || deadline.status === "expired") return false;
+  if (availability.status === "source_closed") return false;
+
+  if (deadline.status === "unknown") {
+    if (!rule.include_unknown_deadline) return false;
+    if (availability.status !== "source_open" && availability.status !== "source_unknown") return false;
+  }
+
+  const minDays = Number(rule.min_days_until_deadline ?? 0);
+  if (deadline.daysUntil !== null && minDays > 0 && deadline.daysUntil < minDays) return false;
+
+  if (!tenderMatchesFilters(tender, {
+    region: rule.region || undefined,
+    prefecture: rule.prefecture || undefined,
+    tenderType: rule.tender_type || undefined,
+    qualification: rule.participation_condition || undefined,
+    defenseOnly: rule.defense_only,
+    openCounterOnly: rule.open_counter_only,
+    keyword: rule.keyword || undefined
+  })) {
+    return false;
+  }
+
+  if (rule.qualification_required_only && !tender.qualification_required) return false;
+  if (rule.deadline_soon_only && deadline.status !== "closing_soon") return false;
+  if (rule.agency_name && !tender.agency_name.includes(rule.agency_name)) return false;
+  if (rule.exclude_keyword) {
+    const haystack = tenderSearchHaystack(tender);
+    const excluded = splitKeywords(rule.exclude_keyword).some((keyword) => haystack.includes(keyword));
+    if (excluded) return false;
+  }
+
+  return true;
+}
+
+export function tenderNotificationMatchReason(tender: Tender, rule: TenderNotificationRule) {
+  const reasons = [];
+  const deadline = assessTenderDeadline(tender);
+  const availability = assessTenderSourceAvailability(tender);
+  if (rule.keyword) reasons.push(`キーワード: ${rule.keyword}`);
+  if (rule.agency_name) reasons.push(`発注機関: ${rule.agency_name}`);
+  if (rule.prefecture) reasons.push(`都道府県: ${rule.prefecture}`);
+  if (rule.region) reasons.push(`地域: ${rule.region}`);
+  if (rule.tender_type) reasons.push(`案件区分: ${rule.tender_type}`);
+  if (rule.defense_only) reasons.push("防衛省・自衛隊のみ");
+  if (deadline.status === "unknown") reasons.push(`期限不明: ${availability.status}`);
+  if (deadline.daysUntil !== null) reasons.push(`締切まで${deadline.daysUntil}日`);
+  return reasons.length ? reasons.join(" / ") : "通知条件に一致";
+}
+
+function tenderSearchHaystack(tender: Tender) {
+  return [
+    tender.title,
+    tender.agency_name,
+    tender.region,
+    tender.prefecture,
+    tender.detail_memo,
+    tender.raw_text,
+    tender.required_qualification,
+    tender.source_name,
+    tender.tender_sources?.source_name,
+    tender.tender_sources?.name
+  ].filter(Boolean).join(" ");
+}
+
+function splitKeywords(value: string) {
+  return String(value)
+    .split(/[\s,、]+/)
+    .map((keyword) => keyword.trim())
+    .filter(Boolean);
 }
 
 function normalizeDeadlineStatus(value: string | undefined): TenderFilters["deadlineStatus"] {

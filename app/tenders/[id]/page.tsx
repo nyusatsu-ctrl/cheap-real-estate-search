@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, Star } from "lucide-react";
-import { saveFavoriteTenderAction } from "@/app/tenders/actions";
+import { ArrowLeft, Bell, ExternalLink, FileText, Star } from "lucide-react";
+import { saveFavoriteTenderAction, saveNotificationAction } from "@/app/tenders/actions";
 import { FAVORITE_TENDER_STATUS_LABELS, TENDER_SOURCE_ORGANIZATION_TYPE_LABELS, TENDER_TYPE_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { getSimilarPastAwardResults, summarizePastAwards } from "@/lib/past-awards";
@@ -194,6 +194,41 @@ export default async function TenderDetailPage({ params }: { params: Promise<{ i
               <textarea name="memo" rows={3} className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
             </label>
             <button className="justify-self-start rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring">保存する</button>
+          </form>
+        </div>
+
+        <div id="notification-rule" className="mt-6 rounded-lg border border-sky-200 bg-sky-50 p-4">
+          <h2 className="flex items-center gap-2 text-lg font-black text-slate-950">
+            <Bell className="h-5 w-5 text-sky-700" />
+            似た条件の新着案件を通知
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            この案件の発注機関・地域・案件区分をもとに、今後新たに公開された該当案件をアプリ内通知で確認できます。
+          </p>
+          <form action={saveNotificationAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input type="hidden" name="name" value={`${tender.agency_name}の新着案件`} />
+            <input type="hidden" name="agency_name" value={tender.agency_name} />
+            <input type="hidden" name="region" value={tender.region} />
+            <input type="hidden" name="prefecture" value={tender.prefecture} />
+            <input type="hidden" name="tender_type" value={tender.tender_type} />
+            <input type="hidden" name="participation_condition" value={tender.qualification_required ? "other_conditions" : "not_required"} />
+            <input type="hidden" name="min_days_until_deadline" value="0" />
+            <input type="hidden" name="include_unknown_deadline" value="on" />
+            <input type="hidden" name="app_enabled" value="on" />
+            <input type="hidden" name="is_active" value="on" />
+            {tender.is_defense ? <input type="hidden" name="defense_only" value="on" /> : null}
+            <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+              追加キーワード（任意）
+              <input name="keyword" placeholder="例: 清掃 警備 備品" className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring" />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+              除外キーワード（任意）
+              <input name="exclude_keyword" placeholder="例: 契約条項 様式 結果" className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring" />
+            </label>
+            <button className="inline-flex items-center justify-center gap-2 rounded bg-sky-700 px-4 py-2 text-sm font-bold text-white focus-ring sm:col-span-2 sm:justify-self-start">
+              <Bell className="h-4 w-4" />
+              この条件で通知を作成
+            </button>
           </form>
         </div>
 

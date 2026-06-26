@@ -3,12 +3,15 @@
 import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export function AppHeader() {
   const pathname = usePathname();
   const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities") || pathname.startsWith("/admin/sales-help");
   const isTenderRoute =
     pathname.startsWith("/tenders")
+    || pathname.startsWith("/favorites")
+    || pathname.startsWith("/notifications")
     || pathname.startsWith("/qualification")
     || pathname.startsWith("/support-product")
     || pathname.startsWith("/admin/tenders")
@@ -75,6 +78,10 @@ function TenderHeader() {
           <Link href="/favorites" className="hover:text-brand-700">
             お気に入り
           </Link>
+          <Link href="/notifications" className="inline-flex items-center gap-1 hover:text-brand-700">
+            通知
+            <TenderUnreadBadge />
+          </Link>
           <Link href="/qualification" className="hover:text-brand-700">
             資格ガイド
           </Link>
@@ -87,6 +94,32 @@ function TenderHeader() {
         </nav>
       </div>
     </header>
+  );
+}
+
+function TenderUnreadBadge() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let ignore = false;
+    fetch("/api/tender-notifications/unread-count", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<{ count?: number }> : { count: 0 })
+      .then((data) => {
+        if (!ignore) setCount(Number(data.count ?? 0));
+      })
+      .catch(() => {
+        if (!ignore) setCount(0);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  if (count <= 0) return null;
+  return (
+    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-700 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 

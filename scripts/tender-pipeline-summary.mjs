@@ -39,8 +39,10 @@ async function main() {
   const published = tenders.filter((row) => row.status === "published");
   const deadline = countDeadlineStatus(published);
   const availability = countSourceAvailability(published);
-  const nonPipelineLogs = runLogs.filter((log) => !isPipelineLog(log));
-  const aggregate = aggregateLogs(nonPipelineLogs);
+  const notificationLog = latestNotificationLog(runLogs);
+  const notificationSummary = parseNotificationSummary(notificationLog?.error_message);
+  const activityLogs = runLogs.filter((log) => !isPipelineLog(log) && !isNotificationLog(log));
+  const aggregate = aggregateLogs(activityLogs);
   const candidateActivity = await countCandidateActivity(startedAt);
   const durationSeconds = Math.max(0, Math.round((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
   const previous = parsePipelineSummary(previousPipeline?.error_message);
@@ -50,9 +52,10 @@ async function main() {
     pendingCandidates,
     publishedCount: published.length,
     durationSeconds,
+    notificationSummary,
     previous,
     stepStatuses,
-    nonPipelineLogs
+    nonPipelineLogs: activityLogs
   });
   const status = statusFrom(stepStatuses, warnings);
 
@@ -81,6 +84,12 @@ async function main() {
     source_closed: availability.source_closed,
     source_unknown: availability.source_unknown,
     deadline_update_count: candidateActivity.deadline_update_count,
+    notification_rule_count: notificationSummary?.active_rule_count ?? 0,
+    notification_target_user_count: notificationSummary?.target_user_count ?? 0,
+    notification_created_count: notificationSummary?.created_count ?? 0,
+    notification_duplicate_skipped_count: notificationSummary?.duplicate_skipped_count ?? 0,
+    notification_error_count: notificationSummary?.error_count ?? 0,
+    email_outbox_pending_count: notificationSummary?.email_outbox_pending_count ?? 0,
     error_count: aggregate.error_count,
     timeout_count: aggregate.timeout_count,
     step_statuses: stepStatuses,
@@ -137,6 +146,12 @@ async function recordPipelineLog(summary) {
     source_closed: summary.source_closed,
     source_unknown: summary.source_unknown,
     deadline_update_count: summary.deadline_update_count,
+    notification_rule_count: summary.notification_rule_count,
+    notification_target_user_count: summary.notification_target_user_count,
+    notification_created_count: summary.notification_created_count,
+    notification_duplicate_skipped_count: summary.notification_duplicate_skipped_count,
+    notification_error_count: summary.notification_error_count,
+    email_outbox_pending_count: summary.email_outbox_pending_count,
     warnings: summary.warnings
   })}`;
   const { error } = await supabase.from("tender_crawl_logs").insert({
@@ -189,6 +204,12 @@ async function writeGitHubStepSummary(summary) {
     `| source_closed | ${summary.source_closed} |`,
     `| source_unknown | ${summary.source_unknown} |`,
     `| Deadline updates | ${summary.deadline_update_count} |`,
+    `| Active notification rules | ${summary.notification_rule_count} |`,
+    `| Notification target users | ${summary.notification_target_user_count} |`,
+    `| App notifications created | ${summary.notification_created_count} |`,
+    `| Notification duplicates skipped | ${summary.notification_duplicate_skipped_count} |`,
+    `| Email outbox pending | ${summary.email_outbox_pending_count} |`,
+    `| Notification errors | ${summary.notification_error_count} |`,
     `| Errors | ${summary.error_count} |`,
     `| Timeouts | ${summary.timeout_count} |`,
     "",
@@ -221,7 +242,7 @@ function aggregateLogs(logs) {
   }), { fetched_count: 0, created_count: 0, duplicate_count: 0, skipped_count: 0, error_count: 0, timeout_count: 0 });
 }
 
-function buildWarnings({ aggregate, candidateActivity, pendingCandidates, publishedCount, durationSeconds, previous, stepStatuses, nonPipelineLogs }) {
+function buildWarnings({ aggregate, candidateActivity, pendingCandidates, publishedCount, durationSeconds, notificationSummary, previous, stepStatuses, nonPipelineLogs }) {
   const warnings = [];
   if (aggregate.created_count === 0) warnings.push("新規取得0件");
   if (aggregate.fetched_count > 0 && aggregate.error_count / aggregate.fetched_count >= 0.2) warnings.push("エラー率20%以上");
@@ -232,6 +253,7 @@ function buildWarnings({ aggregate, candidateActivity, pendingCandidates, publis
   if (nonPipelineLogs.some((log) => /調達ポータル/.test(log.error_message ?? "") && numberValue(log.fetched_count) === 0)) warnings.push("調達ポータル全件取得失敗の可能性");
   if (nonPipelineLogs.some((log) => /防衛系/.test(log.error_message ?? "") && numberValue(log.fetched_count) === 0)) warnings.push("防衛省系全件取得失敗の可能性");
   if (candidateActivity.auto_published_count === 0 && aggregate.created_count > 0) warnings.push("新規候補はあるが自動公開0件");
+  if (numberValue(notificationSummary?.error_count) > 0) warnings.push("通知照合エラーあり");
   return [...new Set(warnings)];
 }
 
@@ -308,6 +330,20 @@ function parsePipelineSummary(value) {
 
 function isPipelineLog(log) {
   return String(log.error_message ?? "").startsWith("daily_pipeline_summary:");
+}
+
+function isNotificationLog(log) {
+  return String(log.error_message ?? "").startsWith("tender_notifications_summary:");
+}
+
+function latestNotificationLog(logs) {
+  return [...logs].reverse().find(isNotificationLog) ?? null;
+}
+
+function parseNotificationSummary(value) {
+  const text = String(value ?? "");
+  if (!text.startsWith("tender_notifications_summary:")) return null;
+  return parseJson(text.slice("tender_notifications_summary:".length), null);
 }
 
 async function countRows(table, configure) {

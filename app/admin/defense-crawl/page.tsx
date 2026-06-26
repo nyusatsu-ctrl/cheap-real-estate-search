@@ -6,6 +6,7 @@ import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAc
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
+import { getTenderNotificationDiagnostics } from "@/lib/tender-notifications";
 import { assessTenderDeadline, assessTenderSourceAvailability } from "@/lib/tender-deadlines";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
 import { isDefenseLike, isWesternAreaAccounting, normalizeDefenseTender, tenderRegion } from "@/lib/tender-normalization";
@@ -37,9 +38,9 @@ export default async function DefenseCrawlPage() {
   const localCandidates = readJson<TenderCandidate[]>(candidatePath, []);
   const localTenders = readJson<Tender[]>(tenderImportPath, []);
   const crawlSummary = readJson<DefenseCrawlSummary>(summaryPath, null);
-  const [dbSources, dbCandidates, dbTenders, crawlLogs] = admin
-    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20)])
-    : [[], [], [], [] as TenderCrawlLog[]];
+  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics] = admin
+    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20), getTenderNotificationDiagnostics()])
+    : [[], [], [], [] as TenderCrawlLog[], null];
   const dbDiagnostics = admin ? await getTenderDatabaseDiagnostics() : null;
   const sources = admin && dbSources.length ? dbSources : localSources;
   const candidates = (admin ? dbCandidates : localCandidates).map(normalizeDefenseTender);
@@ -52,7 +53,7 @@ export default async function DefenseCrawlPage() {
   const sourceDeadlineMetrics = countDeadlineMetricsBySource(publishedTenders);
   const counts = countSources(sources);
   const crawlReadyCount = sources.filter((source) => source.is_active && source.crawl_ready && source.crawler_type !== "manual_only").length;
-  const latestLog = crawlLogs[0] ?? dbDiagnostics?.latestLog ?? null;
+  const latestLog = crawlLogs.find((log) => !isDailyPipelineLog(log) && !isTenderNotificationLog(log)) ?? dbDiagnostics?.latestLog ?? null;
   const pipelineLog = crawlLogs.find(isDailyPipelineLog) ?? null;
   const pipelineSummary = parseDailyPipelineSummary(pipelineLog?.error_message);
   const sourceErrors = sources.filter((source) => source.last_error_message);
@@ -93,6 +94,10 @@ export default async function DefenseCrawlPage() {
 
       {admin ? (
         <DailyPipelineStatus log={pipelineLog} summary={pipelineSummary} />
+      ) : null}
+
+      {admin ? (
+        <TenderNotificationStatus diagnostics={notificationDiagnostics} summary={pipelineSummary} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -422,6 +427,41 @@ function DailyPipelineStatus({
   );
 }
 
+function TenderNotificationStatus({
+  diagnostics,
+  summary
+}: {
+  diagnostics: Awaited<ReturnType<typeof getTenderNotificationDiagnostics>> | null;
+  summary: DailyPipelineSummary | null;
+}) {
+  return (
+    <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-slate-950">新着案件通知 診断</h3>
+          <p className="mt-1 text-slate-600">通知条件と日次パイプラインで作成されたアプリ内通知の状態を確認します。個人のメールアドレスは表示しません。</p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${diagnostics?.error ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {diagnostics?.error ? "確認が必要" : "確認OK"}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="有効通知条件数" value={String(diagnostics?.activeRuleCount ?? summary?.notification_rule_count ?? "-")} />
+        <StatusItem label="通知対象ユーザー数" value={String(diagnostics?.targetUserCount ?? summary?.notification_target_user_count ?? "-")} />
+        <StatusItem label="今回作成通知数" value={String(diagnostics?.latestCreatedCount ?? summary?.notification_created_count ?? "-")} />
+        <StatusItem label="重複スキップ数" value={String(diagnostics?.latestDuplicateSkippedCount ?? summary?.notification_duplicate_skipped_count ?? "-")} />
+        <StatusItem label="通知エラー数" value={String(diagnostics?.latestErrorCount ?? summary?.notification_error_count ?? "-")} />
+        <StatusItem label="メール送信待ち数" value={String(diagnostics?.emailPendingCount ?? summary?.email_outbox_pending_count ?? "-")} />
+        <StatusItem label="最終通知処理日時" value={diagnostics?.latestProcessedAt ? formatDateTime(diagnostics.latestProcessedAt) : "-"} />
+        <StatusItem label="実メール送信" value="無効" />
+      </div>
+      {diagnostics?.error ? (
+        <p className="mt-3 break-all text-xs text-amber-800">確認事項: {diagnostics.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function StatusItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-white/70 bg-white/70 p-3">
@@ -615,6 +655,10 @@ function isDailyPipelineLog(log: TenderCrawlLog) {
   return String(log.error_message ?? "").startsWith("daily_pipeline_summary:");
 }
 
+function isTenderNotificationLog(log: TenderCrawlLog) {
+  return String(log.error_message ?? "").startsWith("tender_notifications_summary:");
+}
+
 function parseDailyPipelineSummary(value?: string | null): DailyPipelineSummary | null {
   const text = String(value ?? "");
   if (!text.startsWith("daily_pipeline_summary:")) return null;
@@ -665,6 +709,12 @@ type DailyPipelineSummary = {
   expired: number;
   unknown: number;
   source_closed: number;
+  notification_rule_count?: number;
+  notification_target_user_count?: number;
+  notification_created_count?: number;
+  notification_duplicate_skipped_count?: number;
+  notification_error_count?: number;
+  email_outbox_pending_count?: number;
   error_count: number;
   warnings: string[];
 };

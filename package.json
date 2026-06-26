@@ -36,6 +36,7 @@
     "classify:tender-candidates": "node scripts/classify-tender-candidates.mjs",
     "classify:tender-deadlines": "node scripts/classify-tender-deadlines.mjs",
     "refetch:tender-deadlines": "node scripts/refetch-tender-deadlines.mjs",
+    "adapter:tender-deadlines": "node scripts/tender-deadline-source-adapters.mjs",
     "normalize:defense-tenders": "node scripts/normalize-defense-tenders.mjs",
     "gps:tcp": "node server/mv930g/tcp-server.mjs",
     "gps:test-send": "node server/mv930g/send-test.mjs"

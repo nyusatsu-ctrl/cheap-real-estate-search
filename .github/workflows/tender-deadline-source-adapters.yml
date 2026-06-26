@@ -1,0 +1,63 @@
+name: Tender deadline source adapters
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "analyze, dry_run, or apply"
+        required: true
+        default: "analyze"
+        type: choice
+        options:
+          - analyze
+          - dry_run
+          - apply
+      limit:
+        description: "Maximum unknown published tenders to inspect"
+        required: true
+        default: "5000"
+      sample:
+        description: "Sample rows per group"
+        required: true
+        default: "10"
+      top_sources:
+        description: "Top source/domain groups to print"
+        required: true
+        default: "20"
+      max_links_per_tender:
+        description: "Maximum related links to follow per tender"
+        required: true
+        default: "6"
+
+jobs:
+  source-adapters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TENDER_SUPABASE_URL: ${{ secrets.TENDER_SUPABASE_URL }}
+      TENDER_SUPABASE_ANON_KEY: ${{ secrets.TENDER_SUPABASE_ANON_KEY }}
+      TENDER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TENDER_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install PDF text extraction tools
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Analyze source-specific deadline adapters
+        run: npm run adapter:tender-deadlines -- --mode=${{ inputs.mode }} --limit=${{ inputs.limit }} --sample=${{ inputs.sample }} --top-sources=${{ inputs.top_sources }} --max-links-per-tender=${{ inputs.max_links_per_tender }}
+
+      - name: Tender DB summary
+        if: always()
+        run: node scripts/tender-db-summary.mjs

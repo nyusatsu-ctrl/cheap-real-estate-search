@@ -1,8 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
+import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { TENDER_PRODUCT_CODE, TENDER_TRIAL_DAYS } from "@/lib/tender-billing";
 
 export type TenderSubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "expired" | "admin";
@@ -242,7 +241,7 @@ async function getTenderAccessForUser(user: CommonAuthUser, options: { createTri
 }
 
 async function getCommonAuthUser(): Promise<CommonAuthUser | null> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) {
     return {
       id: "demo-tender-user",

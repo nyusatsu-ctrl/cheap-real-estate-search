@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
 import { ensureTenderTrialForCurrentUser, ensureTenderTrialForUser } from "@/lib/tender-access";
 
 function requiredString(formData: FormData, key: string) {
@@ -25,7 +25,7 @@ function authErrorMessage(message: string) {
 }
 
 export async function signUpTenderMemberAction(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) redirect("/tenders/signup?error=setup");
 
   const email = requiredString(formData, "email");
@@ -44,7 +44,7 @@ export async function signUpTenderMemberAction(formData: FormData) {
 }
 
 export async function signInTenderMemberAction(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTenderSupabaseServerClient();
   if (!supabase) redirect("/tenders/login?error=setup");
 
   const email = requiredString(formData, "email");

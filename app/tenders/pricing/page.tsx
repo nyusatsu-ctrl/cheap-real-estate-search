@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Bell, Check, CreditCard, FileSearch, ShieldCheck, Star } from "lucide-react";
+import { startTenderCheckoutAction } from "@/app/tenders/billing/actions";
+import { getCurrentTenderAccess } from "@/lib/tender-access";
 import { TENDER_MONTHLY_PRICE_TEXT, TENDER_SERVICE_NAME, TENDER_TRIAL_DAYS } from "@/lib/tender-billing";
 import { tenderMetadata } from "@/lib/tender-metadata";
 
@@ -8,6 +10,8 @@ export const metadata: Metadata = tenderMetadata(
   "料金｜官公庁案件サーチ",
   "官公庁案件サーチは14日間無料、無料期間中カード登録不要。継続利用は月額9,800円（税込）です。"
 );
+
+export const dynamic = "force-dynamic";
 
 const features = [
   "物品・役務・オープンカウンター案件の検索",
@@ -20,7 +24,10 @@ const features = [
   "CSVや管理画面での運用状況確認"
 ];
 
-export default function TenderPricingPage() {
+export default async function TenderPricingPage() {
+  const access = await getCurrentTenderAccess();
+  const canStartCheckout = Boolean(access && access.subscriptionStatus !== "admin");
+
   return (
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
@@ -43,6 +50,17 @@ export default function TenderPricingPage() {
               <Link href="/tenders/login" className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
                 ログイン
               </Link>
+              {canStartCheckout ? (
+                <form action={startTenderCheckoutAction}>
+                  <button className="inline-flex w-full items-center justify-center rounded border border-brand-700 bg-white px-5 py-3 font-bold text-brand-700 focus-ring sm:w-auto">
+                    有料プランに申し込む
+                  </button>
+                </form>
+              ) : (
+                <Link href="/tenders/login?next=/tenders/billing" className="inline-flex items-center justify-center rounded border border-brand-700 bg-white px-5 py-3 font-bold text-brand-700 focus-ring">
+                  有料プランに申し込む
+                </Link>
+              )}
             </div>
           </div>
 

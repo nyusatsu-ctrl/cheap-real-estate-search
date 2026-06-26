@@ -32,9 +32,12 @@ async function main() {
   const unknownTenders = await readUnknownPublishedTenders(limit);
   const analyses = await mapLimit(unknownTenders, concurrency, analyzeTender);
   const highConfidence = analyses.filter((item) => item.best?.confidence === "high");
+  const conflictById = await findDeadlineConflicts(highConfidence);
+  const safeHighConfidence = highConfidence.filter((item) => !conflictById.has(item.row.id));
+  const duplicateConflict = highConfidence.filter((item) => conflictById.has(item.row.id));
   const mediumConfidence = analyses.filter((item) => item.best?.confidence === "medium");
   const stillUnknown = analyses.filter((item) => !item.best);
-  const expiredHighConfidence = highConfidence.filter((item) => deadlineStatus(item.best.deadlineAt) === "expired");
+  const expiredHighConfidence = safeHighConfidence.filter((item) => deadlineStatus(item.best.deadlineAt) === "expired");
 
   const summary = {
     event: shouldApply ? "tender_deadline_source_adapter_apply_plan" : mode === "dry_run" ? "tender_deadline_source_adapter_dry_run" : "tender_deadline_source_analysis",
@@ -48,6 +51,8 @@ async function main() {
     pdf_fetch_failure_count: analyses.filter((item) => item.fetch.pdfAttempts > 0 && item.fetch.pdfSuccess === 0).length,
     image_pdf_count: sum(analyses, (item) => item.fetch.imagePdfCount),
     high_confidence_extract_count: highConfidence.length,
+    safe_high_confidence_update_count: safeHighConfidence.length,
+    duplicate_conflict_count: duplicateConflict.length,
     medium_confidence_count: mediumConfidence.length,
     still_unknown_count: stillUnknown.length,
     expired_after_apply_count: expiredHighConfidence.length,
@@ -61,12 +66,18 @@ async function main() {
     top_source_details: sourceDetails(analyses, topSources),
     samples: {
       high: sampleAnalyses(highConfidence, sampleSize),
+      safe_high: sampleAnalyses(safeHighConfidence, sampleSize),
+      duplicate_conflict: sampleAnalyses(duplicateConflict, sampleSize).map((sample) => ({
+        ...sample,
+        duplicate_conflict: conflictById.get(sample.id) ?? null
+      })),
       medium: sampleAnalyses(mediumConfidence, sampleSize),
       still_unknown: sampleAnalyses(stillUnknown, sampleSize),
       image_pdf: sampleAnalyses(analyses.filter((item) => item.fetch.imagePdfCount > 0), sampleSize)
     },
     safety_checks: {
       only_high_confidence_will_be_applied: true,
+      duplicate_conflicts_skipped: true,
       medium_kept_unknown: true,
       archived_tenders: 0,
       forbidden_labels_not_applied: ["履行期限", "納入期限", "納期", "契約期間", "公告日", "掲載日", "更新日", "質問受付期限", "説明会日時", "開札日時のみ"]
@@ -79,7 +90,13 @@ async function main() {
 
   let updated = 0;
   const errors = [];
+  const skipped = [];
   for (const analysis of highConfidence) {
+    const conflict = conflictById.get(analysis.row.id);
+    if (conflict) {
+      skipped.push({ id: analysis.row.id, reason: "duplicate_deadline_conflict", conflict });
+      continue;
+    }
     const deadlineAt = analysis.best.deadlineAt;
     const { error } = await supabase.from("tenders").update({
       deadline_at: deadlineAt,
@@ -94,10 +111,58 @@ async function main() {
     event: "tender_deadline_source_adapter_apply_result",
     project_ref: projectRef(url),
     updated_tenders: updated,
+    skipped_tenders: skipped.length,
     archived_tenders: 0,
     error_count: errors.length,
+    skipped: skipped.slice(0, 10),
     errors: errors.slice(0, 10)
   }, null, 2));
+}
+
+async function findDeadlineConflicts(highConfidence) {
+  const conflictById = new Map();
+  const uniqueChecks = uniqueBy(highConfidence.map((item) => ({
+    id: item.row.id,
+    title: item.row.title,
+    agencyName: item.row.agency_name,
+    deadlineAt: item.best?.deadlineAt
+  })).filter((item) => item.title && item.agencyName && item.deadlineAt), (item) => `${item.agencyName}\n${item.title}\n${item.deadlineAt}`);
+
+  for (const check of uniqueChecks) {
+    const { data, error } = await supabase
+      .from("tenders")
+      .select("id,title,agency_name,deadline_at,source_url")
+      .eq("agency_name", check.agencyName)
+      .eq("title", check.title)
+      .eq("deadline_at", check.deadlineAt)
+      .neq("id", check.id)
+      .limit(3);
+    if (error) {
+      conflictById.set(check.id, { type: "conflict_check_failed", error: error.message });
+      continue;
+    }
+    if (data?.length) {
+      conflictById.set(check.id, {
+        type: "existing_tender_same_agency_title_deadline",
+        deadline_at: check.deadlineAt,
+        conflicting_ids: data.map((row) => row.id)
+      });
+    }
+  }
+
+  const grouped = groupBy(highConfidence.filter((item) => item.row.title && item.row.agency_name && item.best?.deadlineAt), (item) => `${item.row.agency_name}\n${item.row.title}\n${item.best.deadlineAt}`);
+  for (const groupItems of grouped.values()) {
+    if (groupItems.length <= 1) continue;
+    for (const item of groupItems.slice(1)) {
+      conflictById.set(item.row.id, {
+        type: "same_run_same_agency_title_deadline",
+        deadline_at: item.best.deadlineAt,
+        conflicting_ids: [groupItems[0].row.id]
+      });
+    }
+  }
+
+  return conflictById;
 }
 
 async function readUnknownPublishedTenders(limitRows) {

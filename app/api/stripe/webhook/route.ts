@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { createStripeClient } from "@/lib/billing/stripe";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
-import { TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
+import { createTenderStripeClient, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
 
 export async function POST(request: NextRequest) {
   const stripe = createStripeClient();
@@ -164,7 +164,7 @@ function stripeEventProductCode(event: Stripe.Event) {
 }
 
 async function fetchSubscriptionPeriodEnd(subscriptionId: string) {
-  const stripe = createStripeClient();
+  const stripe = createTenderStripeClient();
   if (!stripe) return null;
   try {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);

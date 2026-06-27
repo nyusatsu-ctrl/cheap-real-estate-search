@@ -1,6 +1,5 @@
 import "server-only";
-import type Stripe from "stripe";
-import { createStripeClient } from "@/lib/billing/stripe";
+import Stripe from "stripe";
 
 export const TENDER_PRODUCT_CODE = "tenders";
 export const TENDER_SERVICE_NAME = "官公庁案件サーチ";
@@ -22,7 +21,11 @@ export function getTenderStripeSetupStatus() {
 }
 
 export function createTenderStripeClient() {
-  return createStripeClient();
+  if (!process.env.STRIPE_SECRET_KEY) return null;
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2026-05-27.dahlia",
+    httpClient: Stripe.createFetchHttpClient()
+  });
 }
 
 export type TenderStripePriceDiagnostics = {

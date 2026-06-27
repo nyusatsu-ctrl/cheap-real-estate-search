@@ -4,7 +4,7 @@ import type Stripe from "stripe";
 import { createStripeClient } from "@/lib/billing/stripe";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { emailHash } from "@/lib/tender-access";
-import { createTenderStripeClient, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
+import { createTenderStripeClient, getTenderStripePriceId, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,13 @@ export async function POST(request: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!stripe || !webhookSecret) {
-    return NextResponse.json({ error: "Webhook environment is not configured." }, { status: 500 });
+    return NextResponse.json({
+      error: "Webhook environment is not configured.",
+      missing: [
+        stripe ? null : "STRIPE_SECRET_KEY",
+        webhookSecret ? null : "STRIPE_WEBHOOK_SECRET"
+      ].filter(Boolean)
+    }, { status: 500 });
   }
 
   const body = await request.text();
@@ -42,7 +48,11 @@ export async function POST(request: NextRequest) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ error: "Webhook environment is not configured." }, { status: 500 });
+    return NextResponse.json({
+      error: "Common billing webhook environment is not configured.",
+      received: true,
+      ignored: true
+    });
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -78,8 +88,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleTenderStripeEvent(event: Stripe.Event) {
-  const productCode = stripeEventProductCode(event);
-  if (productCode !== TENDER_PRODUCT_CODE) return false;
+  if (!(await isTenderStripeEvent(event))) return false;
 
   const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) {
@@ -103,8 +112,7 @@ async function handleTenderStripeEvent(event: Stripe.Event) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const userId = session.metadata?.user_id;
-    if (!userId) return true;
+    const userId = session.metadata?.user_id ?? null;
 
     const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
     const currentPeriodEnd = subscriptionId ? await fetchSubscriptionPeriodEnd(subscriptionId) : null;
@@ -184,7 +192,7 @@ async function upsertTenderStripeAccess({
   currentPeriodEnd,
   cancelAtPeriodEnd
 }: {
-  userId: string;
+  userId: string | null;
   email: string | null;
   status: "active" | "past_due" | "canceled";
   customerId: string | null;
@@ -195,12 +203,16 @@ async function upsertTenderStripeAccess({
   const supabase = createTenderSupabaseServiceRoleClient();
   if (!supabase) return { error: { message: "TENDER_SUPABASE_SERVICE_ROLE_KEY is not configured." } };
 
-  const { data: existing, error: lookupError } = await supabase
+  const email_hash = email ? emailHash(email) : null;
+  const lookup = supabase
     .from("tender_user_access")
     .select("id")
-    .eq("user_id", userId)
-    .eq("product_code", TENDER_PRODUCT_CODE)
-    .maybeSingle();
+    .eq("product_code", TENDER_PRODUCT_CODE);
+  const { data: existing, error: lookupError } = userId
+    ? await lookup.eq("user_id", userId).maybeSingle()
+    : email_hash
+      ? await lookup.eq("email_hash", email_hash).maybeSingle()
+      : { data: null, error: null };
   if (lookupError) return { error: lookupError };
 
   const payload = {
@@ -215,14 +227,14 @@ async function upsertTenderStripeAccess({
   if (existing?.id) {
     return supabase
       .from("tender_user_access")
-      .update(email ? { ...payload, email, email_hash: emailHash(email) } : payload)
+      .update(email_hash ? { ...payload, email, email_hash } : payload)
       .eq("id", existing.id);
   }
 
-  if (!email) {
+  if (!userId || !email || !email_hash) {
     return {
       error: {
-        message: "Cannot create tender_user_access without customer email."
+        message: "Cannot create tender_user_access without user id and customer email."
       }
     };
   }
@@ -232,10 +244,25 @@ async function upsertTenderStripeAccess({
     .insert({
       user_id: userId,
       email,
-      email_hash: emailHash(email),
+      email_hash,
       product_code: TENDER_PRODUCT_CODE,
       ...payload
     });
+}
+
+async function isTenderStripeEvent(event: Stripe.Event) {
+  if (stripeEventProductCode(event) === TENDER_PRODUCT_CODE) return true;
+  if (stripeEventHasTenderPrice(event)) return true;
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    return checkoutSessionHasTenderPrice(session.id);
+  }
+
+  const subscriptionId = stripeEventSubscriptionId(event);
+  if (subscriptionId) return subscriptionBelongsToTenderAccess(subscriptionId);
+
+  return false;
 }
 
 function stripeEventProductCode(event: Stripe.Event) {
@@ -247,6 +274,54 @@ function stripeEventProductCode(event: Stripe.Event) {
     if (metadata?.product_code) return metadata.product_code;
   }
   return null;
+}
+
+function stripeEventHasTenderPrice(event: Stripe.Event) {
+  const priceId = getTenderStripePriceId();
+  if (!priceId) return false;
+  return collectStringValues(event.data.object, "id").includes(priceId);
+}
+
+async function checkoutSessionHasTenderPrice(sessionId: string) {
+  const priceId = getTenderStripePriceId();
+  const stripe = createTenderStripeClient();
+  if (!priceId || !stripe) return false;
+  try {
+    const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, { limit: 10 });
+    return lineItems.data.some((item) => item.price?.id === priceId);
+  } catch (error) {
+    console.error("[tender-stripe-webhook] failed to inspect checkout line items", {
+      message: error instanceof Error ? sanitizeStripeLogMessage(error.message) : "unknown_error"
+    });
+    return false;
+  }
+}
+
+async function subscriptionBelongsToTenderAccess(subscriptionId: string) {
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) return false;
+  const { count, error } = await supabase
+    .from("tender_user_access")
+    .select("id", { count: "exact", head: true })
+    .eq("product_code", TENDER_PRODUCT_CODE)
+    .eq("payment_subscription_id", subscriptionId);
+  if (error) {
+    console.error("[tender-stripe-webhook] failed to inspect subscription owner", {
+      message: sanitizeStripeLogMessage(error.message)
+    });
+    return false;
+  }
+  return Boolean(count);
+}
+
+function collectStringValues(value: unknown, key: string, depth = 0): string[] {
+  if (!value || depth > 6) return [];
+  if (Array.isArray(value)) return value.flatMap((item) => collectStringValues(item, key, depth + 1));
+  if (typeof value !== "object") return [];
+  return Object.entries(value as Record<string, unknown>).flatMap(([entryKey, entryValue]) => {
+    const own = entryKey === key && typeof entryValue === "string" ? [entryValue] : [];
+    return own.concat(collectStringValues(entryValue, key, depth + 1));
+  });
 }
 
 function stripeEventUserId(event: Stripe.Event) {

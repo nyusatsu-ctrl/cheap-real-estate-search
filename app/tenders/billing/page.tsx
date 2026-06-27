@@ -74,7 +74,9 @@ export default async function TenderBillingPage({
           </div>
         ) : null}
         {params.error ? (
-          <div className="mt-5 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">決済処理を開始できませんでした。</div>
+          <div className="mt-5 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold leading-6 text-rose-700">
+            {tenderBillingErrorMessage(params.error)}
+          </div>
         ) : null}
 
         <dl className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -127,4 +129,18 @@ function formatStripeStatus(status: ReturnType<typeof getTenderStripeSetupStatus
     status.hasAppUrl ? null : "app_url"
   ].filter(Boolean);
   return missing.length ? `不足: ${missing.join(", ")}` : "Checkout/Portal/Webhook準備OK";
+}
+
+function tenderBillingErrorMessage(error: string) {
+  const messages: Record<string, string> = {
+    stripe_price: "Stripeの価格設定を確認できませんでした。Price IDの誤り、またはSecret KeyとPrice IDのlive/testモード不一致が考えられます。管理者へお問い合わせください。",
+    stripe_auth: "StripeのSecret Keyを確認できませんでした。決済設定を確認してください。",
+    stripe_url: "Stripe Checkoutの戻り先URL設定に問題があります。NEXT_PUBLIC_APP_URLを確認してください。",
+    stripe_customer: "Stripeの顧客情報を確認できませんでした。管理者へお問い合わせください。",
+    stripe_resource: "Stripeの決済リソースを確認できませんでした。価格IDや顧客IDの設定を確認してください。",
+    no_customer: "支払方法・解約管理を開くには、有料申込み完了後の顧客情報が必要です。",
+    portal: "Stripeの契約管理画面を開始できませんでした。時間をおいて再度お試しください。",
+    checkout: "Stripe Checkoutを開始できませんでした。時間をおいて再度お試しください。"
+  };
+  return messages[error] ?? "決済処理を開始できませんでした。時間をおいて再度お試しください。";
 }

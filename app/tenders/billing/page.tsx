@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CreditCard, ExternalLink, ShieldCheck } from "lucide-react";
+import { Building2, CreditCard, ExternalLink, ShieldCheck } from "lucide-react";
 import { openTenderCustomerPortalAction, startTenderCheckoutAction } from "@/app/tenders/billing/actions";
 import { formatDate } from "@/lib/format";
 import { getCurrentTenderAccess, tenderAccessNotice, tenderAccessStatusLabel } from "@/lib/tender-access";
@@ -100,6 +100,23 @@ export default async function TenderBillingPage({
               支払方法・解約を管理
             </button>
           </form>
+        </div>
+
+        <div className="mt-4 rounded border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 font-bold text-slate-950">
+                <Building2 className="h-4 w-4 text-brand-700" />
+                銀行振込での申込み
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                法人名義での銀行振込をご希望の場合は、入金確認後に手動で利用権限を付与します。銀行振込は自動更新ではありません。
+              </p>
+            </div>
+            <Link href="/tenders/billing/bank-transfer" className="inline-flex shrink-0 items-center justify-center rounded border border-brand-700 bg-white px-4 py-2 text-sm font-bold text-brand-700 focus-ring">
+              銀行振込で申し込む
+            </Link>
+          </div>
         </div>
 
         <div className="mt-5 rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">

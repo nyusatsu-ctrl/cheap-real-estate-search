@@ -1,5 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
+import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 
 export const TENDER_PRODUCT_CODE = "tenders";
 export const TENDER_SERVICE_NAME = "官公庁案件サーチ";
@@ -110,6 +111,122 @@ export async function getTenderStripePriceDiagnostics(): Promise<TenderStripePri
       ].filter(Boolean).join(" / ")
     };
   }
+}
+
+export async function getTenderPaymentEventDiagnostics() {
+  const supabase = createTenderSupabaseServiceRoleClient();
+  if (!supabase) {
+    return {
+      total: null,
+      checkoutCompleted: null,
+      subscriptionCreated: null,
+      subscriptionUpdated: null,
+      invoicePaid: null,
+      invoicePaymentFailed: null,
+      latest: [] as TenderPaymentEventDiagnostic[],
+      error: "TENDER_SUPABASE_SERVICE_ROLE_KEY が未設定です。"
+    };
+  }
+
+  const eventTypes = [
+    "checkout.session.completed",
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "invoice.paid",
+    "invoice.payment_failed"
+  ];
+
+  const [totalResult, latestResult, ...typeResults] = await Promise.all([
+    supabase.from("tender_payment_events").select("id", { count: "exact", head: true }),
+    supabase
+      .from("tender_payment_events")
+      .select("event_type,user_id,payment_customer_id,payment_subscription_id,processed_at,payload")
+      .order("processed_at", { ascending: false })
+      .limit(8),
+    ...eventTypes.map((eventType) => supabase.from("tender_payment_events").select("id", { count: "exact", head: true }).eq("event_type", eventType))
+  ]);
+
+  const firstError = [totalResult, latestResult, ...typeResults].find((result) => result.error)?.error;
+  if (firstError) {
+    return {
+      total: null,
+      checkoutCompleted: null,
+      subscriptionCreated: null,
+      subscriptionUpdated: null,
+      invoicePaid: null,
+      invoicePaymentFailed: null,
+      latest: [] as TenderPaymentEventDiagnostic[],
+      error: firstError.message
+    };
+  }
+
+  return {
+    total: totalResult.count ?? 0,
+    checkoutCompleted: typeResults[0].count ?? 0,
+    subscriptionCreated: typeResults[1].count ?? 0,
+    subscriptionUpdated: typeResults[2].count ?? 0,
+    invoicePaid: typeResults[3].count ?? 0,
+    invoicePaymentFailed: typeResults[4].count ?? 0,
+    latest: ((latestResult.data ?? []) as RawTenderPaymentEvent[]).map(toTenderPaymentEventDiagnostic),
+    error: null as string | null
+  };
+}
+
+type RawTenderPaymentEvent = {
+  event_type: string;
+  user_id: string | null;
+  payment_customer_id: string | null;
+  payment_subscription_id: string | null;
+  processed_at: string;
+  payload: Record<string, unknown> | null;
+};
+
+export type TenderPaymentEventDiagnostic = {
+  eventType: string;
+  processedAt: string;
+  hasUserId: boolean;
+  hasCustomerId: boolean;
+  hasSubscriptionId: boolean;
+  productCode: string | null;
+  objectStatus: string | null;
+  subscriptionStatus: string | null;
+};
+
+function toTenderPaymentEventDiagnostic(row: RawTenderPaymentEvent): TenderPaymentEventDiagnostic {
+  const object = eventObject(row.payload);
+  const subscription = objectRecord(object?.subscription);
+  return {
+    eventType: row.event_type,
+    processedAt: row.processed_at,
+    hasUserId: Boolean(row.user_id),
+    hasCustomerId: Boolean(row.payment_customer_id),
+    hasSubscriptionId: Boolean(row.payment_subscription_id),
+    productCode: eventProductCode(object),
+    objectStatus: stringValue(object?.status),
+    subscriptionStatus: stringValue(subscription?.status)
+  };
+}
+
+function eventObject(payload: Record<string, unknown> | null) {
+  const data = objectRecord(payload?.data);
+  return objectRecord(data?.object);
+}
+
+function eventProductCode(object: Record<string, unknown> | null) {
+  const metadata = objectRecord(object?.metadata);
+  if (typeof metadata?.product_code === "string") return metadata.product_code;
+  const subscriptionDetails = objectRecord(object?.subscription_details);
+  const subscriptionMetadata = objectRecord(subscriptionDetails?.metadata);
+  if (typeof subscriptionMetadata?.product_code === "string") return subscriptionMetadata.product_code;
+  return null;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : null;
 }
 
 function stripeSecretKeyMode(value: string | undefined): TenderStripePriceDiagnostics["secretKeyMode"] {

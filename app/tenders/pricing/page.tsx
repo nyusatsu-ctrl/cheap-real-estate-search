@@ -91,6 +91,13 @@ export default async function TenderPricingPage() {
                 <p className="mt-1 text-sm text-slate-600">有料申込み後から毎月自動更新です。</p>
               </div>
               <div className="rounded border border-slate-200 p-4">
+                <dt className="text-sm font-bold text-slate-500">銀行振込</dt>
+                <dd className="mt-1 text-lg font-black text-slate-950">手動対応</dd>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  クレジットカードをお持ちでない方、または法人名義での銀行振込をご希望の方は、銀行振込でのお申し込みも可能です。入金確認後、利用権限を付与いたします。
+                </p>
+              </div>
+              <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">年額プラン</dt>
                 <dd className="mt-1 text-2xl font-black text-slate-950">なし</dd>
               </div>

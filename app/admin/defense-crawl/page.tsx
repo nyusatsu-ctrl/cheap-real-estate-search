@@ -2,12 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { runDailyTenderCrawlAction, runDefenseCrawlAction, runDefenseDiscoveryAction, runPortalTenderCrawlAction } from "@/app/admin/defense-crawl/actions";
+import {
+  activateTenderBankTransferRequestAction,
+  runDailyTenderCrawlAction,
+  runDefenseCrawlAction,
+  runDefenseDiscoveryAction,
+  runPortalTenderCrawlAction,
+  updateTenderBankTransferRequestAction
+} from "@/app/admin/defense-crawl/actions";
 import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
+import { getTenderBankTransferAdminSummary, TENDER_BANK_TRANSFER_STATUS_LABELS } from "@/lib/tender-bank-transfer";
 import { getTenderAccessDiagnostics } from "@/lib/tender-access";
-import { getTenderStripePriceDiagnostics } from "@/lib/tender-billing";
+import { getTenderPaymentEventDiagnostics, getTenderStripePriceDiagnostics } from "@/lib/tender-billing";
 import { getTenderNotificationDiagnostics } from "@/lib/tender-notifications";
 import { assessTenderDeadline, assessTenderSourceAvailability } from "@/lib/tender-deadlines";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
@@ -40,9 +48,19 @@ export default async function DefenseCrawlPage() {
   const localCandidates = readJson<TenderCandidate[]>(candidatePath, []);
   const localTenders = readJson<Tender[]>(tenderImportPath, []);
   const crawlSummary = readJson<DefenseCrawlSummary>(summaryPath, null);
-  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics, accessDiagnostics, stripeDiagnostics] = admin
-    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20), getTenderNotificationDiagnostics(), getTenderAccessDiagnostics(), getTenderStripePriceDiagnostics()])
-    : [[], [], [], [] as TenderCrawlLog[], null, null, null];
+  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics, accessDiagnostics, stripeDiagnostics, paymentDiagnostics, bankTransferSummary] = admin
+    ? await Promise.all([
+      getTenderSources(),
+      getTenderCandidates("all"),
+      getAdminTenders(),
+      getTenderCrawlLogs(20),
+      getTenderNotificationDiagnostics(),
+      getTenderAccessDiagnostics(),
+      getTenderStripePriceDiagnostics(),
+      getTenderPaymentEventDiagnostics(),
+      getTenderBankTransferAdminSummary()
+    ])
+    : [[], [], [], [] as TenderCrawlLog[], null, null, null, null, null];
   const dbDiagnostics = admin ? await getTenderDatabaseDiagnostics() : null;
   const sources = admin && dbSources.length ? dbSources : localSources;
   const candidates = (admin ? dbCandidates : localCandidates).map(normalizeDefenseTender);
@@ -108,6 +126,14 @@ export default async function DefenseCrawlPage() {
 
       {admin ? (
         <TenderStripeStatus diagnostics={stripeDiagnostics} />
+      ) : null}
+
+      {admin ? (
+        <TenderPaymentEventStatus diagnostics={paymentDiagnostics} />
+      ) : null}
+
+      {admin ? (
+        <TenderBankTransferStatus summary={bankTransferSummary} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -552,6 +578,156 @@ function TenderStripeStatus({
   );
 }
 
+function TenderPaymentEventStatus({
+  diagnostics
+}: {
+  diagnostics: Awaited<ReturnType<typeof getTenderPaymentEventDiagnostics>> | null;
+}) {
+  return (
+    <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-slate-950">Stripe Webhook 受信診断</h3>
+          <p className="mt-1 text-slate-600">官公庁案件サーチ用のStripeイベントがDBに記録されているか確認します。顧客IDやサブスクリプションIDは表示しません。</p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${diagnostics?.error ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {diagnostics?.error ? "確認が必要" : "確認OK"}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="記録済みイベント" value={formatNullableCount(diagnostics?.total ?? null)} />
+        <StatusItem label="checkout.completed" value={formatNullableCount(diagnostics?.checkoutCompleted ?? null)} />
+        <StatusItem label="subscription.created" value={formatNullableCount(diagnostics?.subscriptionCreated ?? null)} />
+        <StatusItem label="subscription.updated" value={formatNullableCount(diagnostics?.subscriptionUpdated ?? null)} />
+        <StatusItem label="invoice.paid" value={formatNullableCount(diagnostics?.invoicePaid ?? null)} />
+        <StatusItem label="invoice.payment_failed" value={formatNullableCount(diagnostics?.invoicePaymentFailed ?? null)} />
+      </div>
+      {diagnostics?.latest.length ? (
+        <div className="mt-4 overflow-hidden rounded border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-xs">
+            <thead className="bg-slate-50 text-left font-bold text-slate-500">
+              <tr>
+                <th className="px-3 py-2">受信日時</th>
+                <th className="px-3 py-2">イベント</th>
+                <th className="px-3 py-2">product</th>
+                <th className="px-3 py-2">user</th>
+                <th className="px-3 py-2">customer/subscription</th>
+                <th className="px-3 py-2">status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {diagnostics.latest.map((event) => (
+                <tr key={`${event.eventType}-${event.processedAt}`}>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">{formatDateTime(event.processedAt)}</td>
+                  <td className="px-3 py-2 font-semibold text-slate-950">{event.eventType}</td>
+                  <td className="px-3 py-2 text-slate-700">{event.productCode ?? "-"}</td>
+                  <td className="px-3 py-2 text-slate-700">{event.hasUserId ? "あり" : "-"}</td>
+                  <td className="px-3 py-2 text-slate-700">{event.hasCustomerId ? "customerあり" : "-"} / {event.hasSubscriptionId ? "subscriptionあり" : "-"}</td>
+                  <td className="px-3 py-2 text-slate-700">{event.objectStatus ?? event.subscriptionStatus ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-slate-500">直近イベント: -</p>
+      )}
+      {diagnostics?.error ? (
+        <p className="mt-3 break-all text-xs text-amber-800">確認事項: {diagnostics.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function TenderBankTransferStatus({
+  summary
+}: {
+  summary: Awaited<ReturnType<typeof getTenderBankTransferAdminSummary>> | null;
+}) {
+  return (
+    <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-slate-950">銀行振込申込み</h3>
+          <p className="mt-1 text-slate-600">銀行振込は自動課金ではありません。入金確認後、管理者が手動で30日分の利用権限を付与します。</p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${summary?.error ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {summary?.error ? "確認が必要" : "確認OK"}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="総申込み" value={formatNullableCount(summary?.total ?? null)} />
+        <StatusItem label="申込み受付" value={formatNullableCount(summary?.pending ?? null)} />
+        <StatusItem label="請求書送付済み" value={formatNullableCount(summary?.invoiced ?? null)} />
+        <StatusItem label="入金確認済み" value={formatNullableCount(summary?.paid ?? null)} />
+        <StatusItem label="利用権限付与済み" value={formatNullableCount(summary?.activated ?? null)} />
+        <StatusItem label="キャンセル" value={formatNullableCount(summary?.canceled ?? null)} />
+      </div>
+      {summary?.latest.length ? (
+        <div className="mt-4 overflow-hidden rounded border border-slate-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-xs">
+              <thead className="bg-slate-50 text-left font-bold text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">申込日</th>
+                  <th className="px-3 py-2">会社/担当</th>
+                  <th className="px-3 py-2">連絡先</th>
+                  <th className="px-3 py-2">状態</th>
+                  <th className="px-3 py-2">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {summary.latest.map((request) => (
+                  <tr key={request.id}>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">{formatDateTime(request.created_at)}</td>
+                    <td className="px-3 py-3 text-slate-700">
+                      <p className="font-semibold text-slate-950">{request.company_name}</p>
+                      <p>{request.contact_name}</p>
+                      <p className="mt-1 text-slate-500">請求書宛名: {request.invoice_name}</p>
+                    </td>
+                    <td className="px-3 py-3 text-slate-700">
+                      <p>{request.email}</p>
+                      <p>{request.phone}</p>
+                      <p className="mt-1 text-slate-500">開始希望: {formatDate(request.desired_start_date)}</p>
+                    </td>
+                    <td className="px-3 py-3 text-slate-700">
+                      <p className="font-bold">{TENDER_BANK_TRANSFER_STATUS_LABELS[request.status]}</p>
+                      <p className="mt-1 text-slate-500">期限: {formatDate(request.activated_until)}</p>
+                      {request.notes ? <p className="mt-1 max-w-xs text-slate-500">{request.notes}</p> : null}
+                    </td>
+                    <td className="px-3 py-3">
+                      <form action={updateTenderBankTransferRequestAction} className="grid min-w-56 gap-2">
+                        <input type="hidden" name="id" value={request.id} />
+                        <select name="status" defaultValue={request.status} className="rounded border border-slate-300 bg-white px-2 py-1">
+                          {Object.entries(TENDER_BANK_TRANSFER_STATUS_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                        <input name="admin_note" defaultValue={request.admin_note ?? ""} placeholder="管理メモ" className="rounded border border-slate-300 px-2 py-1" />
+                        <button className="rounded border border-slate-300 bg-white px-3 py-1 font-bold text-slate-700 focus-ring">保存</button>
+                      </form>
+                      <form action={activateTenderBankTransferRequestAction} className="mt-2">
+                        <input type="hidden" name="id" value={request.id} />
+                        <input type="hidden" name="admin_note" value={request.admin_note ?? ""} />
+                        <button className="rounded bg-brand-700 px-3 py-1 font-bold text-white focus-ring">30日分を有効化</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-slate-500">直近申込み: -</p>
+      )}
+      {summary?.error ? (
+        <p className="mt-3 break-all text-xs text-amber-800">確認事項: {summary.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function StatusItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-white/70 bg-white/70 p-3">
@@ -833,6 +1009,14 @@ function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: "Asia/Tokyo"
+  }).format(new Date(value));
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("ja-JP", {
+    dateStyle: "short",
     timeZone: "Asia/Tokyo"
   }).format(new Date(value));
 }

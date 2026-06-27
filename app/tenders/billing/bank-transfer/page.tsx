@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Building2, CreditCard } from "lucide-react";
 import { createTenderBankTransferRequestAction } from "@/app/tenders/billing/bank-transfer/actions";
-import { formatDate } from "@/lib/format";
 import { getCurrentTenderBankTransferRequests, TENDER_BANK_TRANSFER_STATUS_LABELS } from "@/lib/tender-bank-transfer";
 import { requireTenderMemberAccess } from "@/lib/tender-access";
 import { TENDER_MONTHLY_PRICE_TEXT } from "@/lib/tender-billing";
@@ -110,10 +109,10 @@ export default async function TenderBankTransferPage({
               <tbody className="divide-y divide-slate-200">
                 {requests.map((request) => (
                   <tr key={request.id}>
-                    <td className="px-3 py-3 text-slate-700">{formatDate(request.created_at)}</td>
+                    <td className="px-3 py-3 text-slate-700">{formatJapanDate(request.created_at)}</td>
                     <td className="px-3 py-3 font-semibold text-slate-950">{request.company_name}</td>
                     <td className="px-3 py-3 text-slate-700">{TENDER_BANK_TRANSFER_STATUS_LABELS[request.status]}</td>
-                    <td className="px-3 py-3 text-slate-700">{formatDate(request.activated_until)}</td>
+                    <td className="px-3 py-3 text-slate-700">{formatJapanDate(request.activated_until)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -125,4 +124,15 @@ export default async function TenderBankTransferPage({
       </div>
     </div>
   );
+}
+
+function formatJapanDate(value: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const year = jst.getUTCFullYear();
+  const month = String(jst.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(jst.getUTCDate()).padStart(2, "0");
+  return `${year}/${month}/${day}`;
 }

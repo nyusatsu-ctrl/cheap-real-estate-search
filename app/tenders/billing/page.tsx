@@ -121,7 +121,7 @@ export default async function TenderBillingPage({
 
         <div className="mt-5 rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
           <ShieldCheck className="mr-1 inline h-4 w-4 text-brand-700" />
-          無料体験だけでは自動課金されません。有料プランへ申し込んだ時点から月額課金が始まり、解約するまで毎月自動更新されます。
+          無料体験だけでは自動課金されません。無料体験中に有料プランへ申し込んだ場合も、無料終了日までは請求されず、無料期間終了後から月額課金が始まります。
         </div>
       </div>
     </div>
@@ -155,6 +155,7 @@ function tenderBillingErrorMessage(error: string) {
     stripe_url: "Stripe Checkoutの戻り先URL設定に問題があります。NEXT_PUBLIC_APP_URLを確認してください。",
     stripe_customer: "Stripeの顧客情報を確認できませんでした。管理者へお問い合わせください。",
     stripe_resource: "Stripeの決済リソースを確認できませんでした。価格IDや顧客IDの設定を確認してください。",
+    already_active: "すでに有料プランが有効です。支払方法や解約は契約管理画面から確認してください。",
     no_customer: "支払方法・解約管理を開くには、有料申込み完了後の顧客情報が必要です。",
     portal: "Stripeの契約管理画面を開始できませんでした。時間をおいて再度お試しください。",
     checkout: "Stripe Checkoutを開始できませんでした。時間をおいて再度お試しください。"

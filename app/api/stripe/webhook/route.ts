@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { createStripeClient } from "@/lib/billing/stripe";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
-import { emailHash } from "@/lib/tender-access";
+import { emailHash, type TenderSubscriptionStatus } from "@/lib/tender-access";
 import { createTenderStripeClient, getTenderStripePriceId, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
 
 export const runtime = "nodejs";
@@ -115,16 +115,17 @@ async function handleTenderStripeEvent(event: Stripe.Event) {
     const userId = session.metadata?.user_id ?? null;
 
     const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
-    const currentPeriodEnd = subscriptionId ? await fetchSubscriptionPeriodEnd(subscriptionId) : null;
+    const subscriptionSnapshot = subscriptionId ? await fetchSubscriptionSnapshot(subscriptionId) : null;
     const email = session.customer_details?.email ?? session.customer_email ?? null;
     const { error } = await upsertTenderStripeAccess({
       userId,
       email,
-      status: "active",
+      status: subscriptionSnapshot?.status ?? "active",
       customerId: typeof session.customer === "string" ? session.customer : null,
       subscriptionId,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: false
+      currentPeriodEnd: subscriptionSnapshot?.currentPeriodEnd ?? null,
+      trialEndsAt: subscriptionSnapshot?.trialEndsAt ?? null,
+      cancelAtPeriodEnd: subscriptionSnapshot?.cancelAtPeriodEnd ?? false
     });
     if (error) logTenderWebhookUpdateError(event.type, error);
     return true;
@@ -145,6 +146,7 @@ async function handleTenderStripeEvent(event: Stripe.Event) {
         customerId: typeof subscription.customer === "string" ? subscription.customer : null,
         subscriptionId: subscription.id,
         currentPeriodEnd: subscriptionPeriodEnd(subscription),
+        trialEndsAt: subscriptionTrialEnd(subscription),
         cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end)
       })
       : await supabase
@@ -154,6 +156,7 @@ async function handleTenderStripeEvent(event: Stripe.Event) {
           payment_customer_id: typeof subscription.customer === "string" ? subscription.customer : null,
           payment_subscription_id: subscription.id,
           current_period_end: subscriptionPeriodEnd(subscription),
+          trial_ends_at: subscriptionTrialEnd(subscription),
           cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
           billing_source: "stripe"
         })
@@ -167,12 +170,17 @@ async function handleTenderStripeEvent(event: Stripe.Event) {
     const invoice = event.data.object;
     const subscriptionId = invoiceSubscriptionId(invoice);
     if (!subscriptionId) return true;
+    const subscriptionSnapshot = await fetchSubscriptionSnapshot(subscriptionId);
+    if (event.type === "invoice.paid" && !subscriptionSnapshot && invoiceAmountPaid(invoice) <= 0) return true;
 
     const { error } = await supabase
       .from("tender_user_access")
       .update({
-        subscription_status: event.type === "invoice.paid" ? "active" : "past_due",
-        billing_source: "stripe"
+        subscription_status: event.type === "invoice.paid" ? subscriptionSnapshot?.status ?? "active" : "past_due",
+        billing_source: "stripe",
+        current_period_end: subscriptionSnapshot?.currentPeriodEnd ?? undefined,
+        trial_ends_at: subscriptionSnapshot?.trialEndsAt ?? undefined,
+        cancel_at_period_end: subscriptionSnapshot?.cancelAtPeriodEnd ?? undefined
       })
       .eq("payment_subscription_id", subscriptionId)
       .eq("product_code", TENDER_PRODUCT_CODE);
@@ -190,14 +198,16 @@ async function upsertTenderStripeAccess({
   customerId,
   subscriptionId,
   currentPeriodEnd,
+  trialEndsAt,
   cancelAtPeriodEnd
 }: {
   userId: string | null;
   email: string | null;
-  status: "active" | "past_due" | "canceled";
+  status: TenderStripeAccessStatus;
   customerId: string | null;
   subscriptionId: string | null;
   currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
   cancelAtPeriodEnd: boolean;
 }) {
   const supabase = createTenderSupabaseServiceRoleClient();
@@ -220,6 +230,7 @@ async function upsertTenderStripeAccess({
     payment_customer_id: customerId,
     payment_subscription_id: subscriptionId,
     current_period_end: currentPeriodEnd,
+    trial_ends_at: trialEndsAt,
     cancel_at_period_end: cancelAtPeriodEnd,
     billing_source: "stripe"
   };
@@ -353,16 +364,30 @@ function stripeEventSubscriptionId(event: Stripe.Event) {
   return null;
 }
 
-async function fetchSubscriptionPeriodEnd(subscriptionId: string) {
+type TenderStripeAccessStatus = Extract<TenderSubscriptionStatus, "trialing" | "active" | "past_due" | "canceled">;
+
+type SubscriptionSnapshot = {
+  status: TenderStripeAccessStatus;
+  currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
+async function fetchSubscriptionSnapshot(subscriptionId: string): Promise<SubscriptionSnapshot | null> {
   const stripe = createTenderStripeClient();
   if (!stripe) return null;
   try {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    return subscriptionPeriodEnd(subscription);
+    return {
+      status: mapTenderSubscriptionStatus(subscription.status),
+      currentPeriodEnd: subscriptionPeriodEnd(subscription),
+      trialEndsAt: subscriptionTrialEnd(subscription),
+      cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end)
+    };
   } catch (error) {
     console.error("[tender-stripe-webhook] failed to retrieve subscription", {
-      subscriptionId,
-      message: error instanceof Error ? error.message : String(error)
+      hasSubscriptionId: Boolean(subscriptionId),
+      message: error instanceof Error ? sanitizeStripeLogMessage(error.message) : "unknown_error"
     });
     return null;
   }
@@ -371,6 +396,15 @@ async function fetchSubscriptionPeriodEnd(subscriptionId: string) {
 function subscriptionPeriodEnd(subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>) {
   const value = (subscription as unknown as { current_period_end?: number | null }).current_period_end;
   return value ? new Date(value * 1000).toISOString() : null;
+}
+
+function subscriptionTrialEnd(subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>) {
+  const value = (subscription as unknown as { trial_end?: number | null }).trial_end;
+  return value ? new Date(value * 1000).toISOString() : null;
+}
+
+function invoiceAmountPaid(invoice: Stripe.Invoice) {
+  return (invoice as unknown as { amount_paid?: number | null }).amount_paid ?? 0;
 }
 
 function invoiceSubscriptionId(invoice: Stripe.Invoice) {
@@ -385,7 +419,8 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice) {
 }
 
 function mapTenderSubscriptionStatus(status: Stripe.Subscription.Status) {
-  if (status === "active" || status === "trialing") return "active";
+  if (status === "active") return "active";
+  if (status === "trialing") return "trialing";
   if (status === "canceled") return "canceled";
   return "past_due";
 }

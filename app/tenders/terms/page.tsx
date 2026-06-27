@@ -22,7 +22,7 @@ const sections = [
   },
   {
     title: "第4条 料金と課金",
-    body: `有料プランは${TENDER_LEGAL_INFO.monthlyPriceText}です。有料プランへ申し込んだ時点から月額課金が始まり、解約するまで毎月自動更新されます。`
+    body: `有料プランは${TENDER_LEGAL_INFO.monthlyPriceText}です。無料体験中に有料プランへ申し込んだ場合も、無料期間終了後から月額課金が始まり、解約するまで毎月自動更新されます。`
   },
   {
     title: "第5条 利用停止",

@@ -69,7 +69,7 @@ export default async function TenderPricingPage() {
             <h2 className="mt-4 text-xl font-black text-slate-950">{TENDER_SERVICE_NAME}</h2>
             <p className="mt-4 text-4xl font-black text-brand-700">{TENDER_MONTHLY_PRICE_TEXT}</p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              登録から{TENDER_TRIAL_DAYS}日間は無料です。無料期間終了後に自動課金されることはありません。有料プランへ申し込んだ時点から月額課金が始まり、解約するまで毎月自動更新されます。
+              登録から{TENDER_TRIAL_DAYS}日間は無料です。無料期間終了後に自動課金されることはありません。無料体験中に有料プランへ申し込んだ場合も、無料終了日までは請求されません。
             </p>
           </div>
         </div>
@@ -88,7 +88,7 @@ export default async function TenderPricingPage() {
               <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">有料プラン</dt>
                 <dd className="mt-1 text-2xl font-black text-brand-700">{TENDER_MONTHLY_PRICE_TEXT}</dd>
-                <p className="mt-1 text-sm text-slate-600">有料申込み後から毎月自動更新です。</p>
+                <p className="mt-1 text-sm text-slate-600">無料期間終了後から毎月自動更新です。</p>
               </div>
               <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">銀行振込</dt>
@@ -139,7 +139,7 @@ export default async function TenderPricingPage() {
         <article className="rounded-lg border border-slate-200 bg-white p-5 text-sm leading-6 text-slate-700 shadow-sm">
           <h2 className="font-black text-slate-950">課金・法的表示</h2>
           <p className="mt-2">
-            無料体験終了後に自動課金されることはありません。有料申込み後は解約するまで毎月自動更新されます。
+            無料体験終了後に自動課金されることはありません。無料体験中に有料申込みをしても無料終了日までは請求されず、その後は解約するまで毎月自動更新されます。
           </p>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 font-bold text-brand-700">
             <Link href="/tenders/terms">利用規約</Link>

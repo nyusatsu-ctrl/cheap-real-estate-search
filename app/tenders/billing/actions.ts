@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import type Stripe from "stripe";
 import { createTenderStripeClient, getTenderStripePriceId, hasTenderStripeEnv, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
-import { requireTenderMemberAccess } from "@/lib/tender-access";
+import { requireTenderMemberAccess, type TenderMemberAccess } from "@/lib/tender-access";
 
 function appUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -18,24 +18,31 @@ export async function startTenderCheckoutAction() {
   if (!stripe) redirect("/tenders/billing?setup=stripe");
   const tenderPriceId = getTenderStripePriceId();
   if (!tenderPriceId) redirect("/tenders/billing?setup=stripe");
+  if (access.subscriptionStatus === "active" && access.paymentCustomerId) redirect("/tenders/billing?error=already_active");
+
+  const trialEnd = checkoutTrialEnd(access);
+  const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
+    metadata: {
+      product_code: TENDER_PRODUCT_CODE,
+      user_id: access.userId
+    }
+  };
+  if (trialEnd) subscriptionData.trial_end = trialEnd;
 
   let sessionUrl: string | null = null;
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      payment_method_collection: trialEnd ? "always" : undefined,
       customer: access.paymentCustomerId ?? undefined,
       customer_email: access.paymentCustomerId ? undefined : access.email,
       line_items: [{ price: tenderPriceId, quantity: 1 }],
       metadata: {
         product_code: TENDER_PRODUCT_CODE,
-        user_id: access.userId
+        user_id: access.userId,
+        trial_ends_at: trialEnd ? access.trialEndsAt ?? "" : ""
       },
-      subscription_data: {
-        metadata: {
-          product_code: TENDER_PRODUCT_CODE,
-          user_id: access.userId
-        }
-      },
+      subscription_data: subscriptionData,
       success_url: `${appUrl()}/tenders/billing?checkout=success`,
       cancel_url: `${appUrl()}/tenders/billing?checkout=cancelled`
     });
@@ -55,6 +62,13 @@ export async function startTenderCheckoutAction() {
 
   if (!sessionUrl) redirect("/tenders/billing?error=checkout");
   redirect(sessionUrl);
+}
+
+function checkoutTrialEnd(access: TenderMemberAccess) {
+  if (access.subscriptionStatus !== "trialing" || access.isTrialExpired || !access.trialEndsAt) return null;
+  const timestamp = Math.floor(new Date(access.trialEndsAt).getTime() / 1000);
+  const now = Math.floor(Date.now() / 1000);
+  return timestamp > now ? timestamp : null;
 }
 
 type TenderCheckoutError = {

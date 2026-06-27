@@ -7,6 +7,7 @@ import { AdminShell } from "@/components/AdminShell";
 import { getCurrentAdmin } from "@/lib/admin";
 import { TENDER_SOURCE_ORGANIZATION_TYPE_LABELS } from "@/lib/constants";
 import { getTenderAccessDiagnostics } from "@/lib/tender-access";
+import { getTenderStripePriceDiagnostics } from "@/lib/tender-billing";
 import { getTenderNotificationDiagnostics } from "@/lib/tender-notifications";
 import { assessTenderDeadline, assessTenderSourceAvailability } from "@/lib/tender-deadlines";
 import { getAdminTenders, getTenderCandidates, getTenderCrawlLogs, getTenderDatabaseDiagnostics, getTenderSources, type TenderDatabaseDiagnostics } from "@/lib/tenders";
@@ -39,9 +40,9 @@ export default async function DefenseCrawlPage() {
   const localCandidates = readJson<TenderCandidate[]>(candidatePath, []);
   const localTenders = readJson<Tender[]>(tenderImportPath, []);
   const crawlSummary = readJson<DefenseCrawlSummary>(summaryPath, null);
-  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics, accessDiagnostics] = admin
-    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20), getTenderNotificationDiagnostics(), getTenderAccessDiagnostics()])
-    : [[], [], [], [] as TenderCrawlLog[], null, null];
+  const [dbSources, dbCandidates, dbTenders, crawlLogs, notificationDiagnostics, accessDiagnostics, stripeDiagnostics] = admin
+    ? await Promise.all([getTenderSources(), getTenderCandidates("all"), getAdminTenders(), getTenderCrawlLogs(20), getTenderNotificationDiagnostics(), getTenderAccessDiagnostics(), getTenderStripePriceDiagnostics()])
+    : [[], [], [], [] as TenderCrawlLog[], null, null, null];
   const dbDiagnostics = admin ? await getTenderDatabaseDiagnostics() : null;
   const sources = admin && dbSources.length ? dbSources : localSources;
   const candidates = (admin ? dbCandidates : localCandidates).map(normalizeDefenseTender);
@@ -103,6 +104,10 @@ export default async function DefenseCrawlPage() {
 
       {admin ? (
         <TenderAccessStatus diagnostics={accessDiagnostics} />
+      ) : null}
+
+      {admin ? (
+        <TenderStripeStatus diagnostics={stripeDiagnostics} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -501,6 +506,52 @@ function TenderAccessStatus({
   );
 }
 
+function TenderStripeStatus({
+  diagnostics
+}: {
+  diagnostics: Awaited<ReturnType<typeof getTenderStripePriceDiagnostics>> | null;
+}) {
+  const needsAttention = Boolean(
+    diagnostics?.error
+    || diagnostics?.modeMatches === false
+    || diagnostics?.expectedAmountMatches === false
+    || diagnostics?.expectedCurrencyMatches === false
+    || diagnostics?.expectedIntervalMatches === false
+    || diagnostics?.active === false
+  );
+
+  return (
+    <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-slate-950">Stripe Checkout 価格診断</h3>
+          <p className="mt-1 text-slate-600">官公庁案件サーチの標準プラン価格を確認します。Secret Key、Webhook Secret、Price IDの値は表示しません。</p>
+        </div>
+        <span className={`rounded px-2 py-1 text-xs font-bold ${needsAttention ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {needsAttention ? "確認が必要" : "確認OK"}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <StatusItem label="Secret Key" value={diagnostics?.hasSecretKey ? `設定済み (${modeLabel(diagnostics.secretKeyMode)})` : "未設定"} />
+        <StatusItem label="Price ID" value={diagnostics?.hasTenderPriceId ? "設定済み" : "未設定"} />
+        <StatusItem label="Price取得" value={diagnostics?.priceLookupOk ? "OK" : "未確認"} />
+        <StatusItem label="live/test整合" value={formatBooleanStatus(diagnostics?.modeMatches)} />
+        <StatusItem label="商品名" value={diagnostics?.productName ?? "-"} />
+        <StatusItem label="金額" value={typeof diagnostics?.unitAmount === "number" ? `${diagnostics.unitAmount.toLocaleString("ja-JP")}円` : "-"} />
+        <StatusItem label="通貨" value={(diagnostics?.currency ?? "-").toUpperCase()} />
+        <StatusItem label="請求周期" value={diagnostics?.recurringInterval === "month" ? "毎月" : diagnostics?.recurringInterval ?? "-"} />
+        <StatusItem label="税込設定" value={taxBehaviorLabel(diagnostics?.taxBehavior ?? null)} />
+        <StatusItem label="Price有効" value={formatBooleanStatus(diagnostics?.active ?? null)} />
+        <StatusItem label="9,800円一致" value={formatBooleanStatus(diagnostics?.expectedAmountMatches ?? null)} />
+        <StatusItem label="月額一致" value={formatBooleanStatus(diagnostics?.expectedIntervalMatches ?? null)} />
+      </div>
+      {diagnostics?.error ? (
+        <p className="mt-3 break-all text-xs text-amber-800">確認事項: {diagnostics.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function StatusItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-white/70 bg-white/70 p-3">
@@ -508,6 +559,26 @@ function StatusItem({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-black">{value}</p>
     </div>
   );
+}
+
+function modeLabel(value: "live" | "test" | "unknown" | "missing") {
+  if (value === "live") return "live";
+  if (value === "test") return "test";
+  if (value === "missing") return "未設定";
+  return "不明";
+}
+
+function formatBooleanStatus(value: boolean | null | undefined) {
+  if (value === true) return "OK";
+  if (value === false) return "要確認";
+  return "-";
+}
+
+function taxBehaviorLabel(value: string | null) {
+  if (value === "inclusive") return "税込(inclusive)";
+  if (value === "exclusive") return "税別(exclusive)";
+  if (value === "unspecified") return "未指定";
+  return "-";
 }
 
 function ActionButton({ action, group, label, primary = false }: { action: (formData: FormData) => Promise<void>; group: string; label: string; primary?: boolean }) {

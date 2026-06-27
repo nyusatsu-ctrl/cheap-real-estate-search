@@ -8,16 +8,20 @@ export const TENDER_MONTHLY_PRICE_YEN = 9800;
 export const TENDER_MONTHLY_PRICE_TEXT = "月額9,800円（税込）";
 
 export function hasTenderStripeEnv() {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_TENDER_PRICE_ID && process.env.NEXT_PUBLIC_APP_URL);
+  return Boolean(process.env.STRIPE_SECRET_KEY && getTenderStripePriceId() && process.env.NEXT_PUBLIC_APP_URL);
 }
 
 export function getTenderStripeSetupStatus() {
   return {
     hasSecretKey: Boolean(process.env.STRIPE_SECRET_KEY),
-    hasTenderPriceId: Boolean(process.env.STRIPE_TENDER_PRICE_ID),
+    hasTenderPriceId: Boolean(getTenderStripePriceId()),
     hasWebhookSecret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
     hasAppUrl: Boolean(process.env.NEXT_PUBLIC_APP_URL)
   };
+}
+
+export function getTenderStripePriceId() {
+  return normalizeTenderStripeEnvValue(process.env.STRIPE_TENDER_PRICE_ID);
 }
 
 export function createTenderStripeClient() {
@@ -49,10 +53,11 @@ export type TenderStripePriceDiagnostics = {
 
 export async function getTenderStripePriceDiagnostics(): Promise<TenderStripePriceDiagnostics> {
   const secretKeyMode = stripeSecretKeyMode(process.env.STRIPE_SECRET_KEY);
+  const tenderPriceId = getTenderStripePriceId();
   const base: TenderStripePriceDiagnostics = {
     hasSecretKey: Boolean(process.env.STRIPE_SECRET_KEY),
     secretKeyMode,
-    hasTenderPriceId: Boolean(process.env.STRIPE_TENDER_PRICE_ID),
+    hasTenderPriceId: Boolean(tenderPriceId),
     priceLookupOk: false,
     priceLivemode: null,
     modeMatches: null,
@@ -69,12 +74,12 @@ export async function getTenderStripePriceDiagnostics(): Promise<TenderStripePri
   };
 
   const stripe = createTenderStripeClient();
-  if (!stripe || !process.env.STRIPE_TENDER_PRICE_ID) {
+  if (!stripe || !tenderPriceId) {
     return { ...base, error: "Stripe Secret KeyまたはPrice IDが未設定です。" };
   }
 
   try {
-    const price = await stripe.prices.retrieve(process.env.STRIPE_TENDER_PRICE_ID, { expand: ["product"] });
+    const price = await stripe.prices.retrieve(tenderPriceId, { expand: ["product"] });
     const productName = stripeProductName(price.product);
     const priceMode = price.livemode ? "live" : "test";
     return {
@@ -127,4 +132,14 @@ function sanitizeStripeDiagnosticMessage(message: string) {
     .replace(/cus_[A-Za-z0-9_]+/g, "cus_***")
     .replace(/sub_[A-Za-z0-9_]+/g, "sub_***")
     .slice(0, 500);
+}
+
+function normalizeTenderStripeEnvValue(value: string | undefined) {
+  if (!value) return "";
+  return value
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/^STRIPE_TENDER_PRICE_ID=/i, "")
+    .replace(/^Value:/i, "")
+    .trim();
 }

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import type Stripe from "stripe";
-import { createTenderStripeClient, hasTenderStripeEnv, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
+import { createTenderStripeClient, getTenderStripePriceId, hasTenderStripeEnv, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
 import { requireTenderMemberAccess } from "@/lib/tender-access";
 
 function appUrl() {
@@ -16,6 +16,8 @@ export async function startTenderCheckoutAction() {
 
   const stripe = createTenderStripeClient();
   if (!stripe) redirect("/tenders/billing?setup=stripe");
+  const tenderPriceId = getTenderStripePriceId();
+  if (!tenderPriceId) redirect("/tenders/billing?setup=stripe");
 
   let sessionUrl: string | null = null;
   try {
@@ -23,7 +25,7 @@ export async function startTenderCheckoutAction() {
       mode: "subscription",
       customer: access.paymentCustomerId ?? undefined,
       customer_email: access.paymentCustomerId ? undefined : access.email,
-      line_items: [{ price: process.env.STRIPE_TENDER_PRICE_ID!, quantity: 1 }],
+      line_items: [{ price: tenderPriceId, quantity: 1 }],
       metadata: {
         product_code: TENDER_PRODUCT_CODE,
         user_id: access.userId

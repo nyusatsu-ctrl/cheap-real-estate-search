@@ -37,6 +37,10 @@ export default async function TenderBillingPage({
     );
   }
 
+  const isActive = access.subscriptionStatus === "active";
+  const canStartCheckout = access.subscriptionStatus !== "active" && access.subscriptionStatus !== "admin";
+  const canOpenCustomerPortal = Boolean(access.paymentCustomerId);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <Link href="/tenders" className="mb-4 inline-block text-sm font-bold text-brand-700">
@@ -89,17 +93,33 @@ export default async function TenderBillingPage({
         </dl>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <form action={startTenderCheckoutAction}>
-            <button className="w-full rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
-              有料プランに申し込む
-            </button>
-          </form>
-          <form action={openTenderCustomerPortalAction}>
-            <button className="inline-flex w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
-              <ExternalLink className="h-4 w-4" />
-              支払方法・解約を管理
-            </button>
-          </form>
+          {canStartCheckout ? (
+            <form action={startTenderCheckoutAction}>
+              <button className="w-full rounded bg-brand-700 px-5 py-3 font-bold text-white focus-ring">
+                有料プランに申し込む
+              </button>
+            </form>
+          ) : (
+            <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-900">
+              {isActive
+                ? canOpenCustomerPortal
+                  ? "有料プランは有効です。支払方法の変更や解約は契約管理から行えます。"
+                  : "有料プランは有効です。銀行振込など手動契約の変更はお問い合わせください。"
+                : "管理者アカウントのため有料申込みは不要です。"}
+            </div>
+          )}
+          {canOpenCustomerPortal ? (
+            <form action={openTenderCustomerPortalAction}>
+              <button className={`inline-flex w-full items-center justify-center gap-2 rounded px-5 py-3 font-bold focus-ring ${isActive ? "bg-brand-700 text-white" : "border border-slate-300 bg-white text-slate-800"}`}>
+                <ExternalLink className="h-4 w-4" />
+                支払方法・解約を管理
+              </button>
+            </form>
+          ) : (
+            <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+              支払方法・解約管理は、カード決済の有料申込み完了後に利用できます。
+            </div>
+          )}
         </div>
 
         <div className="mt-4 rounded border border-slate-200 bg-white p-4">

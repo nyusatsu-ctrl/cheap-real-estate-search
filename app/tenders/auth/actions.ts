@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createTenderSupabaseServerClient } from "@/lib/supabase/tenders-server";
+import { createTenderSupabaseServerClient, createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { ensureTenderTrialForCurrentUser, ensureTenderTrialForUser } from "@/lib/tender-access";
+import { TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -32,7 +33,7 @@ export async function signUpTenderMemberAction(formData: FormData) {
   const password = requiredString(formData, "password");
   const next = safeNext(formData);
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await createTenderAuthUser(email, password);
   if (error) redirect(`/tenders/signup?error=${encodeURIComponent(authErrorMessage(error.message))}`);
 
   if (data.user?.id) {
@@ -40,6 +41,10 @@ export async function signUpTenderMemberAction(formData: FormData) {
   } else {
     await ensureTenderTrialForCurrentUser();
   }
+
+  const signInResult = await supabase.auth.signInWithPassword({ email, password });
+  if (signInResult.error) redirect(`/tenders/login?next=${encodeURIComponent(next)}&error=${encodeURIComponent(authErrorMessage(signInResult.error.message))}`);
+
   redirect(next);
 }
 
@@ -56,4 +61,36 @@ export async function signInTenderMemberAction(formData: FormData) {
 
   await ensureTenderTrialForCurrentUser();
   redirect(next);
+}
+
+async function createTenderAuthUser(email: string, password: string) {
+  const service = createTenderSupabaseServiceRoleClient();
+  if (!service) {
+    return createPublicTenderAuthUser(email, password);
+  }
+
+  const created = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      product_code: TENDER_PRODUCT_CODE
+    }
+  });
+
+  if (!created.error) return { data: { user: created.data.user }, error: null };
+  if (isServiceRoleRecoverableSignupError(created.error.message)) {
+    return createPublicTenderAuthUser(email, password);
+  }
+  return { data: { user: null }, error: created.error };
+}
+
+async function createPublicTenderAuthUser(email: string, password: string) {
+  const supabase = await createTenderSupabaseServerClient();
+  if (!supabase) return { data: { user: null }, error: new Error("setup") };
+  return supabase.auth.signUp({ email, password });
+}
+
+function isServiceRoleRecoverableSignupError(message: string) {
+  return /service role|jwt|api key|permission|not configured|missing/i.test(message);
 }

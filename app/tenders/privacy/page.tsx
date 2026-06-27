@@ -9,8 +9,12 @@ export const metadata: Metadata = tenderMetadata(
 
 const sections = [
   {
+    title: "事業者",
+    body: `${TENDER_LEGAL_INFO.companyName}（代表者: ${TENDER_LEGAL_INFO.representative}、所在地: ${TENDER_LEGAL_INFO.address}）が、${TENDER_LEGAL_INFO.serviceName}における個人情報を取り扱います。`
+  },
+  {
     title: "取得する情報",
-    body: "会員登録情報、ログイン情報、通知条件、お気に入り、閲覧・操作ログ、決済処理に必要な識別子を取得します。Stripeのカード情報を当社サーバーで保持しません。"
+    body: "会員登録情報、ログイン情報、通知条件、お気に入り、閲覧・操作ログ、問い合わせ内容、銀行振込申込み情報、決済処理に必要な識別子を取得します。クレジットカード番号は決済事業者が管理し、当社サーバーでは保持しません。"
   },
   {
     title: "利用目的",
@@ -18,7 +22,7 @@ const sections = [
   },
   {
     title: "第三者提供",
-    body: "法令に基づく場合を除き、本人の同意なく第三者へ提供しません。決済処理はStripe等の決済事業者を利用します。"
+    body: "法令に基づく場合を除き、本人の同意なく第三者へ提供しません。決済処理では、クレジットカード決済のためにStripe等の決済事業者を利用します。"
   },
   {
     title: "安全管理",
@@ -26,7 +30,7 @@ const sections = [
   },
   {
     title: "お問い合わせ",
-    body: `個人情報の取扱いに関するお問い合わせは、${TENDER_LEGAL_INFO.companyName}までご連絡ください。`
+    body: `個人情報の取扱いに関するお問い合わせは、${TENDER_LEGAL_INFO.companyName}までご連絡ください。電話受付は${TENDER_LEGAL_INFO.businessHours}、休業日は${TENDER_LEGAL_INFO.holidays}です。`
   }
 ];
 

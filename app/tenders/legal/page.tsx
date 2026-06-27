@@ -12,13 +12,15 @@ const rows = [
   ["代表者", TENDER_LEGAL_INFO.representative],
   ["所在地", TENDER_LEGAL_INFO.address],
   ["電話番号", TENDER_LEGAL_INFO.phone],
-  ["受付時間", TENDER_LEGAL_INFO.businessHours],
+  ["営業時間", TENDER_LEGAL_INFO.businessHours],
+  ["休業日", TENDER_LEGAL_INFO.holidays],
+  ["サービス名", TENDER_LEGAL_INFO.serviceName],
   ["販売価格", TENDER_LEGAL_INFO.monthlyPriceText],
   ["無料期間", `${TENDER_LEGAL_INFO.trialDaysText}。${TENDER_LEGAL_INFO.trialBillingNote}`],
   ["支払方法", TENDER_LEGAL_INFO.paymentMethod],
   ["支払時期", TENDER_LEGAL_INFO.paymentTiming],
-  ["サービス提供時期", "有料申込み完了後、決済反映後に利用できます。無料体験中は登録後すぐに利用できます。"],
-  ["解約方法", "契約状況画面またはお問い合わせ窓口から手続きできます。解約後は現在の契約期間終了後に有料機能の利用が停止します。"],
+  ["サービス提供時期", TENDER_LEGAL_INFO.serviceAvailability],
+  ["解約方法", TENDER_LEGAL_INFO.cancellationMethod],
   ["返金方針", TENDER_LEGAL_INFO.refundPolicy],
   ["追加料金", "サービス利用料以外の追加料金はありません。ただし、通信料、インターネット接続料、公告元への問い合わせや入札参加に伴う費用は利用者負担です。"]
 ];

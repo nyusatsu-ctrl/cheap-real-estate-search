@@ -1,6 +1,7 @@
 "use client";
 
 import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -127,7 +128,16 @@ function RealEstateHeader() {
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link href="/properties" className="min-w-0">
+        <Link href="/properties" className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <Image
+            src="/images/ecoloop-logo.jpeg"
+            alt="株式会社エコループ"
+            width={903}
+            height={539}
+            priority
+            className="h-8 w-auto shrink-0 object-contain sm:h-10"
+            sizes="(max-width: 640px) 90px, 112px"
+          />
           <div className="min-w-0">
             <p className="text-base font-black leading-tight text-slate-950 sm:text-lg">格安不動産サーチ</p>
             <p className="mt-0.5 text-xs font-semibold text-slate-500">株式会社エコループ</p>

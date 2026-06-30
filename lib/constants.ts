@@ -133,9 +133,14 @@ export const PROPERTY_REGION_OPTIONS = [
     prefectures: ["徳島県", "香川県", "愛媛県", "高知県"]
   },
   {
-    value: "kyushu-okinawa",
-    label: "九州・沖縄",
-    prefectures: ["福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"]
+    value: "kyushu",
+    label: "九州",
+    prefectures: ["福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県"]
+  },
+  {
+    value: "okinawa",
+    label: "沖縄",
+    prefectures: ["沖縄県"]
   }
 ] as const;
 

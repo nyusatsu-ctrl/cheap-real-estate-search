@@ -7,6 +7,7 @@ type PriceRangeOption = {
   minPrice?: number;
   maxPrice?: number;
 };
+type LocationFilterMode = "detailed" | "region-only";
 
 export type PropertySearchParams = {
   region?: SearchParamValue;
@@ -21,18 +22,22 @@ export type PropertySearchParams = {
   maxPrice?: SearchParamValue;
 };
 
-export function normalizePropertyFilters(params: PropertySearchParams, options: { priceRangeOptions?: readonly PriceRangeOption[] } = {}): PropertyFilters {
+export function normalizePropertyFilters(
+  params: PropertySearchParams,
+  options: { priceRangeOptions?: readonly PriceRangeOption[]; locationFilterMode?: LocationFilterMode } = {}
+): PropertyFilters {
   const priceRangeOptions = options.priceRangeOptions ?? PROPERTY_PRICE_RANGE_OPTIONS;
   const requestedPriceRange = firstString(params.priceRange);
   const priceBounds = getPriceRangeBounds(requestedPriceRange, priceRangeOptions);
   const priceRange = priceBounds.option ? requestedPriceRange : undefined;
   const minPrice = priceBounds.minPrice ?? parseOptionalNumber(firstString(params.minPrice));
   const maxPrice = priceBounds.maxPrice ?? parseOptionalNumber(firstString(params.maxPrice));
+  const useDetailedLocation = options.locationFilterMode !== "region-only";
 
   return {
     region: firstString(params.region),
-    prefecture: firstString(params.prefecture),
-    city: firstString(params.city),
+    prefecture: useDetailedLocation ? firstString(params.prefecture) : undefined,
+    city: useDetailedLocation ? firstString(params.city) : undefined,
     propertyType: firstString(params.propertyType) as PropertyCategory | undefined,
     priceRange,
     sort: normalizePropertySort(firstString(params.sort)),
@@ -45,6 +50,9 @@ export function normalizePropertyFilters(params: PropertySearchParams, options: 
 export function getRegionPrefectures(region?: string): string[] {
   if (!region) return PREFECTURES;
   const prefectures = PROPERTY_REGION_OPTIONS.find((option) => option.value === region)?.prefectures;
+  if (region === "kyushu-okinawa") {
+    return ["福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"];
+  }
   return prefectures ? [...prefectures] : PREFECTURES;
 }
 

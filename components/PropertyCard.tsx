@@ -12,7 +12,7 @@ const NEW_DAYS = 7;
 
 export function PropertyCard({ property }: { property: Property }) {
   const [isViewed, setIsViewed] = useState(true);
-  const isTodayAdded = isToday(property.first_detected_at);
+  const isTodayAdded = isTodayInTokyo(property.first_detected_at ?? property.scraped_at ?? null);
   const isNew = isWithinDays(property.first_detected_at, NEW_DAYS);
   const isSourceNew = isWithinDays(property.source_published_at ?? property.listed_at ?? null, NEW_DAYS);
   const propertyCategory = property.property_category ?? property.property_type;
@@ -45,7 +45,7 @@ export function PropertyCard({ property }: { property: Property }) {
                 <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">新着</span>
               ) : null}
               {isTodayAdded ? (
-                <span className="rounded bg-sky-100 px-2 py-1 text-xs font-bold text-sky-700">本日追加</span>
+                <span className="rounded bg-orange-100 px-2 py-1 text-xs font-black text-orange-800">本日新着</span>
               ) : null}
               {property.has_updates ? (
                 <span className="rounded bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">更新あり</span>
@@ -115,12 +115,20 @@ function isWithinDays(value: string | null | undefined, days: number) {
   return elapsedDays >= 0 && elapsedDays <= days;
 }
 
-function isToday(value: string | null | undefined) {
+function isTodayInTokyo(value: string | null | undefined) {
   if (!value) return false;
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;
 
-  const now = new Date();
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+  return toTokyoDateKey(date) === toTokyoDateKey(new Date());
+}
+
+function toTokyoDateKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
 }

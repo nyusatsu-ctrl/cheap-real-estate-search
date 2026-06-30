@@ -22,6 +22,8 @@ type Props = {
   propertyType?: string;
   sort?: PropertySort;
   keyword?: string;
+  locationMode?: "detailed" | "region-only";
+  regionLabel?: string;
 };
 
 export function SearchFilters({
@@ -34,22 +36,25 @@ export function SearchFilters({
   priceRangeOptions = PROPERTY_PRICE_RANGE_OPTIONS,
   propertyType,
   sort = "newest",
-  keyword
+  keyword,
+  locationMode = "detailed",
+  regionLabel = "地方ブロック"
 }: Props) {
   const [selectedRegion, setSelectedRegion] = useState(region ?? "");
   const [selectedPrefecture, setSelectedPrefecture] = useState(prefecture ?? "");
   const [selectedCity, setSelectedCity] = useState(city ?? "");
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRange ?? "");
 
+  const showDetailedLocation = locationMode === "detailed";
   const prefectures = getRegionPrefectures(selectedRegion);
   const cities = getCityOptions(locations, selectedRegion, selectedPrefecture);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <form action={action}>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
+        <div className={showDetailedLocation ? "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            地方ブロック
+            {regionLabel}
             <select
               name="region"
               value={selectedRegion}
@@ -69,42 +74,46 @@ export function SearchFilters({
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            都道府県
-            <select
-              name="prefecture"
-              value={selectedPrefecture}
-              onChange={(event) => {
-                setSelectedPrefecture(event.target.value);
-                setSelectedCity("");
-              }}
-              className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
-            >
-              <option value="">全国</option>
-              {prefectures.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {showDetailedLocation ? (
+            <>
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                都道府県
+                <select
+                  name="prefecture"
+                  value={selectedPrefecture}
+                  onChange={(event) => {
+                    setSelectedPrefecture(event.target.value);
+                    setSelectedCity("");
+                  }}
+                  className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+                >
+                  <option value="">全国</option>
+                  {prefectures.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            市区町村
-            <select
-              name="city"
-              value={selectedCity}
-              onChange={(event) => setSelectedCity(event.target.value)}
-              className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
-            >
-              <option value="">すべて</option>
-              {cities.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                市区町村
+                <select
+                  name="city"
+                  value={selectedCity}
+                  onChange={(event) => setSelectedCity(event.target.value)}
+                  className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+                >
+                  <option value="">すべて</option>
+                  {cities.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : null}
 
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             物件種別
@@ -146,7 +155,7 @@ export function SearchFilters({
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-5">
+          <label className={showDetailedLocation ? "grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-5" : "grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-4"}>
             キーワード
             <input
               name="keyword"

@@ -5,10 +5,10 @@ import { SearchFilters } from "@/components/SearchFilters";
 import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
 import { firstString, normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
-import { getPublishedPropertiesResult, getPublishedPropertyLocations } from "@/lib/properties";
+import { getPublishedPropertiesResult } from "@/lib/properties";
 
 const PUBLIC_PROPERTIES_PAGE_SIZE = 100;
-const PRESERVED_PAGE_PARAM_KEYS = ["region", "prefecture", "city", "propertyType", "priceRange", "sort", "keyword"] as const;
+const PRESERVED_PAGE_PARAM_KEYS = ["region", "propertyType", "priceRange", "sort", "keyword"] as const;
 
 export const metadata: Metadata = {
   title: "物件一覧｜格安不動産サーチ",
@@ -26,12 +26,12 @@ export const metadata: Metadata = {
 
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const resolvedSearchParams = await searchParams;
-  const filters = normalizePropertyFilters(resolvedSearchParams, { priceRangeOptions: PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS });
+  const filters = normalizePropertyFilters(resolvedSearchParams, {
+    priceRangeOptions: PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS,
+    locationFilterMode: "region-only"
+  });
   const requestedPage = getRequestedPage(resolvedSearchParams);
-  const [propertiesResult, locations] = await Promise.all([
-    getPublishedPropertiesResult(filters, { page: requestedPage, pageSize: PUBLIC_PROPERTIES_PAGE_SIZE }),
-    getPublishedPropertyLocations()
-  ]);
+  const propertiesResult = await getPublishedPropertiesResult(filters, { page: requestedPage, pageSize: PUBLIC_PROPERTIES_PAGE_SIZE });
   const { properties, totalCount, page, pageSize, errorMessage } = propertiesResult;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -45,15 +45,15 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         </p>
       </div>
       <SearchFilters
-        locations={locations}
+        locations={[]}
         region={filters.region}
-        prefecture={filters.prefecture}
-        city={filters.city}
         priceRange={filters.priceRange}
         priceRangeOptions={PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS}
         propertyType={filters.propertyType}
         sort={filters.sort}
         keyword={filters.keyword}
+        locationMode="region-only"
+        regionLabel="地域"
       />
       <div className="mt-5 flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-700">{formatResultRange(totalCount, properties.length, page, pageSize)}</p>

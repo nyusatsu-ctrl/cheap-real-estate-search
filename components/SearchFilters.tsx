@@ -160,7 +160,7 @@ export function SearchFilters({
             <input
               name="keyword"
               defaultValue={keyword ?? ""}
-              placeholder="空き家、山林、市区町村など"
+              placeholder="空き家、山林、地域名など"
               className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
             />
           </label>

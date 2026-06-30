@@ -7,7 +7,7 @@ type PriceRangeOption = {
   minPrice?: number;
   maxPrice?: number;
 };
-type LocationFilterMode = "detailed" | "region-only";
+type LocationFilterMode = "detailed" | "region-only" | "prefecture-only";
 
 export type PropertySearchParams = {
   region?: SearchParamValue;
@@ -32,12 +32,15 @@ export function normalizePropertyFilters(
   const priceRange = priceBounds.option ? requestedPriceRange : undefined;
   const minPrice = priceBounds.minPrice ?? parseOptionalNumber(firstString(params.minPrice));
   const maxPrice = priceBounds.maxPrice ?? parseOptionalNumber(firstString(params.maxPrice));
-  const useDetailedLocation = options.locationFilterMode !== "region-only";
+  const locationFilterMode = options.locationFilterMode ?? "detailed";
+  const useRegion = locationFilterMode === "detailed" || locationFilterMode === "region-only";
+  const usePrefecture = locationFilterMode === "detailed" || locationFilterMode === "prefecture-only";
+  const useCity = locationFilterMode === "detailed";
 
   return {
-    region: firstString(params.region),
-    prefecture: useDetailedLocation ? firstString(params.prefecture) : undefined,
-    city: useDetailedLocation ? firstString(params.city) : undefined,
+    region: useRegion ? firstString(params.region) : undefined,
+    prefecture: usePrefecture ? firstString(params.prefecture) : undefined,
+    city: useCity ? firstString(params.city) : undefined,
     propertyType: firstString(params.propertyType) as PropertyCategory | undefined,
     priceRange,
     sort: normalizePropertySort(firstString(params.sort)),

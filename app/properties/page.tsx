@@ -8,7 +8,7 @@ import { firstString, normalizePropertyFilters, type PropertySearchParams } from
 import { getPublishedPropertiesResult } from "@/lib/properties";
 
 const PUBLIC_PROPERTIES_PAGE_SIZE = 100;
-const PRESERVED_PAGE_PARAM_KEYS = ["region", "propertyType", "priceRange", "sort", "keyword"] as const;
+const PRESERVED_PAGE_PARAM_KEYS = ["prefecture", "propertyType", "priceRange", "sort", "keyword"] as const;
 
 export const metadata: Metadata = {
   title: "物件一覧｜格安不動産サーチ",
@@ -28,7 +28,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
   const resolvedSearchParams = await searchParams;
   const filters = normalizePropertyFilters(resolvedSearchParams, {
     priceRangeOptions: PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS,
-    locationFilterMode: "region-only"
+    locationFilterMode: "prefecture-only"
   });
   const requestedPage = getRequestedPage(resolvedSearchParams);
   const propertiesResult = await getPublishedPropertiesResult(filters, { page: requestedPage, pageSize: PUBLIC_PROPERTIES_PAGE_SIZE });
@@ -62,14 +62,13 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         </div>
         <SearchFilters
           locations={[]}
-          region={filters.region}
+          prefecture={filters.prefecture}
           priceRange={filters.priceRange}
           priceRangeOptions={PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS}
           propertyType={filters.propertyType}
           sort={filters.sort}
           keyword={filters.keyword}
-          locationMode="region-only"
-          regionLabel="地域"
+          locationMode="prefecture-only"
         />
         <div className="mt-5 flex items-center justify-between rounded-lg border border-slate-200 bg-white/85 px-4 py-3 shadow-sm">
           <p className="text-sm font-semibold text-slate-700">{formatResultRange(totalCount, properties.length, page, pageSize)}</p>

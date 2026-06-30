@@ -37,28 +37,29 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
-        <section className="mb-5 rounded-lg border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/80 to-sky-50 p-5 shadow-lg shadow-emerald-900/5 sm:p-7">
+      <div className="mx-auto max-w-6xl px-4 py-3 sm:py-8">
+        <section className="mb-3 rounded-lg border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/80 to-sky-50 p-4 shadow-lg shadow-emerald-900/5 sm:mb-5 sm:p-7">
           <div className="max-w-3xl">
-            <p className="inline-flex rounded-full bg-emerald-700 px-3 py-1 text-xs font-black text-white shadow-sm">
+            <p className="inline-flex rounded-full bg-emerald-700 px-2.5 py-0.5 text-xs font-black text-white shadow-sm sm:px-3 sm:py-1">
               毎朝更新
             </p>
-            <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950 sm:text-4xl">
+            <h1 className="mt-2 text-xl font-black leading-tight text-slate-950 sm:mt-3 sm:text-4xl">
               全国の格安不動産・0円物件を毎朝更新
             </h1>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base">
-              空き家・山林・土地・戸建てをまとめて検索。公開中の格安物件だけを新しい順に確認できます。
+            <p className="mt-2 text-sm font-semibold leading-5 text-slate-700 sm:mt-3 sm:text-base sm:leading-6">
+              空き家・山林・土地・戸建てをまとめて検索できます。
             </p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-emerald-900 sm:text-sm">
-              <span className="rounded-full bg-white/85 px-3 py-1 shadow-sm ring-1 ring-emerald-100">毎朝取得</span>
-              <span className="rounded-full bg-white/85 px-3 py-1 shadow-sm ring-1 ring-emerald-100">地域で探す</span>
-              <span className="rounded-full bg-white/85 px-3 py-1 shadow-sm ring-1 ring-emerald-100">掲載元で確認</span>
+            <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-bold text-emerald-900 sm:mt-4 sm:gap-2 sm:text-sm">
+              <span className="rounded-full bg-white/85 px-2.5 py-0.5 shadow-sm ring-1 ring-emerald-100 sm:px-3 sm:py-1">毎朝取得</span>
+              <span className="rounded-full bg-white/85 px-2.5 py-0.5 shadow-sm ring-1 ring-emerald-100 sm:px-3 sm:py-1">地域で探す</span>
+              <span className="rounded-full bg-white/85 px-2.5 py-0.5 shadow-sm ring-1 ring-emerald-100 sm:px-3 sm:py-1">掲載元で確認</span>
             </div>
           </div>
         </section>
-        <p className="mb-5 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs font-medium leading-5 text-amber-900 shadow-sm">
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-2 text-[11px] font-medium leading-4 text-amber-900 shadow-sm sm:mb-5 sm:text-xs sm:leading-5">
+          <span className="font-black">掲載情報について：</span>
           {PROPERTY_INFORMATION_NOTICE}
-        </p>
+        </div>
         <SearchFilters
           locations={[]}
           region={filters.region}

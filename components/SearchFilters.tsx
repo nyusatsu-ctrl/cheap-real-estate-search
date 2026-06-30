@@ -26,8 +26,8 @@ type Props = {
   regionLabel?: string;
 };
 
-const labelClass = "grid gap-1.5 text-sm font-black text-slate-700";
-const controlClass = "min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-inner shadow-slate-100 focus-ring";
+const labelClass = "grid gap-1 text-sm font-black text-slate-700 sm:gap-1.5";
+const controlClass = "min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-inner shadow-slate-100 focus-ring sm:min-h-12 sm:py-2.5";
 
 export function SearchFilters({
   action = "/properties",
@@ -53,9 +53,9 @@ export function SearchFilters({
   const cities = getCityOptions(locations, selectedRegion, selectedPrefecture);
 
   return (
-    <section className="rounded-lg border border-emerald-100 bg-white/95 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur sm:p-5">
+    <section className="rounded-lg border border-emerald-100 bg-white/95 p-3 shadow-lg shadow-emerald-900/5 backdrop-blur sm:p-5">
       <form action={action}>
-        <div className={showDetailedLocation ? "grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
+        <div className={showDetailedLocation ? "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
           <label className={labelClass}>
             {regionLabel}
             <select
@@ -79,7 +79,7 @@ export function SearchFilters({
 
           {showDetailedLocation ? (
             <>
-              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              <label className={labelClass}>
                 都道府県
                 <select
                   name="prefecture"
@@ -99,7 +99,7 @@ export function SearchFilters({
                 </select>
               </label>
 
-              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              <label className={labelClass}>
                 市区町村
                 <select
                   name="city"
@@ -168,7 +168,7 @@ export function SearchFilters({
             />
           </label>
 
-          <button className="mt-1 flex min-h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-700 to-brand-700 px-5 py-3 font-black text-white shadow-lg shadow-emerald-900/20 hover:from-emerald-800 hover:to-brand-800 focus-ring lg:mt-7">
+          <button className="mt-0.5 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-700 to-brand-700 px-5 py-2.5 font-black text-white shadow-lg shadow-emerald-900/20 hover:from-emerald-800 hover:to-brand-800 focus-ring sm:min-h-12 sm:py-3 lg:mt-6">
             <Search className="h-4 w-4" />
             検索
           </button>

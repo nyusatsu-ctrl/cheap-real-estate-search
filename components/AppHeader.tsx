@@ -127,36 +127,36 @@ function TenderUnreadBadge() {
 function RealEstateHeader() {
   return (
     <header className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 shadow-sm">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:py-5">
-        <Link href="/properties" className="flex min-w-0 items-center gap-3 sm:gap-4">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:gap-4 sm:py-5">
+        <Link href="/properties" className="flex min-w-0 items-center gap-2.5 sm:gap-4">
           <Image
             src="/images/ecoloop-logo.jpeg"
             alt="株式会社エコループ"
             width={903}
             height={539}
             priority
-            className="h-12 w-auto shrink-0 object-contain sm:h-14"
+            className="h-11 w-auto shrink-0 object-contain sm:h-14"
             sizes="(max-width: 640px) 120px, 150px"
           />
           <div className="min-w-0">
-            <p className="text-2xl font-black leading-tight text-emerald-950 sm:text-3xl">格安不動産サーチ</p>
-            <p className="mt-1 text-base font-bold leading-tight text-emerald-700 sm:text-lg">株式会社エコループ</p>
+            <p className="text-[22px] font-black leading-tight text-emerald-950 sm:text-3xl">格安不動産サーチ</p>
+            <p className="mt-0.5 text-[15px] font-bold leading-tight text-emerald-700 sm:text-lg">株式会社エコループ</p>
           </div>
         </Link>
-        <nav className="flex w-full flex-wrap items-center gap-2 text-sm font-bold text-slate-700 sm:w-auto sm:justify-end sm:text-[15px]">
-          <Link href="/properties" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
+        <nav className="flex w-full flex-wrap items-center gap-1.5 text-[13px] font-bold text-slate-700 sm:w-auto sm:justify-end sm:gap-2 sm:text-[15px]">
+          <Link href="/properties" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
             物件一覧
           </Link>
-          <Link href="/plans" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
+          <Link href="/plans" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
             料金
           </Link>
-          <Link href="/signup" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
+          <Link href="/signup" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
             無料登録
           </Link>
-          <Link href="/dashboard" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
-            会員
+          <Link href="/dashboard" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
+            会員ログイン
           </Link>
-          <Link href="/admin/login?next=/admin/properties" className="rounded-full bg-emerald-700 px-3 py-2 text-white shadow-sm hover:bg-emerald-800">
+          <Link href="/admin/login?next=/admin/properties" className="px-1 py-1 text-xs font-semibold text-slate-500 underline-offset-4 hover:text-emerald-700 hover:underline sm:text-sm">
             管理者ログイン
           </Link>
         </nav>

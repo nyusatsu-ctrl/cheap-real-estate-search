@@ -36,46 +36,62 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-5">
-        <h1 className="text-2xl font-black text-slate-950">物件一覧</h1>
-        <p className="mt-1 text-sm text-slate-600">公開中の物件のみ表示しています。</p>
-        <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
+        <section className="mb-5 rounded-lg border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/80 to-sky-50 p-5 shadow-lg shadow-emerald-900/5 sm:p-7">
+          <div className="max-w-3xl">
+            <p className="inline-flex rounded-full bg-emerald-700 px-3 py-1 text-xs font-black text-white shadow-sm">
+              毎朝更新
+            </p>
+            <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950 sm:text-4xl">
+              全国の格安不動産・0円物件を毎朝更新
+            </h1>
+            <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base">
+              空き家・山林・土地・戸建てをまとめて検索。公開中の格安物件だけを新しい順に確認できます。
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-emerald-900 sm:text-sm">
+              <span className="rounded-full bg-white/85 px-3 py-1 shadow-sm ring-1 ring-emerald-100">毎朝取得</span>
+              <span className="rounded-full bg-white/85 px-3 py-1 shadow-sm ring-1 ring-emerald-100">地域で探す</span>
+              <span className="rounded-full bg-white/85 px-3 py-1 shadow-sm ring-1 ring-emerald-100">掲載元で確認</span>
+            </div>
+          </div>
+        </section>
+        <p className="mb-5 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs font-medium leading-5 text-amber-900 shadow-sm">
           {PROPERTY_INFORMATION_NOTICE}
         </p>
-      </div>
-      <SearchFilters
-        locations={[]}
-        region={filters.region}
-        priceRange={filters.priceRange}
-        priceRangeOptions={PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS}
-        propertyType={filters.propertyType}
-        sort={filters.sort}
-        keyword={filters.keyword}
-        locationMode="region-only"
-        regionLabel="地域"
-      />
-      <div className="mt-5 flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-700">{formatResultRange(totalCount, properties.length, page, pageSize)}</p>
-      </div>
-      {errorMessage ? (
-        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
-          {errorMessage}
+        <SearchFilters
+          locations={[]}
+          region={filters.region}
+          priceRange={filters.priceRange}
+          priceRangeOptions={PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS}
+          propertyType={filters.propertyType}
+          sort={filters.sort}
+          keyword={filters.keyword}
+          locationMode="region-only"
+          regionLabel="地域"
+        />
+        <div className="mt-5 flex items-center justify-between rounded-lg border border-slate-200 bg-white/85 px-4 py-3 shadow-sm">
+          <p className="text-sm font-semibold text-slate-700">{formatResultRange(totalCount, properties.length, page, pageSize)}</p>
         </div>
-      ) : null}
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {properties.map((property) => (
-          <PropertyCard key={property.id} property={property} />
-        ))}
-      </div>
-      {properties.length === 0 && !errorMessage ? (
-        <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
-          条件に一致する公開物件はありません。
+        {errorMessage ? (
+          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+            {errorMessage}
+          </div>
+        ) : null}
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {properties.map((property) => (
+            <PropertyCard key={property.id} property={property} />
+          ))}
         </div>
-      ) : null}
-      {!errorMessage && totalPages > 1 ? (
-        <Pagination searchParams={resolvedSearchParams} currentPage={page} totalPages={totalPages} />
-      ) : null}
+        {properties.length === 0 && !errorMessage ? (
+          <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+            条件に一致する公開物件はありません。
+          </div>
+        ) : null}
+        {!errorMessage && totalPages > 1 ? (
+          <Pagination searchParams={resolvedSearchParams} currentPage={page} totalPages={totalPages} />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -189,6 +205,6 @@ function buildPageHref(params: PropertySearchParams, page: number) {
   return queryString ? `/properties?${queryString}` : "/properties";
 }
 
-const paginationLinkClass = "inline-flex min-h-10 min-w-10 items-center justify-center rounded border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:border-brand-600 hover:text-brand-700 focus-ring";
-const paginationCurrentClass = "inline-flex min-h-10 min-w-10 items-center justify-center rounded border border-brand-700 bg-brand-700 px-3 text-sm font-bold text-white";
+const paginationLinkClass = "inline-flex min-h-10 min-w-10 items-center justify-center rounded border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm hover:border-emerald-600 hover:text-emerald-700 focus-ring";
+const paginationCurrentClass = "inline-flex min-h-10 min-w-10 items-center justify-center rounded border border-emerald-700 bg-emerald-700 px-3 text-sm font-bold text-white shadow-sm";
 const paginationDisabledClass = "inline-flex min-h-10 min-w-10 items-center justify-center rounded border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-400";

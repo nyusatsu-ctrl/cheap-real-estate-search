@@ -126,37 +126,37 @@ function TenderUnreadBadge() {
 
 function RealEstateHeader() {
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link href="/properties" className="flex min-w-0 items-center gap-2 sm:gap-3">
+    <header className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 shadow-sm">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:py-5">
+        <Link href="/properties" className="flex min-w-0 items-center gap-3 sm:gap-4">
           <Image
             src="/images/ecoloop-logo.jpeg"
             alt="株式会社エコループ"
             width={903}
             height={539}
             priority
-            className="h-8 w-auto shrink-0 object-contain sm:h-10"
-            sizes="(max-width: 640px) 90px, 112px"
+            className="h-12 w-auto shrink-0 object-contain sm:h-14"
+            sizes="(max-width: 640px) 120px, 150px"
           />
           <div className="min-w-0">
-            <p className="text-base font-black leading-tight text-slate-950 sm:text-lg">格安不動産サーチ</p>
-            <p className="mt-0.5 text-xs font-semibold text-slate-500">株式会社エコループ</p>
+            <p className="text-2xl font-black leading-tight text-emerald-950 sm:text-3xl">格安不動産サーチ</p>
+            <p className="mt-1 text-base font-bold leading-tight text-emerald-700 sm:text-lg">株式会社エコループ</p>
           </div>
         </Link>
-        <nav className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-slate-700 sm:gap-x-4 sm:text-sm">
-          <Link href="/properties" className="hover:text-brand-700">
+        <nav className="flex w-full flex-wrap items-center gap-2 text-sm font-bold text-slate-700 sm:w-auto sm:justify-end sm:text-[15px]">
+          <Link href="/properties" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
             物件一覧
           </Link>
-          <Link href="/plans" className="hover:text-brand-700">
+          <Link href="/plans" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
             料金
           </Link>
-          <Link href="/signup" className="hover:text-brand-700">
+          <Link href="/signup" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
             無料登録
           </Link>
-          <Link href="/dashboard" className="hover:text-brand-700">
+          <Link href="/dashboard" className="rounded-full bg-white/85 px-3 py-2 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700">
             会員
           </Link>
-          <Link href="/admin/login?next=/admin/properties" className="hover:text-brand-700">
+          <Link href="/admin/login?next=/admin/properties" className="rounded-full bg-emerald-700 px-3 py-2 text-white shadow-sm hover:bg-emerald-800">
             管理者ログイン
           </Link>
         </nav>

@@ -26,6 +26,9 @@ type Props = {
   regionLabel?: string;
 };
 
+const labelClass = "grid gap-1.5 text-sm font-black text-slate-700";
+const controlClass = "min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-inner shadow-slate-100 focus-ring";
+
 export function SearchFilters({
   action = "/properties",
   locations,
@@ -50,10 +53,10 @@ export function SearchFilters({
   const cities = getCityOptions(locations, selectedRegion, selectedPrefecture);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-emerald-100 bg-white/95 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur sm:p-5">
       <form action={action}>
-        <div className={showDetailedLocation ? "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+        <div className={showDetailedLocation ? "grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
+          <label className={labelClass}>
             {regionLabel}
             <select
               name="region"
@@ -63,7 +66,7 @@ export function SearchFilters({
                 setSelectedPrefecture("");
                 setSelectedCity("");
               }}
-              className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+              className={controlClass}
             >
               <option value="">全国</option>
               {PROPERTY_REGION_OPTIONS.map((option) => (
@@ -85,7 +88,7 @@ export function SearchFilters({
                     setSelectedPrefecture(event.target.value);
                     setSelectedCity("");
                   }}
-                  className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+                  className={controlClass}
                 >
                   <option value="">全国</option>
                   {prefectures.map((name) => (
@@ -102,7 +105,7 @@ export function SearchFilters({
                   name="city"
                   value={selectedCity}
                   onChange={(event) => setSelectedCity(event.target.value)}
-                  className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+                  className={controlClass}
                 >
                   <option value="">すべて</option>
                   {cities.map((name) => (
@@ -115,9 +118,9 @@ export function SearchFilters({
             </>
           ) : null}
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          <label className={labelClass}>
             物件種別
-            <select name="propertyType" defaultValue={propertyType ?? ""} className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring">
+            <select name="propertyType" defaultValue={propertyType ?? ""} className={controlClass}>
               <option value="">すべて</option>
               {Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -127,13 +130,13 @@ export function SearchFilters({
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          <label className={labelClass}>
             価格帯
             <select
               name="priceRange"
               value={selectedPriceRange}
               onChange={(event) => setSelectedPriceRange(event.target.value)}
-              className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+              className={controlClass}
             >
               <option value="">指定なし</option>
               {priceRangeOptions.map((option) => (
@@ -144,9 +147,9 @@ export function SearchFilters({
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          <label className={labelClass}>
             並び順
-            <select name="sort" defaultValue={sort} className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring">
+            <select name="sort" defaultValue={sort} className={controlClass}>
               {PROPERTY_SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -155,17 +158,17 @@ export function SearchFilters({
             </select>
           </label>
 
-          <label className={showDetailedLocation ? "grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-5" : "grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2 lg:col-span-4"}>
+          <label className={showDetailedLocation ? `${labelClass} md:col-span-2 lg:col-span-5` : `${labelClass} md:col-span-2 lg:col-span-4`}>
             キーワード
             <input
               name="keyword"
               defaultValue={keyword ?? ""}
               placeholder="空き家、山林、地域名など"
-              className="rounded border border-slate-300 bg-white px-3 py-2 focus-ring"
+              className={controlClass}
             />
           </label>
 
-          <button className="mt-1 flex items-center justify-center gap-2 rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring lg:mt-6">
+          <button className="mt-1 flex min-h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-700 to-brand-700 px-5 py-3 font-black text-white shadow-lg shadow-emerald-900/20 hover:from-emerald-800 hover:to-brand-800 focus-ring lg:mt-7">
             <Search className="h-4 w-4" />
             検索
           </button>

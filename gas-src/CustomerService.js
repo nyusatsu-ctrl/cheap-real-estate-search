@@ -223,8 +223,11 @@ var WEBAPP_BIKE_MARKET_AUTO_LOG_COLUMNS = [
 ];
 var WEBAPP_AUTO_FETCH_MARKET_PROPERTY_KEY = 'AUTO_FETCH_MARKET_ON_NEW_APPLICATION';
 var WEBAPP_AUTO_FETCH_MARKET_TIMEOUT_MS = 30000;
-var WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN = 3;
-var WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS = 280000;
+var WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN = 1;
+var WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS = 240000;
+var WEBAPP_PENDING_MARKET_LOOKUP_MAX_SCAN_ROWS_PER_RUN = 120;
+var WEBAPP_PENDING_MARKET_LOOKUP_CURSOR_PROPERTY_KEY = 'PENDING_BIKE_MARKET_LOOKUP_CURSOR_ROW';
+var WEBAPP_PENDING_MARKET_LOOKUP_LOCK_TIMEOUT_MS = 1000;
 var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v20-goobike-model-master';
 var WEBAPP_BIKE_MARKET_GOOBIKE_BASE_URL = 'https://goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_ALTERNATE_BASE_URL = 'https://www.goobike.com';
@@ -1258,6 +1261,26 @@ function queueBikeMarketLookupForNewCustomer(customerId) {
 }
 
 function processPendingBikeMarketLookups(maxItems) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(WEBAPP_PENDING_MARKET_LOOKUP_LOCK_TIMEOUT_MS)) {
+    return {
+      processed: 0,
+      skipped: 0,
+      errors: 0,
+      deferred: 0,
+      scanned: 0,
+      message: '別の相場取得処理が実行中のため、今回はスキップしました。'
+    };
+  }
+
+  try {
+    return processPendingBikeMarketLookupsLocked_(maxItems);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function processPendingBikeMarketLookupsLocked_(maxItems) {
   var startedAt = new Date().getTime();
   var limit = Math.max(1, Math.min(Number(maxItems || WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN) || WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN, WEBAPP_PENDING_MARKET_LOOKUP_MAX_PER_RUN));
   var sheet = getMainSheet_();
@@ -1278,17 +1301,31 @@ function processPendingBikeMarketLookups(maxItems) {
   var skipped = 0;
   var errors = 0;
   var deferred = 0;
+  var handled = 0;
+  var scanned = 0;
+  var startRowNumber = getPendingBikeMarketLookupCursor_(lastRow);
+  var startIndex = Math.max(0, startRowNumber - 2);
+  var maxScanRows = Math.max(1, Math.min(rows.length, WEBAPP_PENDING_MARKET_LOOKUP_MAX_SCAN_ROWS_PER_RUN));
+  var nextCursorRowNumber = startRowNumber;
+  var stoppedByLimit = false;
+  var stoppedByRuntime = false;
+  var stoppedByScanLimit = false;
 
-  for (var i = 0; i < rows.length; i++) {
-    if (processed >= limit) {
+  for (var offset = 0; offset < rows.length && scanned < maxScanRows; offset++) {
+    if (handled >= limit) {
+      stoppedByLimit = true;
       break;
     }
     if (new Date().getTime() - startedAt >= WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS) {
       deferred++;
+      stoppedByRuntime = true;
       break;
     }
-    var row = rows[i];
-    var rowNumber = i + 2;
+    var rowIndex = (startIndex + offset) % rows.length;
+    var row = rows[rowIndex];
+    var rowNumber = rowIndex + 2;
+    scanned++;
+    nextCursorRowNumber = getNextPendingBikeMarketLookupCursor_(rowNumber, lastRow);
     var status = trimFullWidth(String(getCellByHeader_(row, headerMap, '相場_ステータス') || ''));
     if (status !== 'processing') {
       continue;
@@ -1311,6 +1348,7 @@ function processPendingBikeMarketLookups(maxItems) {
         errorMessage: !bikeName ? '希望車種が未入力です。' : 'バイク申込ではありません。'
       });
       skipped++;
+      handled++;
       continue;
     }
 
@@ -1329,15 +1367,49 @@ function processPendingBikeMarketLookups(maxItems) {
       saveBikeMarketAutoFetchError(rowKey, error);
       errors++;
     }
+    handled++;
   }
+
+  if (scanned >= maxScanRows && scanned < rows.length && handled < limit) {
+    stoppedByScanLimit = true;
+  }
+
+  setPendingBikeMarketLookupCursor_(nextCursorRowNumber, lastRow);
 
   return {
     processed: processed,
     skipped: skipped,
     errors: errors,
     deferred: deferred,
+    scanned: scanned,
+    nextCursorRowNumber: nextCursorRowNumber,
+    stoppedByLimit: stoppedByLimit,
+    stoppedByRuntime: stoppedByRuntime,
+    stoppedByScanLimit: stoppedByScanLimit,
     message: '保留中の相場取得を処理しました。'
   };
+}
+
+function getPendingBikeMarketLookupCursor_(lastRow) {
+  var raw = PropertiesService.getScriptProperties().getProperty(WEBAPP_PENDING_MARKET_LOOKUP_CURSOR_PROPERTY_KEY);
+  var rowNumber = Math.floor(Number(raw));
+  if (!rowNumber || rowNumber < 2 || rowNumber > lastRow) {
+    return 2;
+  }
+  return rowNumber;
+}
+
+function setPendingBikeMarketLookupCursor_(rowNumber, lastRow) {
+  var normalized = Math.floor(Number(rowNumber));
+  if (!normalized || normalized < 2 || normalized > lastRow) {
+    normalized = 2;
+  }
+  PropertiesService.getScriptProperties().setProperty(WEBAPP_PENDING_MARKET_LOOKUP_CURSOR_PROPERTY_KEY, String(normalized));
+}
+
+function getNextPendingBikeMarketLookupCursor_(rowNumber, lastRow) {
+  var nextRowNumber = Math.floor(Number(rowNumber)) + 1;
+  return nextRowNumber > lastRow ? 2 : nextRowNumber;
 }
 
 function installPendingBikeMarketLookupTrigger() {

@@ -16,11 +16,14 @@ var LABEL_NAME = '仮審査_処理済み';
 // 取り込み・整理対象にする最初の日付（2026年5月1日以降だけ残します）
 var IMPORT_START_DATE = new Date(2026, 4, 1, 0, 0, 0);
 var IMPORT_RECENT_QUERY_WINDOW = 'newer_than:14d';
-var IMPORT_GMAIL_SEARCH_LIMIT_PER_QUERY = 10;
-var IMPORT_MAX_THREADS_PER_RUN = 10;
-var IMPORT_MAX_MESSAGES_PER_RUN = 10;
-var IMPORT_MAX_NEW_ROWS_PER_RUN = 5;
-var IMPORT_SAFE_RUNTIME_MS = 280000;
+var IMPORT_GMAIL_SEARCH_LIMIT_PER_QUERY = 8;
+var IMPORT_MAX_THREADS_PER_RUN = 8;
+var IMPORT_MAX_MESSAGES_PER_RUN = 8;
+var IMPORT_MAX_NEW_ROWS_PER_RUN = 2;
+var IMPORT_SAFE_RUNTIME_MS = 240000;
+var IMPORT_LOCK_TIMEOUT_MS = 1000;
+var IMPORT_TRIGGER_INTERVAL_MINUTES = 10;
+var IMPORT_NORMALIZE_AFTER_IMPORT = false;
 var IMPORT_PROCESSED_MESSAGE_IDS_PROPERTY = 'IMPORT_PROCESSED_MESSAGE_IDS';
 var IMPORT_PROCESSED_MESSAGE_IDS_MAX = 300;
 
@@ -129,6 +132,29 @@ var ALL_PREFECTURES_FOR_IMPORT = [
 // メイン処理：メールを読み取ってスプレッドシートに書き込む
 // ============================================================
 function importLoanApplications() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(IMPORT_LOCK_TIMEOUT_MS)) {
+    var skippedMessage = '前回の仮審査取り込みが実行中のため、今回はスキップしました。';
+    Logger.log(skippedMessage);
+    return {
+      checkedMessageCount: 0,
+      importedCount: 0,
+      duplicateCount: 0,
+      skippedCount: 0,
+      reachedLimit: true,
+      lockSkipped: true,
+      message: skippedMessage
+    };
+  }
+
+  try {
+    return importLoanApplicationsLocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function importLoanApplicationsLocked_() {
   var startedAt = new Date().getTime();
   var processedMessageIds = getImportProcessedMessageIdMap_();
   var processedMessageIdsChanged = false;
@@ -168,7 +194,14 @@ function importLoanApplications() {
 
   if (threads.length === 0) {
     Logger.log('新しい仮審査メール・お問い合わせメールはありませんでした。');
-    return;
+    return {
+      checkedMessageCount: 0,
+      importedCount: 0,
+      duplicateCount: 0,
+      skippedCount: 0,
+      reachedLimit: false,
+      message: '新しい仮審査メール・お問い合わせメールはありませんでした。'
+    };
   }
 
   Logger.log(threads.length + ' 件の未処理スレッドが見つかりました。');
@@ -213,6 +246,7 @@ function importLoanApplications() {
         if (messageId) {
           processedMessageIds[messageId] = true;
           processedMessageIdsChanged = true;
+          processedMessageIdsChanged = saveImportProcessedMessageIdMapIfChanged_(processedMessageIds, processedMessageIdsChanged);
         }
         skippedCount++;
         continue;
@@ -224,6 +258,7 @@ function importLoanApplications() {
         if (messageId) {
           processedMessageIds[messageId] = true;
           processedMessageIdsChanged = true;
+          processedMessageIdsChanged = saveImportProcessedMessageIdMapIfChanged_(processedMessageIds, processedMessageIdsChanged);
         }
         skippedCount++;
         continue;
@@ -259,6 +294,7 @@ function importLoanApplications() {
         if (messageId) {
           processedMessageIds[messageId] = true;
           processedMessageIdsChanged = true;
+          processedMessageIdsChanged = saveImportProcessedMessageIdMapIfChanged_(processedMessageIds, processedMessageIdsChanged);
         }
         duplicateCount++;
         continue;
@@ -288,6 +324,7 @@ function importLoanApplications() {
       if (messageId) {
         processedMessageIds[messageId] = true;
         processedMessageIdsChanged = true;
+        processedMessageIdsChanged = saveImportProcessedMessageIdMapIfChanged_(processedMessageIds, processedMessageIdsChanged);
       }
       importedCount++;
       Logger.log('取り込み完了: ' + (parsed['お名前'] || '名前なし'));
@@ -307,13 +344,24 @@ function importLoanApplications() {
     saveImportProcessedMessageIdMap_(processedMessageIds);
   }
 
-  if (!shouldStopImportRun_(startedAt)) {
+  if (IMPORT_NORMALIZE_AFTER_IMPORT && !shouldStopImportRun_(startedAt)) {
     normalizeApplicationSheetForCurrentPolicy();
+  } else if (!IMPORT_NORMALIZE_AFTER_IMPORT) {
+    Logger.log('時間切れ防止のため、取り込みトリガー内のシート整理処理は実行しません。必要に応じて normalizeApplicationSheetForCurrentPolicy を手動実行してください。');
   } else {
     Logger.log('実行時間上限が近いため、シート整理処理は次回以降に回します。');
   }
 
   Logger.log('取り込み処理終了: 確認メール数=' + checkedMessageCount + ', 新規取り込み=' + importedCount + ', 重複スキップ=' + duplicateCount + ', その他スキップ=' + skippedCount + ', 上限到達=' + reachedLimit);
+  return {
+    checkedMessageCount: checkedMessageCount,
+    importedCount: importedCount,
+    duplicateCount: duplicateCount,
+    skippedCount: skippedCount,
+    reachedLimit: reachedLimit,
+    lockSkipped: false,
+    message: '取り込み処理を終了しました。'
+  };
 }
 
 function verifyWorkPostalCodeColumnSetup() {
@@ -414,6 +462,41 @@ function saveImportProcessedMessageIdMap_(messageIdMap) {
     ids = ids.slice(ids.length - IMPORT_PROCESSED_MESSAGE_IDS_MAX);
   }
   PropertiesService.getScriptProperties().setProperty(IMPORT_PROCESSED_MESSAGE_IDS_PROPERTY, JSON.stringify(ids));
+}
+
+function saveImportProcessedMessageIdMapIfChanged_(messageIdMap, changed) {
+  if (!changed) {
+    return false;
+  }
+  saveImportProcessedMessageIdMap_(messageIdMap);
+  return false;
+}
+
+function repairImportLoanApplicationsTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var deletedCount = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction && triggers[i].getHandlerFunction() === 'importLoanApplications') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
+    }
+  }
+
+  ScriptApp.newTrigger('importLoanApplications')
+    .timeBased()
+    .everyMinutes(IMPORT_TRIGGER_INTERVAL_MINUTES)
+    .create();
+
+  return {
+    installed: true,
+    deletedCount: deletedCount,
+    intervalMinutes: IMPORT_TRIGGER_INTERVAL_MINUTES,
+    message: 'importLoanApplications の時間ベーストリガーを1本に整理し、' + IMPORT_TRIGGER_INTERVAL_MINUTES + '分間隔で作成しました。'
+  };
+}
+
+function installImportLoanApplicationsTrigger() {
+  return repairImportLoanApplicationsTrigger();
 }
 
 function getApplicationTypeFromSubject_(subject) {

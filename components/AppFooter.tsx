@@ -20,6 +20,8 @@ const tenderFooterLinks = [
 
 export function AppFooter() {
   const pathname = usePathname();
+  if (pathname.startsWith("/income-potential")) return <IncomePotentialFooter />;
+
   const links = pathname.startsWith("/tenders") || pathname.startsWith("/favorites") || pathname.startsWith("/notifications")
     ? tenderFooterLinks
     : footerLinks;
@@ -31,6 +33,23 @@ export function AppFooter() {
         <nav className="flex flex-wrap gap-x-4 gap-y-2">
           {links.map((link) => (
             <Link key={link.href} href={link.href} className="hover:text-brand-700">
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+    </footer>
+  );
+}
+
+function IncomePotentialFooter() {
+  return (
+    <footer className="border-t border-[#2a2418] bg-[#0b0a0f]">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-stone-400 md:flex-row md:items-center md:justify-between">
+        <p className="font-semibold text-stone-300">年収ポテンシャル診断</p>
+        <nav className="flex flex-wrap gap-x-4 gap-y-2">
+          {footerLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="hover:text-[#f4d58d]">
               {link.label}
             </Link>
           ))}

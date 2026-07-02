@@ -26,10 +26,31 @@ export function AppHeader() {
     || pathname === "/admin/login"
     || pathname.startsWith("/admin/diagnoses");
 
+  if (pathname.startsWith("/income-potential")) return <IncomePotentialHeader />;
   if (isSalesAdmin) return <ContractAdminHeader />;
   if (isTenderRoute) return <TenderHeader />;
   if (isDiagnosisRoute) return <DiagnosisHeader priority={pathname === "/admin/login"} />;
   return <RealEstateHeader />;
+}
+
+function IncomePotentialHeader() {
+  return (
+    <header className="border-b border-[#2a2418] bg-[#0b0a0f] text-stone-100">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <Link href="/income-potential" className="min-w-0">
+          <div className="min-w-0">
+            <p className="text-base font-black leading-tight tracking-normal text-[#f4d58d] sm:text-lg">年収ポテンシャル診断</p>
+            <p className="mt-1 text-xs font-semibold text-stone-400">Income Potential Check</p>
+          </div>
+        </Link>
+        <nav className="flex shrink-0 items-center gap-3 text-xs font-bold text-stone-300 sm:text-sm">
+          <Link href="/income-potential" className="hover:text-[#f4d58d]">
+            診断する
+          </Link>
+        </nav>
+      </div>
+    </header>
+  );
 }
 
 function DiagnosisHeader({ priority = false }: { priority?: boolean }) {

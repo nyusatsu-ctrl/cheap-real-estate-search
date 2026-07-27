@@ -13,10 +13,6 @@ const PRESERVED_PAGE_PARAM_KEYS = ["prefecture", "propertyType", "priceRange", "
 export const metadata: Metadata = {
   title: "物件一覧｜格安不動産サーチ",
   description: "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。",
-  icons: {
-    icon: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }],
-    apple: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }]
-  },
   openGraph: {
     title: "物件一覧｜格安不動産サーチ",
     description: "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。",

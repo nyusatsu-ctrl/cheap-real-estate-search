@@ -11,10 +11,6 @@ import { ViewedPropertyTracker } from "@/components/ViewedPropertyTracker";
 export const metadata: Metadata = {
   title: "物件詳細｜格安不動産サーチ",
   description: "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。",
-  icons: {
-    icon: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }],
-    apple: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }]
-  },
   openGraph: {
     title: "物件詳細｜格安不動産サーチ",
     description: "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。",

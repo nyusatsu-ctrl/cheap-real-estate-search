@@ -34,7 +34,7 @@ export default async function DiagnosisFormPage({ searchParams }: { searchParams
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-8">
-          <Link href="/" className="text-sm font-bold text-brand-700">
+          <Link href="/construction-sales-diagnosis" className="text-sm font-bold text-brand-700">
             トップへ戻る
           </Link>
           <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

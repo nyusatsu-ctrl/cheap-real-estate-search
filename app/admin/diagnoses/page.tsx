@@ -227,7 +227,7 @@ function AdminHeader({ email }: { email: string }) {
         <p className="mt-1 text-xs text-slate-500">{email}</p>
       </div>
       <div className="flex items-center gap-2">
-        <Link href="/" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
+        <Link href="/construction-sales-diagnosis" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
           公開ページ
         </Link>
         <form action={signOutAction}>

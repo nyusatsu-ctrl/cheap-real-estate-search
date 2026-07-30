@@ -21,7 +21,7 @@ export function AppHeader() {
     || pathname.startsWith("/admin/past-awards")
     || pathname.startsWith("/admin/defense-crawl");
   const isDiagnosisRoute =
-    pathname === "/"
+    pathname.startsWith("/construction-sales-diagnosis")
     || pathname.startsWith("/diagnosis")
     || pathname === "/admin/login"
     || pathname.startsWith("/admin/diagnoses");
@@ -57,7 +57,7 @@ function DiagnosisHeader({ priority = false }: { priority?: boolean }) {
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link href="/diagnosis" className="min-w-0">
+        <Link href="/construction-sales-diagnosis" className="min-w-0">
           <EcoloopAdminBrand
             showSystemName
             systemName="建設業売上アップ診断"

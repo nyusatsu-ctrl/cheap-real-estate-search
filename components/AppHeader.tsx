@@ -149,7 +149,7 @@ function RealEstateHeader() {
   return (
     <header className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 shadow-sm">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:gap-4 sm:py-5">
-        <Link href="/properties" className="flex min-w-0 items-center gap-2.5 sm:gap-4">
+        <Link href="/properties" className="flex w-full min-w-0 items-center gap-2.5 sm:w-auto sm:gap-4">
           <Image
             src="/images/ecoloop-logo.jpeg"
             alt="株式会社エコループ"

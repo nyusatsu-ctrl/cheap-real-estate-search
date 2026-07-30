@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluatePropertyAccess } from "../lib/property-access.ts";
+import { evaluatePropertyAccess, getPropertyAccessPageState } from "../lib/property-access.ts";
 
 const now = new Date("2026-07-28T00:00:00.000Z");
 const day = 86_400_000;
@@ -88,4 +88,51 @@ test("administrator access does not depend on subscription state", () => {
   }, now);
   assert.equal(result.allowed, true);
   assert.equal(result.reason, "admin");
+});
+
+test("property page state distinguishes anonymous, trial, active, and administrator access", () => {
+  assert.equal(getPropertyAccessPageState(evaluatePropertyAccess(null, now)), "anonymous");
+  assert.equal(getPropertyAccessPageState(evaluatePropertyAccess(trialInput(14), now)), "trial");
+  assert.equal(getPropertyAccessPageState(evaluatePropertyAccess({
+    role: "viewer",
+    subscriptionStatus: "active",
+    trialStartedAt: null,
+    trialEndsAt: null,
+    currentPeriodEnd: new Date(now.getTime() + 30 * day).toISOString(),
+    cancelAtPeriodEnd: false
+  }, now)), "active");
+  assert.equal(getPropertyAccessPageState(evaluatePropertyAccess({
+    role: "admin",
+    subscriptionStatus: "canceled",
+    trialStartedAt: null,
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false
+  }, now)), "admin");
+});
+
+test("property page state distinguishes trial expiration, payment problems, and inactive subscriptions", () => {
+  assert.equal(getPropertyAccessPageState(evaluatePropertyAccess(trialInput(-1), now)), "trial_expired");
+
+  for (const status of ["past_due", "unpaid", "incomplete"]) {
+    assert.equal(getPropertyAccessPageState(evaluatePropertyAccess({
+      role: "viewer",
+      subscriptionStatus: status,
+      trialStartedAt: null,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false
+    }, now)), "payment_required", status);
+  }
+
+  for (const status of ["canceled", "incomplete_expired", "paused", "unknown"]) {
+    assert.equal(getPropertyAccessPageState(evaluatePropertyAccess({
+      role: "viewer",
+      subscriptionStatus: status,
+      trialStartedAt: null,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false
+    }, now)), "inactive", status);
+  }
 });

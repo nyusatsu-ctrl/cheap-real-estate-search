@@ -40,6 +40,15 @@ export type PropertyAccessDecision = {
   showTrialEndingWarning: boolean;
 };
 
+export type PropertyAccessPageState =
+  | "anonymous"
+  | "trial"
+  | "active"
+  | "admin"
+  | "trial_expired"
+  | "payment_required"
+  | "inactive";
+
 export function evaluatePropertyAccess(
   input: PropertyAccessInput | null,
   now = new Date()
@@ -100,6 +109,25 @@ export function evaluatePropertyAccess(
   }
 
   return denied("inactive_subscription", status);
+}
+
+export function getPropertyAccessPageState(decision: PropertyAccessDecision): PropertyAccessPageState {
+  switch (decision.reason) {
+    case "not_authenticated":
+      return "anonymous";
+    case "trial":
+      return "trial";
+    case "active":
+      return "active";
+    case "admin":
+      return "admin";
+    case "trial_expired":
+      return "trial_expired";
+    case "payment_required":
+      return "payment_required";
+    default:
+      return "inactive";
+  }
 }
 
 export function normalizePropertySubscriptionStatus(value: string | null): PropertySubscriptionStatus {

@@ -1,14 +1,20 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { LockKeyhole } from "lucide-react";
+import { CalendarDays, CircleCheck, LockKeyhole, ShieldCheck } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
 import { SearchFilters } from "@/components/SearchFilters";
 import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
+import {
+  evaluatePropertyAccess,
+  formatPropertyDateJst,
+  getPropertyAccessPageState,
+  type PropertyAccessPageState
+} from "@/lib/property-access";
 import { firstString, normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
 import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedPropertiesResult } from "@/lib/properties";
-import { getCurrentMember } from "@/lib/user";
+import { getCurrentMember, type CurrentMember } from "@/lib/user";
 
 const PUBLIC_PROPERTIES_PAGE_SIZE = 100;
 const PRESERVED_PAGE_PARAM_KEYS = ["prefecture", "propertyType", "priceRange", "sort", "keyword"] as const;
@@ -21,8 +27,16 @@ export const metadata: Metadata = propertyMetadata(
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const resolvedSearchParams = await searchParams;
   const member = await getCurrentMember();
-  if (!member?.access.allowed) {
-    return <RestrictedProperties memberStatus={member?.subscriptionStatus ?? null} />;
+  const access = member?.access ?? evaluatePropertyAccess(null);
+  const accessState = getPropertyAccessPageState(access);
+  if (!member || !access.allowed) {
+    return (
+      <RestrictedProperties
+        accessState={accessState}
+        memberEmail={member?.email ?? null}
+        memberStatus={member?.subscriptionStatus ?? null}
+      />
+    );
   }
 
   const filters = normalizePropertyFilters(resolvedSearchParams, {
@@ -59,6 +73,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
           <span className="font-black">掲載情報について：</span>
           {PROPERTY_INFORMATION_NOTICE}
         </div>
+        <MemberAccessSummary member={member} accessState={accessState} />
         <SearchFilters
           locations={[]}
           prefecture={filters.prefecture}
@@ -95,18 +110,79 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
   );
 }
 
-function RestrictedProperties({ memberStatus }: { memberStatus: string | null }) {
-  const isLoggedIn = memberStatus !== null;
+function MemberAccessSummary({
+  member,
+  accessState
+}: {
+  member: CurrentMember;
+  accessState: PropertyAccessPageState;
+}) {
+  if (accessState === "trial") {
+    return (
+      <section className="mb-5 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950" aria-label="無料期間">
+        <div className="flex items-start gap-3">
+          <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+          <div>
+            <p className="font-black">14日間の無料期間中です</p>
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              <div>開始日: {formatPropertyDateJst(member.trialStartedAt)}</div>
+              <div>終了日: {formatPropertyDateJst(member.trialEndsAt)}</div>
+              <div>残り: {member.access.remainingTrialDays}日</div>
+            </div>
+            <p className="mt-2 text-xs leading-5">無料登録だけでは自動課金されません。無料期間中は物件一覧と物件詳細を閲覧できます。</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (accessState === "active") {
+    return (
+      <section className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950" aria-label="有料会員">
+        <div className="flex items-start gap-3">
+          <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+          <div>
+            <p className="font-black">有料会員として利用中です</p>
+            <p className="mt-1 text-sm">
+              {member.cancelAtPeriodEnd ? "利用期限" : "次回更新日"}: {formatPropertyDateJst(member.currentPeriodEnd)}
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mb-5 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-800" aria-label="管理者アクセス">
+      <div className="flex items-center gap-3">
+        <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" />
+        <p className="font-black">管理者権限で物件情報を閲覧しています</p>
+      </div>
+    </section>
+  );
+}
+
+function RestrictedProperties({
+  accessState,
+  memberEmail,
+  memberStatus
+}: {
+  accessState: PropertyAccessPageState;
+  memberEmail: string | null;
+  memberStatus: string | null;
+}) {
+  const content = restrictedContent(accessState, memberStatus);
   return (
     <div className="min-h-[70vh] bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
       <div className="mx-auto max-w-5xl px-4 py-10">
         <section className="grid gap-6 rounded-lg border border-emerald-100 bg-white p-6 shadow-lg shadow-emerald-900/5 md:grid-cols-[1fr_20rem] md:items-center">
           <div>
             <LockKeyhole className="h-8 w-8 text-emerald-700" />
-            <h1 className="mt-4 text-3xl font-black leading-tight text-slate-950">全国の格安不動産を会員限定で検索</h1>
+            <h1 className="mt-4 text-3xl font-black leading-tight text-slate-950">{content.heading}</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
-              0円物件、空き家、古家付き土地、山林、300万円以下の物件を毎朝更新しています。実際の物件一覧と詳細は、無料期間中または有料会員の方だけが閲覧できます。
+              {content.description}
             </p>
+            {memberEmail ? <p className="mt-3 text-sm font-semibold text-slate-500">ログイン中: {memberEmail}</p> : null}
             <div className="mt-5 flex flex-wrap gap-2 text-sm font-bold text-emerald-900">
               <span className="rounded bg-emerald-50 px-3 py-2">登録後14日間無料</span>
               <span className="rounded bg-sky-50 px-3 py-2">カード登録不要</span>
@@ -114,14 +190,14 @@ function RestrictedProperties({ memberStatus }: { memberStatus: string | null })
             </div>
           </div>
           <div className="rounded border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm font-bold text-slate-500">{isLoggedIn ? "利用期間が終了しています" : "料金プラン"}</p>
+            <p className="text-sm font-bold text-slate-500">{content.label}</p>
             <p className="mt-2 text-3xl font-black text-emerald-800">月額4,980円<span className="ml-1 text-xs">税込</span></p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">有料申込み時に即時決済され、以後毎月自動更新されます。</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{content.paymentDescription}</p>
             <div className="mt-5 grid gap-2">
-              <Link href={isLoggedIn ? "/billing?access=inactive" : "/signup"} className="rounded bg-emerald-700 px-4 py-3 text-center font-bold text-white focus-ring">
-                {isLoggedIn ? "月額4,980円で利用を開始する" : "14日間無料で始める"}
+              <Link href={content.primaryHref} className="rounded bg-emerald-700 px-4 py-3 text-center font-bold text-white focus-ring">
+                {content.primaryLabel}
               </Link>
-              {!isLoggedIn ? (
+              {accessState === "anonymous" ? (
                 <Link href="/login?next=/properties" className="rounded border border-slate-300 bg-white px-4 py-3 text-center font-bold text-slate-700 focus-ring">
                   会員ログイン
                 </Link>
@@ -132,6 +208,67 @@ function RestrictedProperties({ memberStatus }: { memberStatus: string | null })
       </div>
     </div>
   );
+}
+
+function restrictedContent(accessState: PropertyAccessPageState, memberStatus: string | null) {
+  if (accessState === "anonymous") {
+    return {
+      heading: "登録後14日間、格安不動産を無料で検索",
+      description:
+        "0円物件、空き家、古家付き土地、山林、300万円以下の物件を毎朝更新しています。無料登録すると、14日間だけ実際の物件一覧と詳細を閲覧できます。",
+      label: "初めての方へ",
+      paymentDescription: "無料登録にカードは不要です。14日後に自動課金されることはありません。",
+      primaryHref: "/signup",
+      primaryLabel: "無料登録する"
+    };
+  }
+
+  if (accessState === "trial_expired") {
+    return {
+      heading: "無料期間が終了しました",
+      description:
+        "14日間の無料期間が終了したため、物件一覧と物件詳細の閲覧を停止しています。継続利用する場合は有料プランへお申し込みください。",
+      label: "無料期間終了",
+      paymentDescription: "有料申込み時に4,980円（税込）が即時決済され、以後毎月自動更新されます。",
+      primaryHref: "/billing?access=trial_expired",
+      primaryLabel: "月額4,980円で利用を開始する"
+    };
+  }
+
+  if (accessState === "payment_required") {
+    return {
+      heading: "お支払いの確認が必要です",
+      description:
+        "現在のお支払いを確認できないため、物件一覧と物件詳細の閲覧を停止しています。契約・支払い管理で請求状況をご確認ください。",
+      label: propertySubscriptionStatusLabel(memberStatus),
+      paymentDescription: "カード情報や未払いの請求を確認すると、契約状態に応じて利用を再開できます。",
+      primaryHref: "/billing?access=payment_required",
+      primaryLabel: "契約・支払いを確認する"
+    };
+  }
+
+  return {
+    heading: "現在は物件を閲覧できません",
+    description:
+      "契約が終了または停止しているため、物件一覧と物件詳細の閲覧を停止しています。契約状態を確認し、必要に応じて有料プランへ再度お申し込みください。",
+    label: propertySubscriptionStatusLabel(memberStatus),
+    paymentDescription: "有料申込み時に4,980円（税込）が即時決済され、以後毎月自動更新されます。",
+    primaryHref: "/billing?access=inactive",
+    primaryLabel: "契約状態を確認する"
+  };
+}
+
+function propertySubscriptionStatusLabel(status: string | null) {
+  const labels: Record<string, string> = {
+    active: "有料期間終了",
+    past_due: "支払い確認待ち",
+    unpaid: "未払い",
+    canceled: "契約終了",
+    incomplete: "決済未完了",
+    incomplete_expired: "決済期限切れ",
+    paused: "利用停止"
+  };
+  return status ? labels[status] ?? "利用停止" : "利用停止";
 }
 
 function Pagination({

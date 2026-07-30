@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
-import { createStripeClient } from "@/lib/billing/stripe";
+import {
+  createStripeClient,
+  getPropertyStripePriceId,
+  isPropertyStripeMetadata
+} from "@/lib/billing/stripe";
 import { createTenderSupabaseServiceRoleClient } from "@/lib/supabase/tenders-server";
 import { emailHash, type TenderSubscriptionStatus } from "@/lib/tender-access";
 import { createTenderStripeClient, getTenderStripePriceId, TENDER_PRODUCT_CODE } from "@/lib/tender-billing";
@@ -44,47 +48,188 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Tender webhook processing failed." }, { status: 500 });
   }
 
+  try {
+    const propertyHandled = await handlePropertyStripeEvent(event);
+    return NextResponse.json({ received: true, ignored: !propertyHandled });
+  } catch (error) {
+    console.error("[property-stripe-webhook] failed to process property event", {
+      eventType: event.type,
+      message: error instanceof Error ? sanitizeStripeLogMessage(error.message) : "unknown_error"
+    });
+    return NextResponse.json({ error: "Property webhook processing failed." }, { status: 500 });
+  }
+}
+
+async function handlePropertyStripeEvent(event: Stripe.Event) {
+  if (!isSupportedPropertyEvent(event.type)) return false;
+
+  const stripe = createStripeClient();
+  const priceId = getPropertyStripePriceId();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({
-      error: "Common billing webhook environment is not configured.",
-      received: true,
-      ignored: true
-    });
+  if (!stripe || !priceId || !supabaseUrl || !serviceRoleKey) {
+    throw new Error("Property billing environment is not configured.");
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const context = await getPropertyEventContext(event, stripe, priceId);
+  if (!context) return false;
 
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false }
+  });
+  const { data: processed } = await supabase
+    .from("property_payment_events")
+    .select("processed_at")
+    .eq("event_id", event.id)
+    .maybeSingle();
+  if (processed?.processed_at) return true;
+
+  if (!processed) {
+    const inserted = await supabase.from("property_payment_events").insert({
+      event_id: event.id,
+      event_type: event.type,
+      user_id: context.userId,
+      stripe_customer_id: context.customerId,
+      stripe_subscription_id: context.subscriptionId
+    });
+    if (inserted.error && !isUniqueViolation(inserted.error.code)) {
+      throw new Error(`failed to save property payment event: ${inserted.error.message}`);
+    }
+  }
+
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, stripe_customer_id")
+      .eq("id", context.userId)
+      .single();
+    if (profileError || !profile) throw new Error("Property billing profile was not found.");
+    if (profile.stripe_customer_id && profile.stripe_customer_id !== context.customerId) {
+      throw new Error("Stripe customer does not match the property billing profile.");
+    }
+
+    const update = await supabase
+      .from("profiles")
+      .update({
+        stripe_customer_id: context.customerId,
+        stripe_subscription_id: context.subscriptionId,
+        subscription_status: context.status,
+        current_period_end: context.currentPeriodEnd,
+        cancel_at_period_end: context.cancelAtPeriodEnd,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", context.userId);
+    if (update.error) throw new Error(`failed to update property access: ${update.error.message}`);
+
+    const completed = await supabase
+      .from("property_payment_events")
+      .update({ processed_at: new Date().toISOString() })
+      .eq("event_id", event.id);
+    if (completed.error) throw new Error(`failed to complete property payment event: ${completed.error.message}`);
+    return true;
+  } catch (error) {
+    await supabase.from("property_payment_events").delete().eq("event_id", event.id);
+    throw error;
+  }
+}
+
+type PropertyEventContext = {
+  userId: string;
+  customerId: string;
+  subscriptionId: string;
+  status: Stripe.Subscription.Status;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
+async function getPropertyEventContext(
+  event: Stripe.Event,
+  stripe: Stripe,
+  expectedPriceId: string
+): Promise<PropertyEventContext | null> {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const userId = session.metadata?.user_id;
-
-    if (userId) {
-      await supabase.from("profiles").update({
-        stripe_customer_id: typeof session.customer === "string" ? session.customer : null,
-        stripe_subscription_id: typeof session.subscription === "string" ? session.subscription : null,
-        subscription_status: "active",
-        trial_ends_at: null
-      }).eq("id", userId);
-    }
+    if (!isPropertyStripeMetadata(session.metadata)) return null;
+    const subscriptionId = stringId(session.subscription);
+    if (!subscriptionId) throw new Error("Property checkout has no subscription.");
+    return getVerifiedPropertySubscription(stripe, subscriptionId, expectedPriceId, session.metadata?.user_id);
   }
 
-  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+  if (
+    event.type === "customer.subscription.created"
+    || event.type === "customer.subscription.updated"
+    || event.type === "customer.subscription.deleted"
+  ) {
     const subscription = event.data.object;
-    const userId = subscription.metadata?.user_id;
-
-    if (userId) {
-      await supabase.from("profiles").update({
-        stripe_subscription_id: subscription.id,
-        subscription_status: subscription.status,
-        trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null
-      }).eq("id", userId);
-    }
+    if (!isPropertyStripeMetadata(subscription.metadata)) return null;
+    return propertySubscriptionContext(subscription, expectedPriceId);
   }
 
-  return NextResponse.json({ received: true });
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+    const invoice = event.data.object;
+    const subscriptionId = invoiceSubscriptionId(invoice);
+    if (!subscriptionId) return null;
+    const context = await getVerifiedPropertySubscription(stripe, subscriptionId, expectedPriceId);
+    if (!context) return null;
+    return event.type === "invoice.payment_failed"
+      ? { ...context, status: "past_due" }
+      : context;
+  }
+
+  return null;
+}
+
+async function getVerifiedPropertySubscription(
+  stripe: Stripe,
+  subscriptionId: string,
+  expectedPriceId: string,
+  expectedUserId?: string
+) {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  if (!isPropertyStripeMetadata(subscription.metadata)) return null;
+  if (expectedUserId && subscription.metadata.user_id !== expectedUserId) {
+    throw new Error("Property checkout user does not match subscription metadata.");
+  }
+  return propertySubscriptionContext(subscription, expectedPriceId);
+}
+
+function propertySubscriptionContext(
+  subscription: Stripe.Subscription,
+  expectedPriceId: string
+): PropertyEventContext {
+  if (!isPropertyStripeMetadata(subscription.metadata)) {
+    throw new Error("Property subscription metadata is missing.");
+  }
+  if (!subscription.items.data.some((item) => item.price.id === expectedPriceId)) {
+    throw new Error("Property subscription price does not match the configured price.");
+  }
+
+  const customerId = stringId(subscription.customer);
+  if (!customerId) throw new Error("Property subscription customer is missing.");
+  return {
+    userId: subscription.metadata.user_id,
+    customerId,
+    subscriptionId: subscription.id,
+    status: subscription.status,
+    currentPeriodEnd: subscriptionPeriodEnd(subscription),
+    cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end)
+  };
+}
+
+function isSupportedPropertyEvent(type: string) {
+  return [
+    "checkout.session.completed",
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+    "invoice.paid",
+    "invoice.payment_failed"
+  ].includes(type);
+}
+
+function stringId(value: string | { id?: string } | null) {
+  if (typeof value === "string") return value;
+  return value?.id ?? null;
 }
 
 async function handleTenderStripeEvent(event: Stripe.Event) {
@@ -394,7 +539,14 @@ async function fetchSubscriptionSnapshot(subscriptionId: string): Promise<Subscr
 }
 
 function subscriptionPeriodEnd(subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>) {
-  const value = (subscription as unknown as { current_period_end?: number | null }).current_period_end;
+  const typed = subscription as unknown as {
+    current_period_end?: number | null;
+    items?: { data?: Array<{ current_period_end?: number | null }> };
+  };
+  const value = typed.current_period_end
+    ?? typed.items?.data
+      ?.map((item) => item.current_period_end ?? 0)
+      .reduce((latest, current) => Math.max(latest, current), 0);
   return value ? new Date(value * 1000).toISOString() : null;
 }
 

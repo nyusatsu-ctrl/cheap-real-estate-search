@@ -51,37 +51,31 @@ export async function signUpMemberAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/dashboard?demo=1");
 
-  const email = requiredString(formData, "email");
+  const email = normalizeEmail(requiredString(formData, "email"));
   const password = requiredString(formData, "password");
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) redirect(`/signup?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
 
-  if (data.user) {
-    await supabase.from("profiles").upsert({
-      id: data.user.id,
-      email,
-      role: "viewer",
-      subscription_status: "trialing",
-      trial_ends_at: trialEndsAt
-    });
+  if (!data.user || data.user.identities?.length === 0) {
+    redirect("/signup?error=このメールアドレスはすでに登録されています。ログインをお試しください。");
   }
 
-  redirect("/dashboard");
+  redirect(data.session ? "/dashboard" : "/login?message=確認メールを送信しました。メール内のリンクから登録を完了してください。");
 }
 
 export async function signInMemberAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/dashboard?demo=1");
 
-  const email = requiredString(formData, "email");
+  const email = normalizeEmail(requiredString(formData, "email"));
   const password = requiredString(formData, "password");
+  const next = safeMemberNextPath(String(formData.get("next") ?? ""));
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
 
-  redirect("/dashboard");
+  redirect(next);
 }
 
 export async function sendPasswordResetAction(formData: FormData) {
@@ -124,4 +118,16 @@ export async function signOutMemberAction() {
   const supabase = await createSupabaseServerClient();
   if (supabase) await supabase.auth.signOut();
   redirect("/");
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function safeMemberNextPath(value: string) {
+  const path = value.trim();
+  if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/admin")) {
+    return "/dashboard";
+  }
+  return path;
 }

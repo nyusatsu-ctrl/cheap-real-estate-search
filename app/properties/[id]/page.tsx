@@ -5,20 +5,18 @@ import { ArrowLeft, Calculator, ExternalLink, MapPin } from "lucide-react";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatArea, formatDate, formatPrice } from "@/lib/format";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
+import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedProperty } from "@/lib/properties";
+import { requireActiveMember } from "@/lib/user";
 import { ViewedPropertyTracker } from "@/components/ViewedPropertyTracker";
 
-export const metadata: Metadata = {
-  title: "物件詳細｜格安不動産サーチ",
-  description: "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。",
-  openGraph: {
-    title: "物件詳細｜格安不動産サーチ",
-    description: "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。",
-    siteName: "格安不動産サーチ"
-  }
-};
+export const metadata: Metadata = propertyMetadata(
+  "物件詳細｜格安不動産サーチ",
+  "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。"
+);
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireActiveMember();
   const { id } = await params;
   const property = await getPublishedProperty(id);
   if (!property) notFound();

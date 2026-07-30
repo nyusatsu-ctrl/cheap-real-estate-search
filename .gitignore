@@ -15,3 +15,6 @@ data/defense-crawl-summary.json
 data/tender-imports.json
 data/defense-html/
 data/**/*.html
+.env*
+!.env.example
+supabase/.temp/

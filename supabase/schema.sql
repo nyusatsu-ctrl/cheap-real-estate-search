@@ -5,9 +5,12 @@ create table if not exists public.profiles (
   email text not null,
   role text not null default 'viewer' check (role in ('viewer', 'admin')),
   subscription_status text not null default 'trialing',
+  trial_started_at timestamptz,
   trial_ends_at timestamptz,
   stripe_customer_id text,
   stripe_subscription_id text,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -158,6 +161,34 @@ create table if not exists public.subscriptions (
   updated_at timestamptz not null default now(),
   unique (user_id)
 );
+
+create table if not exists public.property_trial_claims (
+  email_hash text primary key,
+  first_user_id uuid not null,
+  latest_user_id uuid not null,
+  first_claimed_at timestamptz not null default now(),
+  last_regranted_at timestamptz,
+  regrant_count integer not null default 0 check (regrant_count >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.property_payment_events (
+  event_id text primary key,
+  event_type text not null,
+  user_id uuid,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  received_at timestamptz not null default now(),
+  processed_at timestamptz
+);
+
+create index if not exists property_payment_events_received_idx
+on public.property_payment_events (received_at desc);
+
+create index if not exists property_payment_events_subscription_idx
+on public.property_payment_events (stripe_subscription_id)
+where stripe_subscription_id is not null;
 
 create table if not exists public.tender_categories (
   id uuid primary key default gen_random_uuid(),
@@ -597,62 +628,102 @@ as $$
   );
 $$;
 
+create or replace function public.can_access_properties()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and (
+        p.role = 'admin'
+        or (
+          p.subscription_status = 'trialing'
+          and p.trial_started_at is not null
+          and p.trial_ends_at is not null
+          and p.trial_started_at <= now()
+          and p.trial_ends_at > now()
+          and p.trial_ends_at > p.trial_started_at
+        )
+        or (
+          p.subscription_status = 'active'
+          and p.current_period_end is not null
+          and p.current_period_end > now()
+        )
+      )
+  );
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  normalized_email text;
+  normalized_email_hash text;
+  existing_claim text;
+  trial_start timestamptz := now();
+  trial_end timestamptz := now() + interval '14 days';
 begin
+  normalized_email := lower(trim(coalesce(new.email, '')));
+  if normalized_email = '' then
+    raise exception 'email is required for property trial registration';
+  end if;
+  normalized_email_hash := encode(extensions.digest(normalized_email, 'sha256'), 'hex');
+
+  select email_hash
+  into existing_claim
+  from public.property_trial_claims
+  where email_hash = normalized_email_hash
+  for update;
+
+  if existing_claim is null then
+    insert into public.property_trial_claims (
+      email_hash,
+      first_user_id,
+      latest_user_id,
+      first_claimed_at
+    )
+    values (
+      normalized_email_hash,
+      new.id,
+      new.id,
+      trial_start
+    );
+  else
+    update public.property_trial_claims
+    set
+      latest_user_id = new.id,
+      updated_at = now()
+    where email_hash = normalized_email_hash;
+    trial_end := trial_start;
+  end if;
+
   insert into public.profiles (
     id,
     email,
     role,
     subscription_status,
+    trial_started_at,
     trial_ends_at
   )
   values (
     new.id,
-    coalesce(new.email, ''),
+    normalized_email,
     'viewer',
-    'trialing',
-    now() + interval '14 days'
+    case when existing_claim is null then 'trialing' else 'canceled' end,
+    trial_start,
+    trial_end
   )
   on conflict (id) do update set
     email = excluded.email,
     updated_at = now();
-
-  insert into public.users (
-    id,
-    email,
-    role,
-    trial_started_at,
-    trial_end_at
-  )
-  values (
-    new.id,
-    coalesce(new.email, ''),
-    'viewer',
-    now(),
-    now() + interval '14 days'
-  )
-  on conflict (id) do update set
-    email = excluded.email,
-    updated_at = now();
-
-  insert into public.subscriptions (
-    user_id,
-    status,
-    plan_name,
-    price
-  )
-  values (
-    new.id,
-    'trial',
-    '全機能プラン',
-    4980
-  )
-  on conflict (user_id) do nothing;
 
   return new;
 end;
@@ -662,6 +733,69 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
+
+create or replace function public.admin_regrant_property_trial(
+  target_user_id uuid,
+  trial_days integer default 14
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_email text;
+  target_email_hash text;
+begin
+  if not public.is_admin() and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'admin access required';
+  end if;
+  if trial_days < 1 or trial_days > 31 then
+    raise exception 'trial_days must be between 1 and 31';
+  end if;
+
+  select lower(trim(email))
+  into target_email
+  from public.profiles
+  where id = target_user_id;
+  if target_email is null then
+    raise exception 'profile not found';
+  end if;
+  target_email_hash := encode(extensions.digest(target_email, 'sha256'), 'hex');
+
+  update public.profiles
+  set
+    subscription_status = 'trialing',
+    trial_started_at = now(),
+    trial_ends_at = now() + make_interval(days => trial_days),
+    current_period_end = null,
+    cancel_at_period_end = false,
+    updated_at = now()
+  where id = target_user_id;
+
+  insert into public.property_trial_claims (
+    email_hash,
+    first_user_id,
+    latest_user_id,
+    first_claimed_at,
+    last_regranted_at,
+    regrant_count
+  )
+  values (
+    target_email_hash,
+    target_user_id,
+    target_user_id,
+    now(),
+    now(),
+    1
+  )
+  on conflict (email_hash) do update set
+    latest_user_id = excluded.latest_user_id,
+    last_regranted_at = now(),
+    regrant_count = public.property_trial_claims.regrant_count + 1,
+    updated_at = now();
+end;
+$$;
 
 alter table public.profiles enable row level security;
 alter table public.property_sources enable row level security;
@@ -674,6 +808,8 @@ alter table public.estimate_quotes enable row level security;
 alter table public.saved_properties enable row level security;
 alter table public.users enable row level security;
 alter table public.subscriptions enable row level security;
+alter table public.property_trial_claims enable row level security;
+alter table public.property_payment_events enable row level security;
 alter table public.tender_categories enable row level security;
 alter table public.tender_sources enable row level security;
 alter table public.tenders enable row level security;
@@ -703,17 +839,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 drop policy if exists "profiles_self_insert" on public.profiles;
-create policy "profiles_self_insert"
-on public.profiles for insert
-to authenticated
-with check (id = auth.uid());
-
 drop policy if exists "profiles_self_update" on public.profiles;
-create policy "profiles_self_update"
-on public.profiles for update
-to authenticated
-using (id = auth.uid() or public.is_admin())
-with check (id = auth.uid() or public.is_admin());
 
 drop policy if exists "sources_public_read" on public.property_sources;
 create policy "sources_public_read"
@@ -729,10 +855,11 @@ using (public.is_admin())
 with check (public.is_admin());
 
 drop policy if exists "properties_public_published_read" on public.properties;
-create policy "properties_public_published_read"
+drop policy if exists "properties_member_read" on public.properties;
+create policy "properties_member_read"
 on public.properties for select
-to anon, authenticated
-using (status = 'published');
+to authenticated
+using (status = 'published' and public.can_access_properties());
 
 drop policy if exists "properties_admin_all" on public.properties;
 create policy "properties_admin_all"
@@ -742,11 +869,13 @@ using (public.is_admin())
 with check (public.is_admin());
 
 drop policy if exists "images_public_for_published_properties" on public.property_images;
-create policy "images_public_for_published_properties"
+drop policy if exists "images_member_for_published_properties" on public.property_images;
+create policy "images_member_for_published_properties"
 on public.property_images for select
-to anon, authenticated
+to authenticated
 using (
-  exists (
+  public.can_access_properties()
+  and exists (
     select 1 from public.properties
     where properties.id = property_images.property_id
       and properties.status = 'published'
@@ -810,19 +939,25 @@ drop policy if exists "saved_properties_owner_read" on public.saved_properties;
 create policy "saved_properties_owner_read"
 on public.saved_properties for select
 to authenticated
-using (profile_id = auth.uid() or public.is_admin());
+using (
+  (profile_id = auth.uid() and public.can_access_properties())
+  or public.is_admin()
+);
 
 drop policy if exists "saved_properties_owner_insert" on public.saved_properties;
 create policy "saved_properties_owner_insert"
 on public.saved_properties for insert
 to authenticated
-with check (profile_id = auth.uid());
+with check (profile_id = auth.uid() and public.can_access_properties());
 
 drop policy if exists "saved_properties_owner_delete" on public.saved_properties;
 create policy "saved_properties_owner_delete"
 on public.saved_properties for delete
 to authenticated
-using (profile_id = auth.uid() or public.is_admin());
+using (
+  (profile_id = auth.uid() and public.can_access_properties())
+  or public.is_admin()
+);
 
 drop policy if exists "users_read_self_or_admin" on public.users;
 create policy "users_read_self_or_admin"
@@ -849,6 +984,18 @@ on public.subscriptions for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+drop policy if exists "property_trial_claims_admin_read" on public.property_trial_claims;
+create policy "property_trial_claims_admin_read"
+on public.property_trial_claims for select
+to authenticated
+using (public.is_admin());
+
+drop policy if exists "property_payment_events_admin_read" on public.property_payment_events;
+create policy "property_payment_events_admin_read"
+on public.property_payment_events for select
+to authenticated
+using (public.is_admin());
 
 drop policy if exists "tender_categories_public_read" on public.tender_categories;
 create policy "tender_categories_public_read"
@@ -1017,8 +1164,8 @@ with check (public.is_admin());
 grant usage on schema public to anon, authenticated;
 
 grant select on public.property_sources to anon, authenticated;
-grant select on public.properties to anon, authenticated;
-grant select on public.property_images to anon, authenticated;
+grant select on public.properties to authenticated;
+grant select on public.property_images to authenticated;
 grant select on public.tender_categories to anon, authenticated;
 grant select on public.tender_sources to anon, authenticated;
 grant select on public.tenders to anon, authenticated;
@@ -1038,6 +1185,8 @@ grant select, insert, update, delete on public.estimate_quotes to authenticated;
 grant select, insert, delete on public.saved_properties to authenticated;
 grant select, insert, update, delete on public.users to authenticated;
 grant select, insert, update, delete on public.subscriptions to authenticated;
+grant select on public.property_trial_claims to authenticated;
+grant select on public.property_payment_events to authenticated;
 grant select, insert, update, delete on public.tender_categories to authenticated;
 grant select, insert, update, delete on public.tender_sources to authenticated;
 grant select, insert, update, delete on public.tenders to authenticated;
@@ -1065,6 +1214,8 @@ grant all on public.estimate_quotes to service_role;
 grant all on public.saved_properties to service_role;
 grant all on public.users to service_role;
 grant all on public.subscriptions to service_role;
+grant all on public.property_trial_claims to service_role;
+grant all on public.property_payment_events to service_role;
 grant all on public.tender_categories to service_role;
 grant all on public.tender_sources to service_role;
 grant all on public.tenders to service_role;
@@ -1083,6 +1234,12 @@ grant all on public.admin_logs to service_role;
 grant insert on public.estimate_requests to anon;
 grant insert on public.contractor_applications to anon;
 grant insert on public.estimate_quotes to anon;
+
+revoke select on public.properties from anon;
+revoke select on public.property_images from anon;
+
+grant execute on function public.can_access_properties() to authenticated;
+grant execute on function public.admin_regrant_property_trial(uuid, integer) to authenticated, service_role;
 
 create index if not exists properties_public_search_idx
 on public.properties (status, prefecture, property_type, price_yen, published_at desc);

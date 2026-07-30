@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Bell, Check, FileSearch, ShieldCheck, Star } from "lucide-react";
+import type { Metadata } from "next";
+import { Check, ExternalLink, FileSearch, MapPinned, ShieldCheck } from "lucide-react";
 import { MONTHLY_PRICE_YEN, TRIAL_DAYS } from "@/lib/billing/stripe";
 import { BUSINESS_INFO } from "@/lib/legal";
+import { propertyMetadata } from "@/lib/property-metadata";
 
 const features = [
   "全国の格安不動産一覧の閲覧",
@@ -10,9 +12,13 @@ const features = [
   "地域・都道府県・市区町村フィルター",
   "キーワード検索",
   "物件詳細と元サイトURLの確認",
-  "お気に入り保存と検討ステータス管理",
-  "新着物件の通知設定"
+  "毎朝更新される新着物件の確認"
 ];
+
+export const metadata: Metadata = propertyMetadata(
+  "料金｜格安不動産サーチ",
+  "格安不動産サーチは登録後14日間無料、継続利用は月額4,980円（税込）の1プランです。"
+);
 
 export default function PlansPage() {
   return (
@@ -25,7 +31,7 @@ export default function PlansPage() {
               {TRIAL_DAYS}日間無料、その後は必要な方だけ継続
             </p>
             <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight text-slate-950 md:text-5xl">
-              全国の格安不動産を、月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円で。
+              全国の格安不動産を、月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円（税込）で。
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
               全国の0円物件・空き家・古家付き土地・山林・300万円以下の格安不動産をまとめて探せるサービスです。無料トライアル中は全機能を利用できます。
@@ -40,7 +46,7 @@ export default function PlansPage() {
             <p className="inline-block rounded bg-brand-700 px-2 py-1 text-xs font-bold text-white">単一プラン</p>
             <h2 className="mt-4 text-xl font-black text-slate-950">全機能プラン</h2>
             <div className="mt-4 flex items-end gap-2">
-              <p className="text-4xl font-black text-brand-700">月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円</p>
+              <p className="text-4xl font-black text-brand-700">月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円<span className="ml-1 text-sm">税込</span></p>
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-700">
               登録から{TRIAL_DAYS}日間は0円。無料登録だけでは自動課金されず、継続利用する場合だけ有料プランへ申し込みます。
@@ -60,7 +66,7 @@ export default function PlansPage() {
               </div>
               <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">無料期間終了後</dt>
-                <dd className="mt-1 text-2xl font-black text-brand-700">月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円</dd>
+                <dd className="mt-1 text-2xl font-black text-brand-700">月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円（税込）</dd>
               </div>
               <div className="rounded border border-slate-200 p-4">
                 <dt className="text-sm font-bold text-slate-500">プラン数</dt>
@@ -87,8 +93,8 @@ export default function PlansPage() {
         <div className="mx-auto grid max-w-6xl gap-4 px-4 py-8 md:grid-cols-3">
           {[
             [FileSearch, "物件を見つける", "0円物件、空き家、土地、山林をまとめて確認します。"],
-            [Star, "検討を管理する", "お気に入りと検討ステータスで気になる物件を整理します。"],
-            [Bell, "見逃しを減らす", "新着物件や条件に合う物件の確認漏れを減らします。"]
+            [MapPinned, "地域で絞り込む", "都道府県、物件種別、価格帯、キーワードで検索します。"],
+            [ExternalLink, "掲載元を確認する", "詳細画面から掲載元へ移動し、最新情報を確認します。"]
           ].map(([Icon, title, text]) => (
             <div key={title as string} className="rounded-lg border border-slate-200 p-4">
               <Icon className="h-5 w-5 text-brand-700" />
@@ -110,7 +116,7 @@ export default function PlansPage() {
             <div className="rounded border border-slate-200 p-4">
               <dt className="text-sm font-bold text-slate-500">無料期間終了後の課金条件</dt>
               <dd className="mt-2 text-sm leading-6 text-slate-700">
-                無料登録だけでは自動課金されません。継続利用する場合のみ、利用者自身で月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円の有料プランへ申し込みます。
+                無料登録だけでは自動課金されません。継続利用する場合のみ、利用者自身で月額{MONTHLY_PRICE_YEN.toLocaleString("ja-JP")}円（税込）の有料プランへ申し込みます。
               </dd>
             </div>
             <div className="rounded border border-slate-200 p-4">
@@ -120,7 +126,7 @@ export default function PlansPage() {
             <div className="rounded border border-slate-200 p-4">
               <dt className="text-sm font-bold text-slate-500">解約方法と停止タイミング</dt>
               <dd className="mt-2 text-sm leading-6 text-slate-700">
-                有料プランは会員画面またはお問い合わせから解約できます。解約手続き完了後、次回更新分から課金を停止し、現在の契約期間終了後に有料機能の利用が停止します。
+                有料申込み時に4,980円（税込）が即時決済され、以後毎月自動更新されます。Stripeの契約管理画面から解約でき、支払済み期間の終了日まで利用できます。
               </dd>
             </div>
           </dl>

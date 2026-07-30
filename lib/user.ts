@@ -1,4 +1,9 @@
 import { redirect } from "next/navigation";
+import {
+  evaluatePropertyAccess,
+  propertyAccessRedirectReason,
+  type PropertyAccessDecision
+} from "@/lib/property-access";
 import { createSupabaseServerClient, hasSupabaseEnv } from "@/lib/supabase/server";
 
 export type CurrentMember = {
@@ -6,26 +11,19 @@ export type CurrentMember = {
   email: string;
   role: string;
   subscriptionStatus: string;
+  trialStartedAt: string | null;
   trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
   isTrialExpired: boolean;
+  access: PropertyAccessDecision;
 };
-
-export function isTrialExpired(subscriptionStatus: string, trialEndsAt: string | null) {
-  if (subscriptionStatus !== "trialing" || !trialEndsAt) return false;
-  return new Date(trialEndsAt).getTime() <= Date.now();
-}
 
 export async function getCurrentMember(): Promise<CurrentMember | null> {
   if (!hasSupabaseEnv()) {
-    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    return {
-      id: "demo-user",
-      email: "demo@example.com",
-      role: "viewer",
-      subscriptionStatus: "trialing",
-      trialEndsAt,
-      isTrialExpired: false
-    };
+    return getDemoMember();
   }
 
   const supabase = await createSupabaseServerClient();
@@ -39,20 +37,39 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, email, subscription_status, trial_ends_at")
+    .select(
+      "role, email, subscription_status, trial_started_at, trial_ends_at, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id"
+    )
     .eq("id", user.id)
     .single();
 
-  const subscriptionStatus = profile?.subscription_status ?? "trialing";
+  const subscriptionStatus = profile?.subscription_status ?? "unknown";
+  const trialStartedAt = profile?.trial_started_at ?? null;
   const trialEndsAt = profile?.trial_ends_at ?? null;
+  const currentPeriodEnd = profile?.current_period_end ?? null;
+  const cancelAtPeriodEnd = Boolean(profile?.cancel_at_period_end);
+  const access = evaluatePropertyAccess({
+    role: profile?.role ?? "viewer",
+    subscriptionStatus,
+    trialStartedAt,
+    trialEndsAt,
+    currentPeriodEnd,
+    cancelAtPeriodEnd
+  });
 
   return {
     id: user.id,
     email: profile?.email ?? user.email ?? "",
     role: profile?.role ?? "viewer",
     subscriptionStatus,
+    trialStartedAt,
     trialEndsAt,
-    isTrialExpired: isTrialExpired(subscriptionStatus, trialEndsAt)
+    currentPeriodEnd,
+    cancelAtPeriodEnd,
+    stripeCustomerId: profile?.stripe_customer_id ?? null,
+    stripeSubscriptionId: profile?.stripe_subscription_id ?? null,
+    isTrialExpired: access.reason === "trial_expired",
+    access
   };
 }
 
@@ -64,6 +81,58 @@ export async function requireMember() {
 
 export async function requireActiveMember() {
   const member = await requireMember();
-  if (member.isTrialExpired) redirect("/billing?trial=expired");
+  if (!member.access.allowed) {
+    redirect(`/billing?access=${propertyAccessRedirectReason(member.access)}`);
+  }
   return member;
+}
+
+function getDemoMember(): CurrentMember | null {
+  const state = process.env.PROPERTY_DEMO_STATE ?? "trial";
+  if (state === "anonymous") return null;
+
+  const now = Date.now();
+  const day = 86_400_000;
+  const trialStartTime = state === "expired"
+    ? now - 15 * day
+    : state === "last-day"
+      ? now - 13.5 * day
+      : state === "warning"
+        ? now - 11 * day
+        : now;
+  const trialEndTime = state === "expired"
+    ? now - day
+    : state === "last-day"
+      ? now + 0.5 * day
+      : state === "warning"
+        ? now + 3 * day
+        : now + 14 * day;
+  const trialStartedAt = new Date(trialStartTime).toISOString();
+  const trialEndsAt = new Date(trialEndTime).toISOString();
+  const subscriptionStatus = state.startsWith("active") ? "active" : state === "past_due" ? "past_due" : "trialing";
+  const currentPeriodEnd = state.startsWith("active") ? new Date(now + 30 * 86_400_000).toISOString() : null;
+  const input = {
+    role: state === "admin" ? "admin" : "viewer",
+    subscriptionStatus,
+    trialStartedAt,
+    trialEndsAt,
+    currentPeriodEnd,
+    cancelAtPeriodEnd: state === "active-canceling"
+  };
+  const access = evaluatePropertyAccess(input);
+
+  return {
+    id: "demo-user",
+    email: "demo@example.com",
+    role: input.role,
+    subscriptionStatus,
+    trialStartedAt,
+    trialEndsAt,
+    currentPeriodEnd,
+    cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+    stripeCustomerId: state.startsWith("active") ? "demo-customer" : null,
+    stripeSubscriptionId: state.startsWith("active") ? "demo-subscription" : null,
+    isTrialExpired: access.reason === "trial_expired",
+    access
+  };
 }

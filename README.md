@@ -48,7 +48,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 - `/admin/properties`: 運営者向け物件一覧
 - `/admin/properties/new`: 物件登録
 - `/admin/properties/[id]/edit`: 物件編集
-- `/plans`: 14日間無料、月額2,980円の料金ページ
+- `/plans`: 14日間無料、月額4,980円（税込）の料金ページ
 - `/estimate`: 名義変更、解体、リフォーム、土木工事の見積もり相談
 - `/partners/register`: 提携業者登録
 - `/partners/quotes/new`: 業者用の見積もり入力

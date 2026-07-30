@@ -28,7 +28,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
 export async function getPublishedPropertiesResult(filters: PropertyFilters = {}, pagination: { page?: number; pageSize?: number } = {}): Promise<PublishedPropertiesResult> {
   const page = normalizePage(pagination.page);
   const pageSize = normalizePageSize(pagination.pageSize);
-  const supabase = await createPropertyReadClient();
+  const supabase = await createPropertyMemberReadClient();
 
   if (!supabase) {
     if (shouldUseSampleFallback()) {
@@ -73,7 +73,9 @@ export async function getAdminPropertyLocations() {
 }
 
 async function getPropertyLocations({ publishedOnly }: { publishedOnly: boolean }): Promise<PropertyLocationOption[]> {
-  const supabase = await createPropertyReadClient();
+  const supabase = publishedOnly
+    ? await createPropertyMemberReadClient()
+    : await createPropertyAdminReadClient();
 
   if (!supabase) {
     return shouldUseSampleFallback()
@@ -130,7 +132,7 @@ function applyServerFilters<T extends PropertyQuery<T>>(query: T, filters: Prope
 }
 
 export async function getPublishedProperty(id: string) {
-  const supabase = await createPropertyReadClient();
+  const supabase = await createPropertyMemberReadClient();
 
   if (!supabase) {
     if (!shouldUseSampleFallback()) return null;
@@ -150,7 +152,7 @@ export async function getPublishedProperty(id: string) {
 }
 
 export async function getAdminProperties(filters: PropertyFilters = {}) {
-  const supabase = await createPropertyReadClient();
+  const supabase = await createPropertyAdminReadClient();
   if (!supabase) return shouldUseSampleFallback() ? sortProperties(filterProperties(sampleProperties, filters), filters.sort) : [];
 
   let { data, error } = await fetchAdminProperties(supabase, filters, { includeSources: true });
@@ -165,7 +167,7 @@ export async function getAdminProperties(filters: PropertyFilters = {}) {
 }
 
 export async function getAdminProperty(id: string) {
-  const supabase = await createPropertyReadClient();
+  const supabase = await createPropertyAdminReadClient();
   if (!supabase) return shouldUseSampleFallback() ? sampleProperties.find((property) => property.id === id) ?? null : null;
 
   let { data, error } = await supabase
@@ -186,12 +188,16 @@ export async function getAdminProperty(id: string) {
   return data as Property;
 }
 
-async function createPropertyReadClient() {
+async function createPropertyMemberReadClient() {
+  return createSupabaseServerClient();
+}
+
+async function createPropertyAdminReadClient() {
   return createSupabaseServiceRoleClient() ?? await createSupabaseServerClient();
 }
 
 async function fetchAdminProperties(
-  supabase: NonNullable<Awaited<ReturnType<typeof createPropertyReadClient>>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createPropertyAdminReadClient>>>,
   filters: PropertyFilters,
   { includeSources }: { includeSources: boolean }
 ) {

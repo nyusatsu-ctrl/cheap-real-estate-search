@@ -8,7 +8,7 @@ export const BUSINESS_INFO = {
   phone: "096-201-7191",
   businessHours: "9:30〜17:30 日祝休み",
   serviceName: "格安不動産サーチ",
-  monthlyPriceText: "月額4,980円",
+  monthlyPriceText: "月額4,980円（税込）",
   trialDaysText: "14日間",
   paymentMethod: "クレジットカード決済"
 };

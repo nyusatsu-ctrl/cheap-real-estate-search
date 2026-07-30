@@ -1,27 +1,30 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { LockKeyhole } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
 import { SearchFilters } from "@/components/SearchFilters";
 import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
 import { firstString, normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
+import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedPropertiesResult } from "@/lib/properties";
+import { getCurrentMember } from "@/lib/user";
 
 const PUBLIC_PROPERTIES_PAGE_SIZE = 100;
 const PRESERVED_PAGE_PARAM_KEYS = ["prefecture", "propertyType", "priceRange", "sort", "keyword"] as const;
 
-export const metadata: Metadata = {
-  title: "物件一覧｜格安不動産サーチ",
-  description: "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。",
-  openGraph: {
-    title: "物件一覧｜格安不動産サーチ",
-    description: "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。",
-    siteName: "格安不動産サーチ"
-  }
-};
+export const metadata: Metadata = propertyMetadata(
+  "物件一覧｜格安不動産サーチ",
+  "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。"
+);
 
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
   const resolvedSearchParams = await searchParams;
+  const member = await getCurrentMember();
+  if (!member?.access.allowed) {
+    return <RestrictedProperties memberStatus={member?.subscriptionStatus ?? null} />;
+  }
+
   const filters = normalizePropertyFilters(resolvedSearchParams, {
     priceRangeOptions: PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS,
     locationFilterMode: "prefecture-only"
@@ -87,6 +90,45 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         {!errorMessage && totalPages > 1 ? (
           <Pagination searchParams={resolvedSearchParams} currentPage={page} totalPages={totalPages} />
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function RestrictedProperties({ memberStatus }: { memberStatus: string | null }) {
+  const isLoggedIn = memberStatus !== null;
+  return (
+    <div className="min-h-[70vh] bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
+      <div className="mx-auto max-w-5xl px-4 py-10">
+        <section className="grid gap-6 rounded-lg border border-emerald-100 bg-white p-6 shadow-lg shadow-emerald-900/5 md:grid-cols-[1fr_20rem] md:items-center">
+          <div>
+            <LockKeyhole className="h-8 w-8 text-emerald-700" />
+            <h1 className="mt-4 text-3xl font-black leading-tight text-slate-950">全国の格安不動産を会員限定で検索</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+              0円物件、空き家、古家付き土地、山林、300万円以下の物件を毎朝更新しています。実際の物件一覧と詳細は、無料期間中または有料会員の方だけが閲覧できます。
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2 text-sm font-bold text-emerald-900">
+              <span className="rounded bg-emerald-50 px-3 py-2">登録後14日間無料</span>
+              <span className="rounded bg-sky-50 px-3 py-2">カード登録不要</span>
+              <span className="rounded bg-slate-100 px-3 py-2">自動課金なし</span>
+            </div>
+          </div>
+          <div className="rounded border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm font-bold text-slate-500">{isLoggedIn ? "利用期間が終了しています" : "料金プラン"}</p>
+            <p className="mt-2 text-3xl font-black text-emerald-800">月額4,980円<span className="ml-1 text-xs">税込</span></p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">有料申込み時に即時決済され、以後毎月自動更新されます。</p>
+            <div className="mt-5 grid gap-2">
+              <Link href={isLoggedIn ? "/billing?access=inactive" : "/signup"} className="rounded bg-emerald-700 px-4 py-3 text-center font-bold text-white focus-ring">
+                {isLoggedIn ? "月額4,980円で利用を開始する" : "14日間無料で始める"}
+              </Link>
+              {!isLoggedIn ? (
+                <Link href="/login?next=/properties" className="rounded border border-slate-300 bg-white px-4 py-3 text-center font-bold text-slate-700 focus-ring">
+                  会員ログイン
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

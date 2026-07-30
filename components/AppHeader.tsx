@@ -1,10 +1,21 @@
 "use client";
 
+import { signOutMemberAction } from "@/app/auth/actions";
 import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
+import type { PropertyAccessPageState } from "@/lib/property-access";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+
+type PropertyMemberState =
+  | { authenticated: false }
+  | {
+      authenticated: true;
+      email: string;
+      role: string;
+      accessState: PropertyAccessPageState;
+    };
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -25,12 +36,31 @@ export function AppHeader() {
     || pathname.startsWith("/diagnosis")
     || pathname === "/admin/login"
     || pathname.startsWith("/admin/diagnoses");
+  const showPropertyMemberState =
+    pathname === "/"
+    || [
+      "/properties",
+      "/plans",
+      "/signup",
+      "/login",
+      "/dashboard",
+      "/billing",
+      "/forgot-password",
+      "/reset-password",
+      "/auth/callback",
+      "/estimate",
+      "/legal",
+      "/privacy",
+      "/terms",
+      "/contact",
+      "/partners"
+    ].some((prefix) => pathname.startsWith(prefix));
 
   if (pathname.startsWith("/income-potential")) return <IncomePotentialHeader />;
   if (isSalesAdmin) return <ContractAdminHeader />;
   if (isTenderRoute) return <TenderHeader />;
   if (isDiagnosisRoute) return <DiagnosisHeader priority={pathname === "/admin/login"} />;
-  return <RealEstateHeader />;
+  return <RealEstateHeader showMemberState={showPropertyMemberState} />;
 }
 
 function IncomePotentialHeader() {
@@ -145,7 +175,11 @@ function TenderUnreadBadge() {
   );
 }
 
-function RealEstateHeader() {
+function RealEstateHeader({ showMemberState }: { showMemberState: boolean }) {
+  const fetchedMember = usePropertyMember(showMemberState);
+  const member = showMemberState ? fetchedMember : null;
+  const showAnonymousActions = !showMemberState || member?.authenticated === false;
+
   return (
     <header className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 shadow-sm">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:gap-4 sm:py-5">
@@ -171,19 +205,83 @@ function RealEstateHeader() {
           <Link href="/plans" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
             料金
           </Link>
-          <Link href="/signup" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
-            無料登録
-          </Link>
-          <Link href="/dashboard" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
-            会員ログイン
-          </Link>
-          <Link href="/admin/login?next=/admin/properties" className="px-1 py-1 text-xs font-semibold text-slate-500 underline-offset-4 hover:text-emerald-700 hover:underline sm:text-sm">
-            管理者ログイン
-          </Link>
+          {showAnonymousActions ? (
+            <>
+              <Link href="/signup" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
+                無料登録
+              </Link>
+              <Link href="/dashboard" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
+                会員ログイン
+              </Link>
+            </>
+          ) : null}
+          {member?.authenticated ? (
+            <>
+              <span className="max-w-full truncate rounded bg-white/85 px-2.5 py-1.5 text-xs shadow-sm ring-1 ring-emerald-100 sm:max-w-64 sm:px-3 sm:py-2 sm:text-sm" title={member.email}>
+                {member.email}
+                <span className="ml-2 font-black text-emerald-700">{propertyMemberStatusLabel(member)}</span>
+              </span>
+              <Link
+                href={member.role === "admin" ? "/admin/properties" : "/dashboard"}
+                className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2"
+              >
+                {member.role === "admin" ? "管理画面" : "会員ページ"}
+              </Link>
+              <form action={signOutMemberAction}>
+                <button type="submit" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
+                  ログアウト
+                </button>
+              </form>
+            </>
+          ) : null}
+          {!member?.authenticated ? (
+            <Link href="/admin/login?next=/admin/properties" className="px-1 py-1 text-xs font-semibold text-slate-500 underline-offset-4 hover:text-emerald-700 hover:underline sm:text-sm">
+              管理者ログイン
+            </Link>
+          ) : null}
         </nav>
       </div>
     </header>
   );
+}
+
+function usePropertyMember(enabled: boolean) {
+  const [member, setMember] = useState<PropertyMemberState | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let ignore = false;
+    fetch("/api/property-member", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<PropertyMemberState> : null)
+      .then((data) => {
+        if (!ignore && data) setMember(data);
+      })
+      .catch(() => {
+        if (!ignore) setMember(null);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [enabled]);
+
+  return member;
+}
+
+function propertyMemberStatusLabel(member: Extract<PropertyMemberState, { authenticated: true }>) {
+  if (member.role === "admin") return "管理者";
+
+  const labels: Record<PropertyAccessPageState, string> = {
+    anonymous: "未ログイン",
+    trial: "無料期間中",
+    active: "有料会員",
+    admin: "管理者",
+    trial_expired: "無料期間終了",
+    payment_required: "支払い確認要",
+    inactive: "利用停止"
+  };
+  return labels[member.accessState];
 }
 
 function ContractAdminHeader() {

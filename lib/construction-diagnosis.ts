@@ -111,6 +111,10 @@ export type AdminDiagnosisFilters = {
   consultationRequested?: boolean;
   salesStatus?: string;
   dealStatus?: string;
+  primaryTrade?: string;
+  publicWorkIntent?: string;
+  feedbackSubmitted?: boolean;
+  feedbackAccuracy?: number;
 };
 
 export type PublicWorksRoutePlan = {
@@ -952,6 +956,14 @@ export async function getConstructionDiagnoses(filters: AdminDiagnosisFilters = 
   if (typeof filters.consultationRequested === "boolean") query = query.eq("consultation_requested", filters.consultationRequested);
   if (filters.salesStatus) query = query.eq("sales_status", filters.salesStatus);
   if (filters.dealStatus) query = query.eq("deal_status", filters.dealStatus);
+  if (filters.primaryTrade) query = query.eq("primary_trade", filters.primaryTrade);
+  if (filters.publicWorkIntent) query = query.eq("public_work_intent", filters.publicWorkIntent);
+  if (typeof filters.feedbackSubmitted === "boolean") {
+    query = filters.feedbackSubmitted
+      ? query.not("feedback_submitted_at", "is", null)
+      : query.is("feedback_submitted_at", null);
+  }
+  if (filters.feedbackAccuracy) query = query.eq("feedback_accuracy", filters.feedbackAccuracy);
 
   const { data, error } = await query;
 

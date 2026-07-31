@@ -6,24 +6,37 @@ import {
   DIAGNOSIS_V2_SALES_STATUS_LABELS
 } from "@/lib/construction-diagnosis-v2/data";
 import {
-  DETAILED_DIAGNOSIS_QUESTIONS,
+  CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   DIAGNOSIS_V2_QUESTION_BY_ID,
   DIAGNOSIS_V2_SECTIONS,
   QUICK_DIAGNOSIS_QUESTIONS,
+  getApplicableDetailedQuestions,
   getDiagnosisV2OptionLabel,
   getQuickDiagnosisOptionLabel
 } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  getOrderModelLabel,
+  getPrimaryTradeLabel,
+  getPublicWorkIntentLabel,
+  getSpecialtyQuestions,
+  getSpecialtyQuestionLabel
+} from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { formatDiagnosisDate, getLeadSourceLabel } from "@/lib/construction-diagnosis";
 
 export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionManagementDiagnosis }) {
   const result = diagnosis.diagnosis_result;
+  const isV21 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+  const applicableQuestions = getApplicableDetailedQuestions(isV21
+    ? { primaryTrade: diagnosis.primary_trade, publicWorkIntent: diagnosis.public_work_intent, includeSpecialty: true }
+    : { includeSpecialty: false });
+  const specialtyQuestionIds = new Set(isV21 ? getSpecialtyQuestions(diagnosis.primary_trade).map((question) => question.id) : []);
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/admin/diagnoses" className="text-sm font-bold text-brand-700">診断者一覧へ戻る</Link>
           <h1 className="mt-2 text-2xl font-black text-slate-950">{diagnosis.company_name} / {diagnosis.respondent_name}さん</h1>
-          <p className="mt-1 text-sm text-slate-600">{formatDiagnosisDate(diagnosis.created_at)}・v2</p>
+          <p className="mt-1 text-sm text-slate-600">{formatDiagnosisDate(diagnosis.created_at)}・{diagnosis.diagnosis_version}</p>
         </div>
         {diagnosis.detailed_completed_at ? (
           <Link href={`/diagnosis/results/${diagnosis.id}`} className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">結果ページを表示</Link>
@@ -44,6 +57,17 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="従業員数" value={diagnosis.employee_range ?? "-"} />
             <Info label="創業年" value={diagnosis.founding_year ? String(diagnosis.founding_year) : "-"} />
             <Info label="主な工事業種" value={diagnosis.main_business ?? "-"} />
+            {isV21 ? (
+              <>
+                <Info label="主な業態" value={getPrimaryTradeLabel(diagnosis.primary_trade)} />
+                <Info label="副業種" value={diagnosis.secondary_trades.length > 0 ? diagnosis.secondary_trades.map(getPrimaryTradeLabel).join(" / ") : "-"} />
+                <Info label="受注形態" value={diagnosis.order_models.length > 0 ? diagnosis.order_models.map(getOrderModelLabel).join(" / ") : "-"} />
+                <Info label="売上構成" value={`元請 ${formatRatio(diagnosis.prime_ratio)} / 下請 ${formatRatio(diagnosis.subcontract_ratio)} / 公共 ${formatRatio(diagnosis.public_ratio)} / 個人客 ${formatRatio(diagnosis.consumer_ratio)}`} />
+                <Info label="自社施工比率" value={diagnosis.self_perform_ratio ?? "-"} />
+                <Info label="主な工事金額" value={diagnosis.average_project_size ?? "-"} />
+                <Info label="公共工事への意向" value={getPublicWorkIntentLabel(diagnosis.public_work_intent)} />
+              </>
+            ) : null}
             <Info label="年商区分" value={diagnosis.sales_range ?? "-"} />
             <Info label="URL流入元" value={getLeadSourceLabel(diagnosis.lead_source)} />
             <Info label="診断を知ったきっかけ" value={diagnosis.source ?? "-"} />
@@ -98,6 +122,25 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
               <ResultBlock title="優先課題" items={result.priorities.map((item) => `${item.label}: ${item.detail}`)} />
               <ResultBlock title="公共工事参入の現在地" body={result.publicWorks.summary} items={[result.publicWorks.title, ...result.publicWorks.prerequisites]} />
               <ResultBlock title="推奨アクション" items={[...result.plan90Days.month1, ...result.plan90Days.month2, ...result.plan90Days.month3]} />
+              {result.specialty ? (
+                <>
+                  <ResultBlock title={`業態別重要指標（${result.specialty.score.toFixed(1)}点）`} items={result.specialty.kpis} />
+                  <ResultBlock title="業態別の強み" items={result.specialty.strengths} />
+                  <ResultBlock title="業態別の優先課題" items={result.specialty.priorities} />
+                  <ResultBlock title="業態別90日改善策" items={result.specialty.plan90Days} />
+                </>
+              ) : null}
+            </AdminSection>
+          ) : null}
+
+          {isV21 ? (
+            <AdminSection title="テストフィードバック">
+              <Info label="回答状況" value={diagnosis.feedback_submitted_at ? `回答済み（${formatDiagnosisDate(diagnosis.feedback_submitted_at)}）` : "未回答"} />
+              <Info label="質問の分かりやすさ" value={formatFeedbackRating(diagnosis.feedback_clarity)} />
+              <Info label="診断結果の正確性" value={formatFeedbackRating(diagnosis.feedback_accuracy)} />
+              <Info label="参考度" value={formatFeedbackRating(diagnosis.feedback_usefulness)} />
+              <Info label="相談意向" value={formatFeedbackInterest(diagnosis.feedback_consultation_interest)} />
+              <Info label="自由入力" value={diagnosis.feedback_comment ?? "-"} />
             </AdminSection>
           ) : null}
 
@@ -122,7 +165,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
               <div key={section.id} className="mt-5 first:mt-0">
                 <h3 className="text-base font-black text-slate-950">{section.label}</h3>
                 <div className="mt-2 divide-y divide-slate-200">
-                  {DETAILED_DIAGNOSIS_QUESTIONS.filter((question) => question.section === section.id).map((question) => (
+                  {applicableQuestions.filter((question) => question.section === section.id && !specialtyQuestionIds.has(question.id)).map((question) => (
                     <AnswerRow
                       key={question.id}
                       id={question.id}
@@ -134,6 +177,16 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
               </div>
             ))}
           </AdminSection>
+
+          {isV21 ? (
+            <AdminSection title="業態別回答">
+              <div className="divide-y divide-slate-200">
+                {applicableQuestions.filter((question) => specialtyQuestionIds.has(question.id)).map((question) => (
+                  <AnswerRow key={question.id} id={question.id} question={question.question} answer={getSpecialtyQuestionLabel(question.id, diagnosis.specialty_answers[question.id])} />
+                ))}
+              </div>
+            </AdminSection>
+          ) : null}
         </main>
       </div>
     </div>
@@ -205,4 +258,19 @@ function toDateTimeLocal(value: string | null) {
 function formatDateTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : formatDiagnosisDate(value);
+}
+
+function formatRatio(value: number | null) {
+  return value === null ? "-" : `${Number(value).toLocaleString("ja-JP")}％`;
+}
+
+function formatFeedbackRating(value: number | null) {
+  return value === null ? "-" : `${value} / 5`;
+}
+
+function formatFeedbackInterest(value: string | null) {
+  if (value === "yes") return "はい";
+  if (value === "neutral") return "どちらともいえない";
+  if (value === "no") return "いいえ";
+  return "-";
 }

@@ -1,23 +1,37 @@
 import {
-  DETAILED_DIAGNOSIS_QUESTIONS,
   DIAGNOSIS_V2_QUESTION_BY_ID,
   DIAGNOSIS_V2_SECTIONS,
+  getApplicableDetailedQuestions,
   getDiagnosisV2AnswerScore,
   getDiagnosisV2OptionLabel,
   type DiagnosisV2AnswerMap,
+  type DiagnosisV2ScoringContext,
   type DiagnosisV2ScoringResult,
   type DiagnosisV2SectionId
-} from "@/lib/construction-diagnosis-v2/questions";
+} from "./questions.ts";
+import {
+  ALL_SPECIALTY_QUESTIONS,
+  buildSpecialtyDiagnosisSummary,
+  getPublicWorkIntentLabel,
+  type PublicWorksScoringMode,
+  type SpecialtyDiagnosisSummary
+} from "./specialty-questions.ts";
 
 export type DiagnosisV2ResultSnapshot = {
   strengths: DiagnosisV2ResultItem[];
   priorities: DiagnosisV2ResultItem[];
   publicWorks: {
+    mode?: PublicWorksScoringMode;
     title: string;
     summary: string;
     currentState: string[];
     expansionPotential: string;
     prerequisites: string[];
+  };
+  specialty: SpecialtyDiagnosisSummary | null;
+  consultation?: {
+    heading: string;
+    body: string;
   };
   plan90Days: {
     month1: string[];
@@ -105,7 +119,10 @@ const CRITICAL_DETAILS: Record<string, string> = {
   T04: "安全・法令・社会保険・施工体制の未整備は、受注継続や公共工事参加の前提に関わります。事実確認と是正を最優先にしてください。",
   I01: "銀行送金・返金・高額支払いを単独で実行できる状態は、誤送金や不正のリスクを高めます。二段階承認と上限設定が必要です。",
   I02: "請求・支払・入金照合を同一人物だけで完結させず、別担当または代表者による確認を導入してください。",
-  I03: "契約書・注文書・請求書・入金が案件単位で追えない状態は、請求漏れや未収の発見を遅らせます。証憑の一元化が必要です。"
+  I03: "契約書・注文書・請求書・入金が案件単位で追えない状態は、請求漏れや未収の発見を遅らせます。証憑の一元化が必要です。",
+  D02: "石綿・有害物、埋設物、近隣条件等の着工前確認が不足しています。法令違反、事故、追加原価を防ぐため、受注拡大より先に是正してください。",
+  D04: "廃棄物の搬出先、数量、処分記録、マニフェストの案件別管理が不足しています。法令記録の整備を最優先にしてください。",
+  SC03: "資格、作業手順、点検、墜落防止等の安全管理に重大な不足があります。公共工事の有無にかかわらず、最優先で是正してください。"
 };
 
 const QUESTION_DETAILS: Record<string, string> = {
@@ -127,7 +144,8 @@ const QUESTION_DETAILS: Record<string, string> = {
 
 export function buildDiagnosisV2Result(
   answers: DiagnosisV2AnswerMap,
-  scoring: DiagnosisV2ScoringResult
+  scoring: DiagnosisV2ScoringResult,
+  context: DiagnosisV2ScoringContext = {}
 ): DiagnosisV2ResultSnapshot {
   if (!scoring.complete || scoring.totalScore === null || !scoring.judgment) {
     throw new Error("A complete detailed diagnosis is required.");
@@ -135,6 +153,7 @@ export function buildDiagnosisV2Result(
 
   const sortedSections = DIAGNOSIS_V2_SECTIONS
     .map((section) => ({ ...section, score: scoring.axisScores[section.id] }))
+    .filter((section): section is typeof section & { score: number } => typeof section.score === "number")
     .sort((a, b) => b.score - a.score);
 
   const strengths = sortedSections
@@ -148,7 +167,7 @@ export function buildDiagnosisV2Result(
     }));
 
   const criticalSections = scoring.criticalFlags
-    .map((flag) => DIAGNOSIS_V2_QUESTION_BY_ID.get(flag)?.section)
+    .map((flag) => getQuestionById(flag)?.section)
     .filter((section): section is DiagnosisV2SectionId => Boolean(section));
   const prioritySectionIds = [
     ...new Set([
@@ -159,43 +178,62 @@ export function buildDiagnosisV2Result(
 
   const priorities = prioritySectionIds.map((sectionId) => {
     const section = DIAGNOSIS_V2_SECTIONS.find((candidate) => candidate.id === sectionId)!;
-    const lowQuestion = getLowestQuestion(sectionId, answers);
-    const criticalFlag = scoring.criticalFlags.find((flag) => DIAGNOSIS_V2_QUESTION_BY_ID.get(flag)?.section === sectionId);
+    const lowQuestion = getLowestQuestion(sectionId, answers, context);
+    const criticalFlag = scoring.criticalFlags.find((flag) => getQuestionById(flag)?.section === sectionId);
+    const sectionScore = scoring.axisScores[sectionId] ?? 0;
     return {
       id: sectionId,
       label: section.label,
-      score: scoring.axisScores[sectionId],
+      score: sectionScore,
       detail: criticalFlag
         ? CRITICAL_DETAILS[criticalFlag]
-        : scoring.axisScores[sectionId] >= 70
+        : sectionScore >= 70
           ? `${getStrengthDetail(sectionId)} 現在の水準を維持し、記録と定期確認によって再現性を高めてください。`
         : QUESTION_DETAILS[lowQuestion?.id ?? ""] ?? AXIS_ACTIONS[sectionId].issue
     };
   });
 
-  const publicWorks = buildPublicWorksDiagnosis(answers, scoring);
+  const publicWorks = buildPublicWorksDiagnosis(answers, scoring, context.publicWorkIntent);
+  const specialty = context.includeSpecialty !== false && context.primaryTrade
+    ? buildSpecialtyDiagnosisSummary(context.primaryTrade, answers)
+    : null;
   const plan90Days = build90DayPlan(prioritySectionIds);
+  if (specialty) {
+    plan90Days.month1 = [...new Set([...specialty.plan90Days.slice(0, 2), ...plan90Days.month1])].slice(0, 6);
+  }
   const selfServiceActions = buildSelfServiceActions(prioritySectionIds, scoring);
   const professionalSupportActions = buildProfessionalSupportActions(prioritySectionIds, scoring);
+  const consultation = buildConsultationCopy(scoring.publicWorksMode);
 
   return {
     strengths,
     priorities,
     publicWorks,
+    specialty,
+    consultation,
     plan90Days,
     selfServiceActions,
     professionalSupportActions
   };
 }
 
-function getLowestQuestion(section: DiagnosisV2SectionId, answers: DiagnosisV2AnswerMap) {
-  return DETAILED_DIAGNOSIS_QUESTIONS
+function getLowestQuestion(
+  section: DiagnosisV2SectionId,
+  answers: DiagnosisV2AnswerMap,
+  context: DiagnosisV2ScoringContext
+) {
+  return getApplicableDetailedQuestions(context)
     .filter((question) => question.section === section)
     .map((question) => ({
       question,
       score: getDiagnosisV2AnswerScore(question, answers[question.id]) ?? 4
     }))
     .sort((a, b) => a.score - b.score || b.question.weight - a.question.weight)[0]?.question;
+}
+
+function getQuestionById(id: string) {
+  return DIAGNOSIS_V2_QUESTION_BY_ID.get(id)
+    ?? ALL_SPECIALTY_QUESTIONS.find((question) => question.id === id);
 }
 
 function getStrengthDetail(section: DiagnosisV2SectionId) {
@@ -214,15 +252,27 @@ function getStrengthDetail(section: DiagnosisV2SectionId) {
 
 function buildPublicWorksDiagnosis(
   answers: DiagnosisV2AnswerMap,
-  scoring: DiagnosisV2ScoringResult
+  scoring: DiagnosisV2ScoringResult,
+  publicWorkIntent: string | null | undefined
 ): DiagnosisV2ResultSnapshot["publicWorks"] {
+  if (scoring.publicWorksMode === "excluded") {
+    return {
+      mode: "excluded",
+      title: "公共工事は総合評価の対象外です",
+      summary: "公共工事は、御社の現在の希望に基づき総合評価の対象外としています。経審や入札参加がないことを、経営上の弱点とは判定していません。",
+      currentState: [`公共工事への意向: ${getPublicWorkIntentLabel(publicWorkIntent)}`],
+      expansionPotential: "今後、公共工事を検討する場合は、建設業許可、技術者、経審、参加資格の順に確認できます。",
+      prerequisites: ["現時点では、民間受注、利益管理、施工体制の改善を優先してください。"]
+    };
+  }
+
   const values = ["K01", "K02", "K03", "K04", "K05", "T01", "T02", "T03"].map((id) => ({
     id,
     score: getDiagnosisV2AnswerScore(DIAGNOSIS_V2_QUESTION_BY_ID.get(id)!, answers[id]) ?? 0,
     label: getDiagnosisV2OptionLabel(id, answers[id])
   }));
   const byId = Object.fromEntries(values.map((value) => [value.id, value]));
-  const score = scoring.axisScores.public_works;
+  const score = scoring.axisScores.public_works ?? 0;
   const title = score >= 70
     ? "参加先拡大を具体的に検討できる段階"
     : score >= 45
@@ -250,13 +300,35 @@ function buildPublicWorksDiagnosis(
   if (prerequisites.length === 0) prerequisites.push("参加先候補ごとに個別の資格・技術者・所在地要件を照合する");
 
   return {
+    mode: scoring.publicWorksMode,
     title,
-    summary: "回答内容を見る限り、自治体以外の発注機関へ参加先を広げられる可能性があります。ただし、許可業種、経審、技術者、所在地、施工体制、発注者ごとの資格要件を個別に確認する必要があります。",
+    summary: scoring.publicWorksMode === "reference"
+      ? "公共工事は参考診断として表示し、総合点には含めていません。回答内容から、許可、経審、参加資格、技術者、書類体制の現在地を確認できます。"
+      : "回答内容を見る限り、自治体以外の発注機関へ参加先を広げられる可能性があります。ただし、許可業種、経審、技術者、所在地、施工体制、発注者ごとの資格要件を個別に確認する必要があります。",
     currentState,
     expansionPotential: score >= 70
       ? "現在の参加体制を活用し、国・関連機関を含む参加先を選別して案件探索の幅を広げられる可能性があります。"
       : "不足項目を順番に整えることで、現在より参加候補となる発注機関を増やせる可能性があります。",
     prerequisites
+  };
+}
+
+function buildConsultationCopy(mode: PublicWorksScoringMode) {
+  if (mode === "included") {
+    return {
+      heading: "公共工事への参加先拡大や体制整備について相談する",
+      body: "診断結果をもとに、許可、経審、技術者、参加資格と、業態別の経営課題を整理できます。"
+    };
+  }
+  if (mode === "reference") {
+    return {
+      heading: "御社が公共工事へ進める状態か確認する",
+      body: "公共工事を総合点へ含めず、将来検討する場合に必要となる条件を確認できます。"
+    };
+  }
+  return {
+    heading: "診断結果について個別に確認する",
+    body: "診断結果の内容や、今後公共工事を検討する場合の条件について確認したい方は、個別相談をご利用ください。"
   };
 }
 

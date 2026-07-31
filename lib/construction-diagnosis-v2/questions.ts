@@ -1,4 +1,15 @@
-export const CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2";
+import {
+  ALL_SPECIALTY_QUESTIONS,
+  getPublicWorksScoringMode,
+  getSpecialtyQuestionLabel,
+  getSpecialtyQuestions,
+  type PrimaryTrade,
+  type PublicWorkIntent,
+  type PublicWorksScoringMode
+} from "./specialty-questions.ts";
+
+export const CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2_1";
+export const LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2";
 
 export type DiagnosisV2SectionId =
   | "finance"
@@ -45,10 +56,18 @@ export type DiagnosisV2Section = {
 export type DiagnosisV2ScoringResult = {
   complete: boolean;
   unanswered: string[];
-  axisScores: Record<DiagnosisV2SectionId, number>;
+  axisScores: Partial<Record<DiagnosisV2SectionId, number>>;
   totalScore: number | null;
   criticalFlags: string[];
   judgment: DiagnosisV2Judgment | null;
+  publicWorksMode: PublicWorksScoringMode;
+  applicableQuestionIds: string[];
+};
+
+export type DiagnosisV2ScoringContext = {
+  primaryTrade?: PrimaryTrade | string | null;
+  publicWorkIntent?: PublicWorkIntent | string | null;
+  includeSpecialty?: boolean;
 };
 
 export type QuickDiagnosisResult = {
@@ -276,6 +295,26 @@ export function getDetailedQuestionsForSection(section: DiagnosisV2SectionId) {
   return DETAILED_DIAGNOSIS_QUESTIONS.filter((question) => question.section === section);
 }
 
+export function getApplicableDetailedQuestions(context: DiagnosisV2ScoringContext = {}) {
+  const publicWorksMode = context.publicWorkIntent
+    ? getPublicWorksScoringMode(context.publicWorkIntent)
+    : "included";
+  const commonQuestions = publicWorksMode === "excluded"
+    ? DETAILED_DIAGNOSIS_QUESTIONS.filter((question) => question.section !== "public_works")
+    : DETAILED_DIAGNOSIS_QUESTIONS;
+  const specialtyQuestions = context.includeSpecialty === false || !context.primaryTrade
+    ? []
+    : getSpecialtyQuestions(context.primaryTrade);
+  return [...commonQuestions, ...specialtyQuestions];
+}
+
+export function getApplicableQuestionsForSection(
+  section: DiagnosisV2SectionId,
+  context: DiagnosisV2ScoringContext = {}
+) {
+  return getApplicableDetailedQuestions(context).filter((question) => question.section === section);
+}
+
 export function getDiagnosisV2AnswerScore(question: DiagnosisV2Question, answer: string | undefined) {
   return question.options.find((candidate) => candidate.value === answer)?.score ?? null;
 }
@@ -308,14 +347,22 @@ export function scoreQuickDiagnosis(answers: DiagnosisV2AnswerMap): QuickDiagnos
   };
 }
 
-export function scoreDetailedDiagnosis(answers: DiagnosisV2AnswerMap): DiagnosisV2ScoringResult {
-  const unanswered = DETAILED_DIAGNOSIS_QUESTIONS
+export function scoreDetailedDiagnosis(
+  answers: DiagnosisV2AnswerMap,
+  context: DiagnosisV2ScoringContext = {}
+): DiagnosisV2ScoringResult {
+  const publicWorksMode = context.publicWorkIntent
+    ? getPublicWorksScoringMode(context.publicWorkIntent)
+    : "included";
+  const applicableQuestions = getApplicableDetailedQuestions(context);
+  const unanswered = applicableQuestions
     .filter((question) => getDiagnosisV2AnswerScore(question, answers[question.id]) === null)
     .map((question) => question.id);
-  const axisScores = {} as Record<DiagnosisV2SectionId, number>;
+  const axisScores: Partial<Record<DiagnosisV2SectionId, number>> = {};
 
   for (const section of DIAGNOSIS_V2_SECTIONS) {
-    const questions = getDetailedQuestionsForSection(section.id);
+    const questions = applicableQuestions.filter((question) => question.section === section.id);
+    if (questions.length === 0) continue;
     const earned = questions.reduce((sum, question) => {
       const score = getDiagnosisV2AnswerScore(question, answers[question.id]);
       return sum + (score ?? 0) * question.weight;
@@ -324,7 +371,7 @@ export function scoreDetailedDiagnosis(answers: DiagnosisV2AnswerMap): Diagnosis
     axisScores[section.id] = roundOne((earned / maximum) * 100);
   }
 
-  const criticalFlags = DETAILED_DIAGNOSIS_QUESTIONS
+  const criticalFlags = applicableQuestions
     .filter((question) => question.critical)
     .filter((question) => {
       const score = getDiagnosisV2AnswerScore(question, answers[question.id]);
@@ -339,14 +386,19 @@ export function scoreDetailedDiagnosis(answers: DiagnosisV2AnswerMap): Diagnosis
       axisScores,
       totalScore: null,
       criticalFlags,
-      judgment: null
+      judgment: null,
+      publicWorksMode,
+      applicableQuestionIds: applicableQuestions.map((question) => question.id)
     };
   }
 
-  const earned = DETAILED_DIAGNOSIS_QUESTIONS.reduce((sum, question) => {
+  const totalQuestions = applicableQuestions.filter((question) =>
+    publicWorksMode === "included" || question.section !== "public_works"
+  );
+  const earned = totalQuestions.reduce((sum, question) => {
     return sum + (getDiagnosisV2AnswerScore(question, answers[question.id]) ?? 0) * question.weight;
   }, 0);
-  const maximum = DETAILED_DIAGNOSIS_QUESTIONS.reduce((sum, question) => sum + question.weight * 4, 0);
+  const maximum = totalQuestions.reduce((sum, question) => sum + question.weight * 4, 0);
   const totalScore = roundOne((earned / maximum) * 100);
 
   return {
@@ -357,26 +409,31 @@ export function scoreDetailedDiagnosis(answers: DiagnosisV2AnswerMap): Diagnosis
     criticalFlags,
     judgment: getDiagnosisV2Judgment({
       totalScore,
-      publicWorksScore: axisScores.public_works,
+      publicWorksScore: axisScores.public_works ?? 100,
+      publicWorksIncluded: publicWorksMode === "included",
       criticalFlags,
       growthExecutionScore: getDiagnosisV2AnswerScore(DIAGNOSIS_V2_QUESTION_BY_ID.get("G03")!, answers.G03) ?? 0
-    })
+    }),
+    publicWorksMode,
+    applicableQuestionIds: applicableQuestions.map((question) => question.id)
   };
 }
 
 export function getDiagnosisV2Judgment({
   totalScore,
   publicWorksScore,
+  publicWorksIncluded = true,
   criticalFlags,
   growthExecutionScore
 }: {
   totalScore: number;
   publicWorksScore: number;
+  publicWorksIncluded?: boolean;
   criticalFlags: string[];
   growthExecutionScore: number;
 }): DiagnosisV2Judgment {
   if (criticalFlags.length > 0) return "経営基盤の整備を優先";
-  if (totalScore >= 75 && publicWorksScore >= 70) return "自社対応可能＋必要時スポット支援";
+  if (totalScore >= 75 && (!publicWorksIncluded || publicWorksScore >= 70)) return "自社対応可能＋必要時スポット支援";
   if (totalScore >= 55) return "一部支援推奨";
   if (growthExecutionScore >= 2) return "段階的な専門支援推奨";
   return "現時点では保留";
@@ -384,7 +441,10 @@ export function getDiagnosisV2Judgment({
 
 export function getDiagnosisV2OptionLabel(questionId: string, value: string | undefined) {
   const question = DIAGNOSIS_V2_QUESTION_BY_ID.get(questionId);
-  return question?.options.find((option) => option.value === value)?.label ?? value ?? "未回答";
+  return question?.options.find((option) => option.value === value)?.label
+    ?? (ALL_SPECIALTY_QUESTIONS.some((candidate) => candidate.id === questionId)
+      ? getSpecialtyQuestionLabel(questionId, value)
+      : value ?? "未回答");
 }
 
 export function getQuickDiagnosisOptionLabel(questionId: string, value: string | undefined) {

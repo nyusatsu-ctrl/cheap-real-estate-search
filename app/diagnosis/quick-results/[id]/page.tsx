@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
 import { QUICK_CATEGORY_LABELS, type QuickDiagnosisCategory } from "@/lib/construction-diagnosis-v2/questions";
+import { getPrimaryTradeLabel, getPublicWorksScoringMode } from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default async function DiagnosisV2QuickResultPage({ params }: { params: Promise<{ id: string }> }) {
@@ -11,9 +12,14 @@ export default async function DiagnosisV2QuickResultPage({ params }: { params: P
 
   const scoreEntries = Object.entries(diagnosis.quick_scores) as [QuickDiagnosisCategory, number][];
   const publicScore = diagnosis.quick_scores.public_works ?? 0;
-  const message = publicScore >= 60
-    ? "御社は公共工事への参加先を広げられる可能性があります。詳細診断では、許可、経審、技術者、原価管理、組織体制を含めて確認します。"
-    : "現時点では、公共工事の参加先拡大より先に確認すべき経営・体制上の項目がある可能性があります。詳細診断で優先順位を整理できます。";
+  const publicWorksMode = diagnosis.public_work_intent ? getPublicWorksScoringMode(diagnosis.public_work_intent) : "included";
+  const message = publicWorksMode === "excluded"
+    ? `詳細診断では、${getPrimaryTradeLabel(diagnosis.primary_trade)}の経営・原価・施工・組織体制を中心に確認します。公共工事に未参加であることは、総合点の弱点として扱いません。`
+    : publicWorksMode === "reference"
+      ? `詳細診断では、${getPrimaryTradeLabel(diagnosis.primary_trade)}の経営課題に加え、公共工事体制を参考情報として確認します。公共工事分野は総合点に含めません。`
+      : publicScore >= 60
+        ? "御社は公共工事への参加先を広げられる可能性があります。詳細診断では、許可、経審、技術者、原価管理、組織体制を含めて確認します。"
+        : "現時点では、公共工事の参加先拡大より先に確認すべき経営・体制上の項目がある可能性があります。詳細診断で優先順位を整理できます。";
 
   return (
     <div className="bg-slate-50">
@@ -47,7 +53,7 @@ export default async function DiagnosisV2QuickResultPage({ params }: { params: P
             <div>
               <h2 className="text-xl font-black text-slate-950">詳細診断で確認すること</h2>
               <p className="mt-2 text-sm leading-7 text-slate-700">
-                8分野34問から、総合点、強み、優先課題、公共工事参入の現在地、90日再成長戦略を整理します。回答時間の目安は10～15分です。
+                共通8分野と業態別5問から、総合点、強み、優先課題、業態別KPI、公共工事参入の現在地、90日再成長戦略を整理します。回答時間の目安は10～15分です。
               </p>
             </div>
           </div>

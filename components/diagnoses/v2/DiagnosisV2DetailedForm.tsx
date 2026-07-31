@@ -4,17 +4,44 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitDiagnosisV2DetailedAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
 import {
-  DETAILED_DIAGNOSIS_QUESTIONS,
   DIAGNOSIS_V2_SECTIONS,
-  getDetailedQuestionsForSection
+  getApplicableDetailedQuestions,
+  getApplicableQuestionsForSection,
+  type DiagnosisV2Question,
+  type DiagnosisV2ScoringContext
 } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  getPrimaryTradeLabel,
+  getPublicWorksScoringMode,
+  getSpecialtyQuestions,
+  type PrimaryTrade,
+  type PublicWorkIntent
+} from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { ArrowLeft, ArrowRight, Save } from "lucide-react";
 
 const INITIAL_STATE: DiagnosisV2FormState = { fieldErrors: {} };
 
-export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }) {
+type DetailedStep = {
+  id: string;
+  label: string;
+  description: string;
+  questions: DiagnosisV2Question[];
+  referenceOnly?: boolean;
+};
+
+export function DiagnosisV2DetailedForm({
+  diagnosisId,
+  primaryTrade,
+  publicWorkIntent,
+  includeSpecialty
+}: {
+  diagnosisId: string;
+  primaryTrade: PrimaryTrade | null;
+  publicWorkIntent: PublicWorkIntent | null;
+  includeSpecialty: boolean;
+}) {
   const [state, formAction] = useActionState(submitDiagnosisV2DetailedAction, INITIAL_STATE);
-  const storageKey = `construction-management-diagnosis-v2-details-${diagnosisId}`;
+  const storageKey = `construction-management-diagnosis-v2-1-details-${diagnosisId}`;
   const sectionStorageKey = `${storageKey}-section`;
   const [sectionIndex, setSectionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -25,15 +52,45 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
     () => ({ ...(state.fieldErrors ?? {}), ...clientErrors }),
     [clientErrors, state.fieldErrors]
   );
+  const context = useMemo<DiagnosisV2ScoringContext>(() => ({
+    primaryTrade,
+    publicWorkIntent,
+    includeSpecialty
+  }), [includeSpecialty, primaryTrade, publicWorkIntent]);
+  const publicWorksMode = publicWorkIntent ? getPublicWorksScoringMode(publicWorkIntent) : "included";
+  const applicableQuestions = useMemo(() => getApplicableDetailedQuestions(context), [context]);
+  const steps = useMemo<DetailedStep[]>(() => {
+    const commonSteps = DIAGNOSIS_V2_SECTIONS.flatMap((section) => {
+      const questions = getApplicableQuestionsForSection(section.id, context)
+        .filter((question) => !getSpecialtyQuestions(primaryTrade).some((specialty) => specialty.id === question.id));
+      return questions.length > 0 ? [{
+        id: section.id,
+        label: section.label,
+        description: section.description,
+        questions,
+        referenceOnly: section.id === "public_works" && publicWorksMode === "reference"
+      }] : [];
+    });
+    if (!includeSpecialty || !primaryTrade) return commonSteps;
+    return [...commonSteps, {
+      id: "specialty",
+      label: `${getPrimaryTradeLabel(primaryTrade)}の業態別診断`,
+      description: "業態固有の原価、施工、受注、安全・管理状況を確認します。回答は既存8分野と業態別重要指標へ反映します。",
+      questions: getSpecialtyQuestions(primaryTrade)
+    }];
+  }, [context, includeSpecialty, primaryTrade, publicWorksMode]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      setAnswers(readStoredAnswers(storageKey));
-      setSectionIndex(readStoredSection(sectionStorageKey));
+      const applicableIds = new Set(applicableQuestions.map((question) => question.id));
+      setAnswers(Object.fromEntries(
+        Object.entries(readStoredAnswers(storageKey)).filter(([questionId]) => applicableIds.has(questionId))
+      ));
+      setSectionIndex(readStoredSection(sectionStorageKey, steps.length));
       setStorageRestored(true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [sectionStorageKey, storageKey]);
+  }, [applicableQuestions, sectionStorageKey, steps.length, storageKey]);
 
   useEffect(() => {
     if (storageRestored) sessionStorage.setItem(storageKey, JSON.stringify(answers));
@@ -43,12 +100,12 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
     if (storageRestored) sessionStorage.setItem(sectionStorageKey, String(sectionIndex));
   }, [sectionIndex, sectionStorageKey, storageRestored]);
 
-  const currentSection = DIAGNOSIS_V2_SECTIONS[sectionIndex];
-  const completedCount = DETAILED_DIAGNOSIS_QUESTIONS.filter((question) => Boolean(answers[question.id])).length;
+  const currentStep = steps[sectionIndex] ?? steps[0];
+  const completedCount = applicableQuestions.filter((question) => Boolean(answers[question.id])).length;
 
   const validateSection = (index: number) => {
     const errors: Record<string, string> = {};
-    for (const question of getDetailedQuestionsForSection(DIAGNOSIS_V2_SECTIONS[index].id)) {
+    for (const question of steps[index]?.questions ?? []) {
       if (!answers[question.id]) errors[question.id] = "回答を選択してください";
     }
     setClientErrors(errors);
@@ -57,7 +114,7 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
 
   const goNext = () => {
     if (!validateSection(sectionIndex)) return;
-    setSectionIndex((current) => Math.min(current + 1, DIAGNOSIS_V2_SECTIONS.length - 1));
+    setSectionIndex((current) => Math.min(current + 1, steps.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -67,7 +124,7 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
       return;
     }
     const errors: Record<string, string> = {};
-    for (const question of DETAILED_DIAGNOSIS_QUESTIONS) {
+    for (const question of applicableQuestions) {
       if (!answers[question.id]) errors[question.id] = "回答を選択してください";
     }
     if (Object.keys(errors).length === 0) {
@@ -77,8 +134,8 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
     event.preventDefault();
     setClientErrors(errors);
     const firstErrorId = Object.keys(errors)[0];
-    const targetSection = DIAGNOSIS_V2_SECTIONS.findIndex((section) =>
-      getDetailedQuestionsForSection(section.id).some((question) => question.id === firstErrorId)
+    const targetSection = steps.findIndex((step) =>
+      step.questions.some((question) => question.id === firstErrorId)
     );
     if (targetSection >= 0) setSectionIndex(targetSection);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -88,6 +145,8 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
     submittingRef.current = false;
   }, [state]);
 
+  if (!currentStep) return null;
+
   return (
     <form action={formAction} onSubmit={handleSubmit} className="mx-auto max-w-5xl px-4 py-8">
       <input type="hidden" name="id" value={diagnosisId} />
@@ -95,23 +154,26 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-black text-brand-700">詳細診断 8分野・34問</p>
+              <p className="text-sm font-black text-brand-700">詳細診断 8分野＋業態別・{applicableQuestions.length}問</p>
               <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-black text-amber-800">テスト版</span>
             </div>
-            <h1 className="mt-1 text-2xl font-black text-slate-950">{sectionIndex + 1}. {currentSection.label}</h1>
-            <p className="mt-2 text-sm leading-7 text-slate-600">{currentSection.description}</p>
+            <h1 className="mt-1 text-2xl font-black text-slate-950">{sectionIndex + 1}. {currentStep.label}</h1>
+            <p className="mt-2 text-sm leading-7 text-slate-600">{currentStep.description}</p>
+            {currentStep.referenceOnly ? (
+              <p className="mt-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold leading-6 text-sky-900">この分野は参考診断として表示し、総合点には含めません。</p>
+            ) : null}
           </div>
-          <p className="text-sm font-bold text-slate-600">{completedCount} / {DETAILED_DIAGNOSIS_QUESTIONS.length}問 回答済み</p>
+          <p className="text-sm font-bold text-slate-600">{completedCount} / {applicableQuestions.length}問 回答済み</p>
         </div>
-        <div className="mt-4 grid grid-cols-8 gap-1">
-          {DIAGNOSIS_V2_SECTIONS.map((section, index) => (
+        <div className="mt-4 grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+          {steps.map((step, index) => (
             <button
-              key={section.id}
+              key={step.id}
               type="button"
               onClick={() => setSectionIndex(index)}
               className={`h-2 rounded ${index === sectionIndex ? "bg-brand-700" : index < sectionIndex ? "bg-emerald-500" : "bg-slate-200"}`}
-              aria-label={`${section.label}へ移動`}
-              title={section.label}
+              aria-label={`${step.label}へ移動`}
+              title={step.label}
             />
           ))}
         </div>
@@ -123,9 +185,9 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
         </div>
       ) : null}
 
-      {DIAGNOSIS_V2_SECTIONS.map((section, index) => (
-        <section key={section.id} className={index === sectionIndex ? "mt-5 space-y-4" : "hidden"} aria-hidden={index !== sectionIndex}>
-          {getDetailedQuestionsForSection(section.id).map((question) => (
+      {steps.map((step, index) => (
+        <section key={step.id} className={index === sectionIndex ? "mt-5 space-y-4" : "hidden"} aria-hidden={index !== sectionIndex}>
+          {step.questions.map((question) => (
             <fieldset key={question.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <legend className="text-base font-black leading-7 text-slate-950">
                 <span className="mr-2 text-brand-700">{question.id}</span>
@@ -173,7 +235,7 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
           <ArrowLeft className="h-4 w-4" />
           前の分野
         </button>
-        {sectionIndex < DIAGNOSIS_V2_SECTIONS.length - 1 ? (
+        {sectionIndex < steps.length - 1 ? (
           <button type="button" onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring">
             次の分野
             <ArrowRight className="h-4 w-4" />
@@ -207,8 +269,8 @@ function readStoredAnswers(storageKey: string): Record<string, string> {
   }
 }
 
-function readStoredSection(storageKey: string) {
+function readStoredSection(storageKey: string, stepCount: number) {
   if (typeof window === "undefined") return 0;
   const value = Number(sessionStorage.getItem(storageKey));
-  return Number.isInteger(value) && value >= 0 && value < DIAGNOSIS_V2_SECTIONS.length ? value : 0;
+  return Number.isInteger(value) && value >= 0 && value < stepCount ? value : 0;
 }

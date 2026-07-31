@@ -1,9 +1,19 @@
 import Link from "next/link";
+import { DiagnosisV21FeedbackForm } from "@/components/diagnoses/v2/DiagnosisV21FeedbackForm";
 import { PrintButton } from "@/components/diagnoses/v2/PrintButton";
 import type { ConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
-import { DIAGNOSIS_V2_SECTIONS } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
+  DIAGNOSIS_V2_SECTIONS,
+  type DiagnosisV2ScoringContext
+} from "@/lib/construction-diagnosis-v2/questions";
 import { buildDiagnosisV2Result } from "@/lib/construction-diagnosis-v2/results";
 import { scoreDetailedDiagnosis } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  getOrderModelLabel,
+  getPrimaryTradeLabel,
+  getPublicWorkIntentLabel
+} from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { formatDiagnosisDate } from "@/lib/construction-diagnosis";
 import { AlertTriangle, ArrowRight, BarChart3, Building2, CalendarRange, CheckCircle2, ClipboardList, Route, ShieldCheck } from "lucide-react";
 
@@ -16,7 +26,15 @@ export function DiagnosisV2ResultView({
   diagnosis: ConstructionManagementDiagnosis;
   printMode?: boolean;
 }) {
-  const scoring = scoreDetailedDiagnosis(diagnosis.detailed_answers);
+  const isV21 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+  const context: DiagnosisV2ScoringContext = isV21
+    ? {
+        primaryTrade: diagnosis.primary_trade,
+        publicWorkIntent: diagnosis.public_work_intent,
+        includeSpecialty: true
+      }
+    : { includeSpecialty: false };
+  const scoring = scoreDetailedDiagnosis(diagnosis.detailed_answers, context);
   if (!scoring.complete || scoring.totalScore === null || !scoring.judgment) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
@@ -29,7 +47,9 @@ export function DiagnosisV2ResultView({
     );
   }
 
-  const result = diagnosis.diagnosis_result ?? buildDiagnosisV2Result(diagnosis.detailed_answers, scoring);
+  const result = isV21
+    ? buildDiagnosisV2Result(diagnosis.detailed_answers, scoring, context)
+    : diagnosis.diagnosis_result ?? buildDiagnosisV2Result(diagnosis.detailed_answers, scoring, context);
   const shouldRecommendConsultation = [
     "経営基盤の整備を優先",
     "一部支援推奨",
@@ -74,20 +94,63 @@ export function DiagnosisV2ResultView({
           <div className="grid gap-4">
             {DIAGNOSIS_V2_SECTIONS.map((section) => {
               const score = scoring.axisScores[section.id];
+              const excluded = section.id === "public_works" && scoring.publicWorksMode === "excluded";
               return (
                 <div key={section.id}>
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-bold text-slate-700">{section.label}</span>
-                    <span className="font-black text-slate-950">{score.toFixed(1)}点</span>
+                    <span className="font-bold text-slate-700">
+                      {section.label}
+                      {section.id === "public_works" && scoring.publicWorksMode === "reference" ? <span className="ml-2 text-xs text-sky-700">参考</span> : null}
+                    </span>
+                    <span className="font-black text-slate-950">{excluded || score === undefined ? "対象外" : `${score.toFixed(1)}点`}</span>
                   </div>
-                  <div className="mt-2 h-3 overflow-hidden rounded bg-slate-100">
-                    <div className={`h-full rounded ${score >= 70 ? "bg-emerald-600" : score >= 55 ? "bg-brand-700" : "bg-amber-600"}`} style={{ width: `${Math.min(100, score)}%` }} />
-                  </div>
+                  {!excluded && score !== undefined ? (
+                    <div className="mt-2 h-3 overflow-hidden rounded bg-slate-100">
+                      <div className={`h-full rounded ${score >= 70 ? "bg-emerald-600" : score >= 55 ? "bg-brand-700" : "bg-amber-600"}`} style={{ width: `${Math.min(100, score)}%` }} />
+                    </div>
+                  ) : <div className="mt-2 h-3 rounded bg-slate-100" />}
                 </div>
               );
             })}
           </div>
         </ResultSection>
+
+        {isV21 && result.specialty ? (
+          <ResultSection title="御社の業態別重要指標" icon={<Building2 className="h-5 w-5 text-brand-700" />}>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ProfileMetric label="主な業態" value={getPrimaryTradeLabel(diagnosis.primary_trade)} />
+              <ProfileMetric label="主な受注形態" value={diagnosis.order_models.length > 0 ? diagnosis.order_models.map(getOrderModelLabel).join(" / ") : "未回答"} />
+              <ProfileMetric label="自社施工比率" value={diagnosis.self_perform_ratio ?? "未回答"} />
+              <ProfileMetric label="主な工事金額" value={diagnosis.average_project_size ?? "未回答"} />
+              <ProfileMetric label="公共工事への意向" value={getPublicWorkIntentLabel(diagnosis.public_work_intent)} />
+              <ProfileMetric label="業態別質問の評価" value={`${result.specialty.score.toFixed(1)}点`} />
+            </div>
+            <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4">
+              <h3 className="text-sm font-black text-slate-950">売上構成</h3>
+              <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">元請 {formatRatio(diagnosis.prime_ratio)} / 下請 {formatRatio(diagnosis.subcontract_ratio)} / 公共工事 {formatRatio(diagnosis.public_ratio)} / 個人客 {formatRatio(diagnosis.consumer_ratio)}</p>
+            </div>
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-black text-slate-950">業態特有の強み</h3>
+                <ResultItemList items={result.specialty.strengths} tone="positive" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-950">業態特有の優先課題</h3>
+                <ResultItemList items={result.specialty.priorities} tone="warning" />
+              </div>
+            </div>
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-black text-slate-950">業態別に見るべきKPI</h3>
+                <ResultItemList items={result.specialty.kpis} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-950">90日間の業態別改善策</h3>
+                <ResultItemList items={result.specialty.plan90Days} />
+              </div>
+            </div>
+          </ResultSection>
+        ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <ResultSection title="主な強み" icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}>
@@ -138,10 +201,8 @@ export function DiagnosisV2ResultView({
         {!printMode ? (
           <section className="print:hidden">
             <div className="rounded-lg border border-brand-200 bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-black text-slate-950">診断結果について詳しく確認したい会社様へ</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-700">
-                診断結果は、入力内容に基づく簡易判定です。御社の許可業種、経審、技術者、所在地、施工体制、現在の入札参加先を確認することで、より具体的な優先順位を整理できます。
-              </p>
+              <h2 className="text-xl font-black text-slate-950">{result.consultation?.heading ?? "診断結果について詳しく確認したい会社様へ"}</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-700">{result.consultation?.body ?? "診断結果は入力内容に基づく簡易判定です。個別要件を確認することで、より具体的な優先順位を整理できます。"}</p>
               {diagnosis.consultation_requested ? (
                 <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">個別相談を申込み済みです。日程確認のご連絡をお待ちください。</p>
               ) : shouldRecommendConsultation ? (
@@ -161,6 +222,10 @@ export function DiagnosisV2ResultView({
               )}
             </div>
           </section>
+        ) : null}
+
+        {!printMode && isV21 ? (
+          <DiagnosisV21FeedbackForm diagnosisId={diagnosis.id} submitted={Boolean(diagnosis.feedback_submitted_at)} />
         ) : null}
 
         <section className="rounded border border-slate-300 bg-white p-5">
@@ -231,4 +296,17 @@ function MonthPlan({ month, subtitle, items }: { month: string; subtitle: string
       <ResultItemList items={items} />
     </div>
   );
+}
+
+function ProfileMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-black leading-6 text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function formatRatio(value: number | null) {
+  return value === null ? "未回答" : `${Number(value).toLocaleString("ja-JP")}％`;
 }

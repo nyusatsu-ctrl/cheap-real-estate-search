@@ -3,8 +3,10 @@ import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
+  LEAD_SOURCE_LABELS,
   SUPPLEMENTAL_ANSWER_FIELDS,
   type AdminDiagnosisFilters,
+  type LeadSource,
   formatAnswerValue,
   formatDiagnosisDate,
   getAnswerLabel,
@@ -21,6 +23,15 @@ import {
   getQuickDiagnosisOptionLabel,
   type DiagnosisV2Judgment
 } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  ALL_SPECIALTY_QUESTIONS,
+  PRIMARY_TRADE_OPTIONS,
+  PUBLIC_WORK_INTENT_OPTIONS,
+  getOrderModelLabel,
+  getPrimaryTradeLabel,
+  getPublicWorkIntentLabel,
+  getSpecialtyQuestionLabel
+} from "@/lib/construction-diagnosis-v2/specialty-questions";
 import {
   DIAGNOSIS_V2_DEAL_STATUS_LABELS,
   DIAGNOSIS_V2_SALES_STATUS_LABELS,
@@ -57,6 +68,16 @@ export async function GET(request: Request) {
     "従業員数",
     "創業年",
     "主な工事業種",
+    "主な業態",
+    "副業種",
+    "主な受注形態",
+    "元請比率",
+    "下請比率",
+    "公共工事比率",
+    "個人客比率",
+    "自社施工比率",
+    "主な工事金額",
+    "公共工事への意向",
     "年商区分",
     "流入経路",
     "URL流入元",
@@ -65,6 +86,11 @@ export async function GET(request: Request) {
     "詳細診断完了日時",
     "総合点",
     ...DIAGNOSIS_V2_SECTIONS.map((section) => `${section.label}スコア`),
+    "業態別スコア",
+    "業態別の強み",
+    "業態別の優先課題",
+    "業態別KPI",
+    "業態別90日改善策",
     "支援判定",
     "重大フラグ",
     "相談希望",
@@ -79,8 +105,15 @@ export async function GET(request: Request) {
     "失注理由",
     "次回対応日",
     "管理者メモ",
+    "フィードバック・質問の分かりやすさ",
+    "フィードバック・診断結果の正確性",
+    "フィードバック・参考度",
+    "フィードバック・相談意向",
+    "フィードバック・自由入力",
+    "フィードバック回答日時",
     ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
     ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
+    ...ALL_SPECIALTY_QUESTIONS.map((question) => `${question.id} ${question.question}`),
     "旧診断タイプ",
     "旧サブ課題",
     "旧相談意欲",
@@ -107,6 +140,16 @@ export async function GET(request: Request) {
         diagnosis.employee_range ?? "",
         diagnosis.founding_year ?? "",
         diagnosis.main_business ?? "",
+        diagnosis.primary_trade ? getPrimaryTradeLabel(diagnosis.primary_trade) : "",
+        diagnosis.secondary_trades.map(getPrimaryTradeLabel).join(" / "),
+        diagnosis.order_models.map(getOrderModelLabel).join(" / "),
+        diagnosis.prime_ratio ?? "",
+        diagnosis.subcontract_ratio ?? "",
+        diagnosis.public_ratio ?? "",
+        diagnosis.consumer_ratio ?? "",
+        diagnosis.self_perform_ratio ?? "",
+        diagnosis.average_project_size ?? "",
+        diagnosis.public_work_intent ? getPublicWorkIntentLabel(diagnosis.public_work_intent) : "",
         diagnosis.sales_range ?? "",
         diagnosis.source ?? "",
         getLeadSourceLabel(diagnosis.lead_source),
@@ -115,6 +158,11 @@ export async function GET(request: Request) {
         formatNullableDate(diagnosis.detailed_completed_at),
         diagnosis.total_score ?? "",
         ...DIAGNOSIS_V2_SECTIONS.map((section) => diagnosis.axis_scores[section.id] ?? ""),
+        diagnosis.specialty_score ?? "",
+        diagnosis.specialty_summary?.strengths.join(" / ") ?? "",
+        diagnosis.specialty_summary?.priorities.join(" / ") ?? "",
+        diagnosis.specialty_summary?.kpis.join(" / ") ?? "",
+        diagnosis.specialty_summary?.plan90Days.join(" / ") ?? "",
         diagnosis.judgment ?? "",
         diagnosis.critical_flags.join(" / "),
         diagnosis.consultation_requested ? "希望あり" : "希望なし",
@@ -129,8 +177,15 @@ export async function GET(request: Request) {
         diagnosis.loss_reason ?? "",
         formatNullableDate(diagnosis.next_action_at),
         diagnosis.admin_notes ?? "",
+        diagnosis.feedback_clarity ?? "",
+        diagnosis.feedback_accuracy ?? "",
+        diagnosis.feedback_usefulness ?? "",
+        formatFeedbackInterest(diagnosis.feedback_consultation_interest),
+        diagnosis.feedback_comment ?? "",
+        formatNullableDate(diagnosis.feedback_submitted_at),
         ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
         ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => getDiagnosisV2OptionLabel(question.id, diagnosis.detailed_answers[question.id])),
+        ...ALL_SPECIALTY_QUESTIONS.map((question) => diagnosis.specialty_answers[question.id] === undefined ? "" : getSpecialtyQuestionLabel(question.id, diagnosis.specialty_answers[question.id])),
         "", "", "", "", "", "",
         ...SUPPLEMENTAL_ANSWER_FIELDS.map(() => "")
       ];
@@ -141,24 +196,41 @@ export async function GET(request: Request) {
       formatDiagnosisDate(rawDiagnosis.created_at),
       rawDiagnosis.company_name ?? "",
       rawDiagnosis.name,
-      "", "", "",
+      "",
+      "",
+      "",
       rawDiagnosis.phone ?? "",
       rawDiagnosis.email,
-      "", "", "",
+      "",
+      "",
+      "",
       getAnswerLabel("business_type", rawDiagnosis.business_type),
+      ...Array(10).fill(""),
       getAnswerLabel("monthly_sales", rawDiagnosis.monthly_sales),
       "",
       getLeadSourceLabel(rawDiagnosis.lead_source),
       rawDiagnosis.source_campaign ?? "",
       "", "", "",
       ...DIAGNOSIS_V2_SECTIONS.map(() => ""),
-      "", "",
+      ...Array(5).fill(""),
+      "",
+      "",
       CONSULTATION_LABELS[rawDiagnosis.wants_consultation] ?? rawDiagnosis.wants_consultation,
-      "", "", rawDiagnosis.preferred_contact_time ?? "", "",
-      "", getLeadStatusLabel(rawDiagnosis.lead_status), "", "", "", "",
+      "",
+      "",
+      rawDiagnosis.preferred_contact_time ?? "",
+      "",
+      "",
+      getLeadStatusLabel(rawDiagnosis.lead_status),
+      "",
+      "",
+      "",
+      "",
       rawDiagnosis.admin_memo ?? "",
+      ...Array(6).fill(""),
       ...QUICK_DIAGNOSIS_QUESTIONS.map(() => ""),
       ...DETAILED_DIAGNOSIS_QUESTIONS.map(() => ""),
+      ...ALL_SPECIALTY_QUESTIONS.map(() => ""),
       DIAGNOSIS_TYPES[rawDiagnosis.main_type].name,
       DIAGNOSIS_TYPES[rawDiagnosis.sub_type].name,
       CONSULTATION_LABELS[rawDiagnosis.wants_consultation] ?? rawDiagnosis.wants_consultation,
@@ -180,21 +252,29 @@ export async function GET(request: Request) {
 
 function getFilters(params: URLSearchParams): AdminDiagnosisFilters {
   const consultation = params.get("consultation_requested") ?? "";
+  const feedbackSubmitted = params.get("feedback_submitted") ?? "";
+  const feedbackAccuracy = Number(params.get("feedback_accuracy") ?? "");
   const dateFrom = normalizeDateStart(params.get("date_from") ?? "");
   const dateTo = normalizeDateEnd(params.get("date_to") ?? "");
   const source = params.get("source") ?? "";
   const judgment = params.get("judgment") ?? "";
   const salesStatus = params.get("sales_status") ?? "";
   const dealStatus = params.get("deal_status") ?? "";
+  const leadSource = params.get("lead_source") ?? "";
   return {
     dateFrom,
     dateTo,
     prefecture: params.get("prefecture") || undefined,
+    leadSource: leadSource in LEAD_SOURCE_LABELS ? leadSource as LeadSource : undefined,
     source: SOURCES.includes(source) ? source : undefined,
     judgment: JUDGMENTS.includes(judgment as DiagnosisV2Judgment) ? judgment : undefined,
     consultationRequested: consultation === "true" ? true : consultation === "false" ? false : undefined,
     salesStatus: salesStatus in DIAGNOSIS_V2_SALES_STATUS_LABELS ? salesStatus : undefined,
-    dealStatus: dealStatus in DIAGNOSIS_V2_DEAL_STATUS_LABELS ? dealStatus : undefined
+    dealStatus: dealStatus in DIAGNOSIS_V2_DEAL_STATUS_LABELS ? dealStatus : undefined,
+    primaryTrade: PRIMARY_TRADE_OPTIONS.some((option) => option.value === params.get("primary_trade")) ? params.get("primary_trade") ?? undefined : undefined,
+    publicWorkIntent: PUBLIC_WORK_INTENT_OPTIONS.some((option) => option.value === params.get("public_work_intent")) ? params.get("public_work_intent") ?? undefined : undefined,
+    feedbackSubmitted: feedbackSubmitted === "true" ? true : feedbackSubmitted === "false" ? false : undefined,
+    feedbackAccuracy: Number.isInteger(feedbackAccuracy) && feedbackAccuracy >= 1 && feedbackAccuracy <= 5 ? feedbackAccuracy : undefined
   };
 }
 
@@ -212,4 +292,11 @@ function normalizeDateStart(value: string) {
 
 function normalizeDateEnd(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T23:59:59.999+09:00` : undefined;
+}
+
+function formatFeedbackInterest(value: string | null) {
+  if (value === "yes") return "はい";
+  if (value === "neutral") return "どちらともいえない";
+  if (value === "no") return "いいえ";
+  return "";
 }

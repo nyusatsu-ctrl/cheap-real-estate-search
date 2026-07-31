@@ -20,6 +20,12 @@ import {
   isConstructionManagementDiagnosis,
   normalizeConstructionManagementDiagnosis
 } from "@/lib/construction-diagnosis-v2/data";
+import {
+  PRIMARY_TRADE_OPTIONS,
+  PUBLIC_WORK_INTENT_OPTIONS,
+  getPrimaryTradeLabel,
+  getPublicWorkIntentLabel
+} from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { Download, Filter, LogOut } from "lucide-react";
 
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -82,6 +88,19 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
           <SelectFilter name="deal_status" label="成約状況" defaultValue={filters.dealStatus ?? ""}>
             {Object.entries(DIAGNOSIS_V2_DEAL_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectFilter>
+          <SelectFilter name="primary_trade" label="主な業態" defaultValue={filters.primaryTrade ?? ""}>
+            {PRIMARY_TRADE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </SelectFilter>
+          <SelectFilter name="public_work_intent" label="公共工事への意向" defaultValue={filters.publicWorkIntent ?? ""}>
+            {PUBLIC_WORK_INTENT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </SelectFilter>
+          <SelectFilter name="feedback_submitted" label="フィードバック" defaultValue={typeof filters.feedbackSubmitted === "boolean" ? String(filters.feedbackSubmitted) : ""}>
+            <option value="true">回答済み</option>
+            <option value="false">未回答</option>
+          </SelectFilter>
+          <SelectFilter name="feedback_accuracy" label="結果の正確性" defaultValue={filters.feedbackAccuracy ? String(filters.feedbackAccuracy) : ""}>
+            {[1, 2, 3, 4, 5].map((score) => <option key={score} value={score}>{score}点</option>)}
+          </SelectFilter>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white focus-ring">
@@ -94,10 +113,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-[1900px] divide-y divide-slate-200 text-sm">
+          <table className="min-w-[2250px] divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
               <tr>
-                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "URL流入元", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
+                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "URL流入元", "主な業態", "公共工事意向", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "結果正確性", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
                   <th key={header} className="whitespace-nowrap px-3 py-3">{header}</th>
                 ))}
               </tr>
@@ -115,12 +134,15 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                       <Cell>{diagnosis.phone}</Cell>
                       <Cell>{diagnosis.email}</Cell>
                       <Cell>{getLeadSourceLabel(diagnosis.lead_source)}</Cell>
+                      <Cell>{diagnosis.primary_trade ? getPrimaryTradeLabel(diagnosis.primary_trade) : "-"}</Cell>
+                      <Cell>{diagnosis.public_work_intent ? getPublicWorkIntentLabel(diagnosis.public_work_intent) : "-"}</Cell>
                       <Cell>{diagnosis.quick_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell>{diagnosis.detailed_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell bold>{diagnosis.total_score === null ? "-" : Number(diagnosis.total_score).toFixed(1)}</Cell>
                       <Cell bold>{diagnosis.judgment ?? "-"}</Cell>
                       <Cell>{diagnosis.critical_flags.length}件</Cell>
                       <Cell>{diagnosis.consultation_requested ? "希望あり" : "希望なし"}</Cell>
+                      <Cell>{diagnosis.feedback_accuracy === null ? "-" : `${diagnosis.feedback_accuracy}点`}</Cell>
                       <Cell>{formatNullableDate(diagnosis.meeting_at)}</Cell>
                       <Cell>{DIAGNOSIS_V2_SALES_STATUS_LABELS[diagnosis.sales_status]}</Cell>
                       <Cell>{DIAGNOSIS_V2_DEAL_STATUS_LABELS[diagnosis.deal_status]}</Cell>
@@ -140,12 +162,15 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                     <Cell>{rawDiagnosis.phone ?? "-"}</Cell>
                     <Cell>{rawDiagnosis.email}</Cell>
                     <Cell>{getLeadSourceLabel(rawDiagnosis.lead_source)}</Cell>
+                    <Cell>-</Cell>
+                    <Cell>-</Cell>
                     <Cell>旧診断</Cell>
                     <Cell>旧診断</Cell>
                     <Cell>-</Cell>
                     <Cell>{DIAGNOSIS_TYPES[rawDiagnosis.main_type].name}</Cell>
                     <Cell>-</Cell>
                     <Cell>{CONSULTATION_LABELS[rawDiagnosis.wants_consultation] ?? rawDiagnosis.wants_consultation}</Cell>
+                    <Cell>-</Cell>
                     <Cell>-</Cell>
                     <Cell>{getLeadStatusLabel(rawDiagnosis.lead_status)}</Cell>
                     <Cell>-</Cell>
@@ -156,7 +181,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                 );
               })}
               {diagnoses.length === 0 ? (
-                <tr><td colSpan={19} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">条件に一致する診断データはありません。</td></tr>
+                <tr><td colSpan={22} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">条件に一致する診断データはありません。</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -168,6 +193,8 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
 
 function getFilters(params: Record<string, string | string[] | undefined>): AdminDiagnosisFilters {
   const consultation = firstParam(params.consultation_requested);
+  const feedbackSubmitted = firstParam(params.feedback_submitted);
+  const feedbackAccuracy = Number(firstParam(params.feedback_accuracy));
   const dateFrom = normalizeDateStart(firstParam(params.date_from));
   const dateTo = normalizeDateEnd(firstParam(params.date_to));
   return {
@@ -182,7 +209,11 @@ function getFilters(params: Record<string, string | string[] | undefined>): Admi
     judgment: JUDGMENTS.includes(firstParam(params.judgment) as DiagnosisV2Judgment) ? firstParam(params.judgment) : undefined,
     consultationRequested: consultation === "true" ? true : consultation === "false" ? false : undefined,
     salesStatus: firstParam(params.sales_status) in DIAGNOSIS_V2_SALES_STATUS_LABELS ? firstParam(params.sales_status) : undefined,
-    dealStatus: firstParam(params.deal_status) in DIAGNOSIS_V2_DEAL_STATUS_LABELS ? firstParam(params.deal_status) : undefined
+    dealStatus: firstParam(params.deal_status) in DIAGNOSIS_V2_DEAL_STATUS_LABELS ? firstParam(params.deal_status) : undefined,
+    primaryTrade: PRIMARY_TRADE_OPTIONS.some((option) => option.value === firstParam(params.primary_trade)) ? firstParam(params.primary_trade) : undefined,
+    publicWorkIntent: PUBLIC_WORK_INTENT_OPTIONS.some((option) => option.value === firstParam(params.public_work_intent)) ? firstParam(params.public_work_intent) : undefined,
+    feedbackSubmitted: feedbackSubmitted === "true" ? true : feedbackSubmitted === "false" ? false : undefined,
+    feedbackAccuracy: Number.isInteger(feedbackAccuracy) && feedbackAccuracy >= 1 && feedbackAccuracy <= 5 ? feedbackAccuracy : undefined
   };
 }
 
@@ -197,6 +228,10 @@ function getFilterQuery(filters: AdminDiagnosisFilters) {
   if (typeof filters.consultationRequested === "boolean") params.set("consultation_requested", String(filters.consultationRequested));
   if (filters.salesStatus) params.set("sales_status", filters.salesStatus);
   if (filters.dealStatus) params.set("deal_status", filters.dealStatus);
+  if (filters.primaryTrade) params.set("primary_trade", filters.primaryTrade);
+  if (filters.publicWorkIntent) params.set("public_work_intent", filters.publicWorkIntent);
+  if (typeof filters.feedbackSubmitted === "boolean") params.set("feedback_submitted", String(filters.feedbackSubmitted));
+  if (filters.feedbackAccuracy) params.set("feedback_accuracy", String(filters.feedbackAccuracy));
   const query = params.toString();
   return query ? `?${query}` : "";
 }

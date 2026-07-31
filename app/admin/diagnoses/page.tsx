@@ -24,8 +24,10 @@ import {
   PRIMARY_TRADE_OPTIONS,
   PUBLIC_WORK_INTENT_OPTIONS,
   getPrimaryTradeLabel,
-  getPublicWorkIntentLabel
+  getPublicWorkIntentLabel,
+  type PrimaryTrade
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
+import { getDiagnosisV22FunnelSummary, type DiagnosisV22FunnelSummary } from "@/lib/construction-diagnosis-v2/sessions";
 import { Download, Filter, LogOut } from "lucide-react";
 
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -47,12 +49,16 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
 
   const params = await searchParams;
   const filters = getFilters(params);
-  const diagnoses = await getConstructionDiagnoses(filters);
+  const [diagnoses, funnel] = await Promise.all([
+    getConstructionDiagnoses(filters),
+    getDiagnosisV22FunnelSummary()
+  ]);
   const exportHref = `/admin/diagnoses/export${getFilterQuery(filters)}`;
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6">
       <AdminHeader email={admin.email} />
+      {funnel ? <DiagnosisFunnel summary={funnel} /> : null}
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-950">診断者一覧</h1>
@@ -189,6 +195,34 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
       </div>
     </div>
   );
+}
+
+function DiagnosisFunnel({ summary }: { summary: DiagnosisV22FunnelSummary }) {
+  const cards = [
+    ["短縮診断を始めた数", summary.started],
+    ["短縮診断を完了した数", summary.shortCompleted],
+    ["短縮診断の完了率", `${summary.shortCompletionRate}%`],
+    ["詳細診断へ進んだ数", summary.detailedStarted],
+    ["詳細診断を完了した数", summary.detailedCompleted],
+    ["連絡先未入力の診断", summary.activeAnonymous]
+  ];
+  return (
+    <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-lg font-black text-slate-950">v2.2 診断の進み具合</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {cards.map(([label, value]) => <div key={String(label)} className="rounded border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div>)}
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <FunnelList title="止まっている質問" items={summary.abandonedQuestions.map((item) => `${item.label}: ${item.count}件`)} />
+        <FunnelList title="業種別の完了率" items={summary.tradeStats.map((item) => `${getPrimaryTradeLabel(item.label as PrimaryTrade)}: ${item.completed}/${item.started}件（${item.rate}%）`)} />
+        <FunnelList title="端末・ブラウザ別の完了率" items={summary.deviceStats.map((item) => `${item.label}: ${item.completed}/${item.started}件（${item.rate}%）`)} />
+      </div>
+    </section>
+  );
+}
+
+function FunnelList({ title, items }: { title: string; items: string[] }) {
+  return <div className="rounded border border-slate-200 p-3"><h3 className="text-sm font-black text-slate-900">{title}</h3>{items.length > 0 ? <ul className="mt-2 grid gap-1 text-xs font-semibold leading-5 text-slate-600">{items.slice(0, 8).map((item) => <li key={item}>・{item}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500">該当なし</p>}</div>;
 }
 
 function getFilters(params: Record<string, string | string[] | undefined>): AdminDiagnosisFilters {

@@ -1,35 +1,34 @@
 export type DiagnosisV2StartFormValues = Record<string, string>;
 
+export const DIAGNOSIS_V22_EMPLOYEE_OPTIONS = ["1人", "2～5人", "6～10人", "11～30人", "31～50人", "51人以上"];
+export const DIAGNOSIS_V22_SALES_OPTIONS = [
+  "3,000万円未満",
+  "3,000万円以上1億円未満",
+  "1億円以上3億円未満",
+  "3億円以上5億円未満",
+  "5億円以上10億円未満",
+  "10億円以上",
+  "回答しない"
+];
+
 export const DIAGNOSIS_V2_BASIC_FIELD_ORDER = [
-  "company_name",
-  "respondent_name",
-  "prefecture",
-  "phone",
-  "email",
   "primary_trade",
-  "order_models",
-  "prime_ratio",
-  "subcontract_ratio",
-  "public_ratio",
-  "consumer_ratio",
-  "public_work_intent",
-  "privacy_consent"
+  "order_model",
+  "employee_range",
+  "sales_range",
+  "public_work_intent"
 ] as const;
 
 const REQUIRED_FIELDS: Array<{
   name: (typeof DIAGNOSIS_V2_BASIC_FIELD_ORDER)[number];
   message: string;
 }> = [
-  { name: "company_name", message: "会社名を入力してください" },
-  { name: "respondent_name", message: "回答者名を入力してください" },
-  { name: "prefecture", message: "都道府県を選択してください" },
-  { name: "phone", message: "電話番号を入力してください" },
-  { name: "email", message: "メールアドレスを入力してください" },
-  { name: "primary_trade", message: "主な業態・工事業種を選択してください" },
-  { name: "public_work_intent", message: "公共工事への意向を選択してください" }
+  { name: "primary_trade", message: "会社の主な業種を選んでください" },
+  { name: "order_model", message: "主な仕事の受け方を選んでください" },
+  { name: "employee_range", message: "従業員数を選んでください" },
+  { name: "sales_range", message: "年商区分を選んでください" },
+  { name: "public_work_intent", message: "公共工事への考えを選んでください" }
 ];
-
-const RATIO_FIELDS = ["prime_ratio", "subcontract_ratio", "public_ratio", "consumer_ratio"];
 
 export function sanitizeDiagnosisV2StartValues(input: unknown): DiagnosisV2StartFormValues {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
@@ -56,29 +55,6 @@ export function validateDiagnosisV2BasicStep(values: DiagnosisV2StartFormValues)
 
   for (const field of REQUIRED_FIELDS) {
     if (!values[field.name]?.trim()) errors[field.name] = field.message;
-  }
-
-  if (readDiagnosisV2MultiValue(values.order_models).length === 0) {
-    errors.order_models = "主な受注形態を1つ以上選択してください";
-  }
-  if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
-    errors.email = "メールアドレスの形式を確認してください";
-  }
-  if (values.website_url && !/^https?:\/\/[^\s]+$/i.test(values.website_url)) {
-    errors.website_url = "ホームページURLは http:// または https:// から入力してください";
-  }
-  if (values.founding_year && !/^\d{4}$/.test(values.founding_year)) {
-    errors.founding_year = "創業年は西暦4桁で入力してください";
-  }
-  if (values.privacy_consent !== "agreed") {
-    errors.privacy_consent = "個人情報の取扱いへの同意が必要です";
-  }
-
-  for (const field of RATIO_FIELDS) {
-    const value = values[field];
-    if (value && (!/^\d{1,3}$/.test(value) || Number(value) < 0 || Number(value) > 100)) {
-      errors[field] = "0～100の範囲で入力してください";
-    }
   }
 
   return errors;

@@ -3,6 +3,7 @@ import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnos
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
+  PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   type DiagnosisV2AnswerMap,
   type DiagnosisV2Judgment,
   type DiagnosisV2SectionId
@@ -90,6 +91,15 @@ export type ConstructionManagementDiagnosis = {
   detailed_completed_at: string | null;
   created_at: string;
   updated_at: string;
+  anonymous_session_id: string | null;
+  short_started_at: string | null;
+  short_last_step: number | null;
+  detailed_started_at: string | null;
+  detailed_last_step: number | null;
+  abandoned_stage: string | null;
+  abandoned_question_id: string | null;
+  device_type: string | null;
+  browser_family: string | null;
 };
 
 export const DIAGNOSIS_V2_SALES_STATUS_LABELS: Record<DiagnosisV2SalesStatus, string> = {
@@ -114,6 +124,7 @@ export function isConstructionManagementDiagnosis(value: unknown): value is Cons
   if (!value || typeof value !== "object") return false;
   const version = (value as { diagnosis_version?: unknown }).diagnosis_version;
   return version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
+    || version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
     || version === LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
 }
 
@@ -161,7 +172,16 @@ export function normalizeConstructionManagementDiagnosis(
     feedback_submitted_at: diagnosis.feedback_submitted_at ?? null,
     sales_status: diagnosis.sales_status ?? "uncontacted",
     deal_status: diagnosis.deal_status ?? "open",
-    consultation_requested: Boolean(diagnosis.consultation_requested)
+    consultation_requested: Boolean(diagnosis.consultation_requested),
+    anonymous_session_id: diagnosis.anonymous_session_id ?? null,
+    short_started_at: diagnosis.short_started_at ?? null,
+    short_last_step: diagnosis.short_last_step ?? null,
+    detailed_started_at: diagnosis.detailed_started_at ?? null,
+    detailed_last_step: diagnosis.detailed_last_step ?? null,
+    abandoned_stage: diagnosis.abandoned_stage ?? null,
+    abandoned_question_id: diagnosis.abandoned_question_id ?? null,
+    device_type: diagnosis.device_type ?? null,
+    browser_family: diagnosis.browser_family ?? null
   };
 }
 

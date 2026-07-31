@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
+import { getDiagnosisV22Session, type DiagnosisV22Session } from "@/lib/construction-diagnosis-v2/sessions";
+import { getShortAxisLabel } from "@/lib/construction-diagnosis-v2/short-result";
 import { QUICK_CATEGORY_LABELS, type QuickDiagnosisCategory } from "@/lib/construction-diagnosis-v2/questions";
 import { getPrimaryTradeLabel, getPublicWorksScoringMode } from "@/lib/construction-diagnosis-v2/specialty-questions";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { DiagnosisV22ResultActions } from "@/components/diagnoses/v2/DiagnosisV22ResultActions";
+import { ArrowRight, CalendarRange, CheckCircle2, CircleAlert, Gauge, ListChecks } from "lucide-react";
 
 export default async function DiagnosisV2QuickResultPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await getDiagnosisV22Session(id);
+  if (session?.short_completed_at && session.short_result) return <DiagnosisV22QuickResult session={session} />;
   const diagnosis = await getConstructionManagementDiagnosis(id);
   if (!diagnosis?.quick_completed_at) notFound();
 
@@ -74,4 +79,45 @@ export default async function DiagnosisV2QuickResultPage({ params }: { params: P
       </div>
     </div>
   );
+}
+
+function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) {
+  const result = session.short_result!;
+  const axisScores = Object.entries(session.short_axis_scores);
+  return (
+    <div className="bg-slate-50">
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-5xl px-4 py-8">
+          <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-brand-700">3分経営診断結果</p><span className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800">テスト版</span></div>
+          <h1 className="mt-3 text-3xl font-black text-slate-950">今の会社の状態</h1>
+          <p className="mt-3 text-sm leading-7 text-slate-700">短い質問から、先に確認したいことを整理しました。会社名や連絡先を入力しなくても、ここまで確認できます。</p>
+          <div className="mt-5 rounded-lg border border-brand-200 bg-brand-50 p-5"><p className="text-sm font-bold text-brand-800">総合点</p><p className="mt-1 text-4xl font-black text-slate-950">{result.totalScore.toFixed(1)}点</p></div>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2"><Gauge className="h-5 w-5 text-brand-700" /><h2 className="text-xl font-black text-slate-950">確認した分野の点数</h2></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {axisScores.map(([section, score]) => <div key={section} className="rounded border border-slate-200 bg-slate-50 p-3"><div className="flex justify-between gap-3 text-sm"><span className="font-bold text-slate-700">{getShortAxisLabel(section as Parameters<typeof getShortAxisLabel>[0])}</span><span className="font-black text-slate-950">{Number(score).toFixed(1)}点</span></div></div>)}
+          </div>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <QuickSection title="主な強み" items={result.strengths} tone="positive" />
+          <QuickSection title="最優先で確認すること" items={result.priorities} tone="warning" />
+        </div>
+        <QuickSection title="この工事業種で毎月見る数字" items={result.monthlyNumbers} icon={<ListChecks className="h-5 w-5 text-brand-700" />} />
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><CircleAlert className="h-5 w-5 text-brand-700" /><h2 className="text-xl font-black text-slate-950">公共工事への現在地</h2></div><p className="mt-3 text-sm font-semibold leading-7 text-slate-700">{result.publicWorksStatus}</p></section>
+        <QuickSection title="今後30日間に行うこと" items={result.actions30Days} icon={<CalendarRange className="h-5 w-5 text-brand-700" />} />
+        <DiagnosisV22ResultActions sessionId={session.id} alreadySaved={Boolean(session.diagnosis_id)} />
+        <p className="rounded border border-slate-200 bg-white p-4 text-xs font-semibold leading-6 text-slate-600">{result.disclaimer}</p>
+      </div>
+    </div>
+  );
+}
+
+function QuickSection({ title, items, tone = "default", icon }: { title: string; items: string[]; tone?: "default" | "positive" | "warning"; icon?: React.ReactNode }) {
+  const dot = tone === "positive" ? "bg-emerald-600" : tone === "warning" ? "bg-amber-600" : "bg-brand-700";
+  return <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center gap-2">{icon}<h2 className="text-xl font-black text-slate-950">{title}</h2></div><ul className="mt-3 grid gap-2">{items.map((item) => <li key={item} className="flex gap-3 text-sm font-semibold leading-7 text-slate-700"><span className={`mt-2.5 h-2 w-2 shrink-0 rounded-full ${dot}`} />{item}</li>)}</ul></section>;
 }

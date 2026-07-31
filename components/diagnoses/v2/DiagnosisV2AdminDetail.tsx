@@ -6,13 +6,13 @@ import {
   DIAGNOSIS_V2_SALES_STATUS_LABELS
 } from "@/lib/construction-diagnosis-v2/data";
 import {
-  CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   DIAGNOSIS_V2_QUESTION_BY_ID,
   DIAGNOSIS_V2_SECTIONS,
   QUICK_DIAGNOSIS_QUESTIONS,
   getApplicableDetailedQuestions,
   getDiagnosisV2OptionLabel,
-  getQuickDiagnosisOptionLabel
+  getQuickDiagnosisOptionLabel,
+  isSpecialtyConstructionDiagnosisVersion
 } from "@/lib/construction-diagnosis-v2/questions";
 import {
   getShortDiagnosisOptionLabel,
@@ -30,11 +30,11 @@ import { formatDiagnosisDate, getLeadSourceLabel } from "@/lib/construction-diag
 
 export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionManagementDiagnosis }) {
   const result = diagnosis.diagnosis_result;
-  const isV21 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
-  const applicableQuestions = getApplicableDetailedQuestions(isV21
+  const hasSpecialty = isSpecialtyConstructionDiagnosisVersion(diagnosis.diagnosis_version);
+  const applicableQuestions = getApplicableDetailedQuestions(hasSpecialty
     ? { primaryTrade: diagnosis.primary_trade, publicWorkIntent: diagnosis.public_work_intent, includeSpecialty: true }
     : { includeSpecialty: false });
-  const specialtyQuestionIds = new Set(isV21 ? getSpecialtyQuestions(diagnosis.primary_trade).map((question) => question.id) : []);
+  const specialtyQuestionIds = new Set(hasSpecialty ? getSpecialtyQuestions(diagnosis.primary_trade).map((question) => question.id) : []);
   const usesShortDiagnosis = hasShortDiagnosisAnswers(diagnosis.quick_answers);
   const quickQuestions = usesShortDiagnosis
     ? getShortDiagnosisQuestions({
@@ -69,7 +69,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="従業員数" value={diagnosis.employee_range ?? "-"} />
             <Info label="創業年" value={diagnosis.founding_year ? String(diagnosis.founding_year) : "-"} />
             <Info label="主な工事業種" value={diagnosis.main_business ?? "-"} />
-            {isV21 ? (
+            {hasSpecialty ? (
               <>
                 <Info label="主な業態" value={getPrimaryTradeLabel(diagnosis.primary_trade)} />
                 <Info label="副業種" value={diagnosis.secondary_trades.length > 0 ? diagnosis.secondary_trades.map(getPrimaryTradeLabel).join(" / ") : "-"} />
@@ -83,6 +83,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="年商区分" value={diagnosis.sales_range ?? "-"} />
             <Info label="URL流入元" value={getLeadSourceLabel(diagnosis.lead_source)} />
             <Info label="診断を知ったきっかけ" value={diagnosis.source ?? "-"} />
+            <Info label="端末・ブラウザ" value={`${diagnosis.device_type ?? "不明"} / ${diagnosis.browser_family ?? "不明"}`} />
           </AdminSection>
 
           <AdminSection title="相談・商談管理">
@@ -145,7 +146,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             </AdminSection>
           ) : null}
 
-          {isV21 ? (
+          {hasSpecialty ? (
             <AdminSection title="テストフィードバック">
               <Info label="回答状況" value={diagnosis.feedback_submitted_at ? `回答済み（${formatDiagnosisDate(diagnosis.feedback_submitted_at)}）` : "未回答"} />
               <Info label="質問の分かりやすさ" value={formatFeedbackRating(diagnosis.feedback_clarity)} />
@@ -197,7 +198,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             ))}
           </AdminSection>
 
-          {isV21 ? (
+          {hasSpecialty ? (
             <AdminSection title="業態別回答">
               <div className="divide-y divide-slate-200">
                 {applicableQuestions.filter((question) => specialtyQuestionIds.has(question.id)).map((question) => (

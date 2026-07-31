@@ -81,11 +81,20 @@ export const ORDER_MODEL_OPTIONS: Array<{ value: OrderModel; label: string }> = 
   { value: "other", label: "その他" }
 ];
 
+export const DIAGNOSIS_V22_ORDER_MODEL_OPTIONS: Array<{ value: OrderModel; label: string }> = [
+  { value: "consumer_direct", label: "個人のお客様から直接受注" },
+  { value: "private_prime", label: "会社から直接受注" },
+  { value: "subcontract", label: "建設会社や工務店から下請受注" },
+  { value: "municipal_public", label: "公共工事" },
+  { value: "property_management", label: "管理会社や不動産会社から受注" },
+  { value: "other", label: "その他" }
+];
+
 export const PUBLIC_WORK_INTENT_OPTIONS: Array<{ value: PublicWorkIntent; label: string }> = [
-  { value: "participating", label: "現在すでに参加している" },
-  { value: "expand_within_year", label: "今後1年以内に参加・拡大したい" },
-  { value: "interested_unscheduled", label: "関心はあるが時期は未定" },
-  { value: "not_interested", label: "現時点では希望しない" },
+  { value: "participating", label: "現在参加している" },
+  { value: "expand_within_year", label: "1年以内に参加または参加先を増やしたい" },
+  { value: "interested_unscheduled", label: "関心はある" },
+  { value: "not_interested", label: "今のところ希望しない" },
   { value: "unknown", label: "分からない" }
 ];
 
@@ -216,7 +225,7 @@ const ACTION_BY_QUESTION: Record<string, string> = {
   R02: "見積に含む範囲、含まない範囲、追加工事の承認方法を契約書または確認書へ明記する。",
   R03: "複数の職人の担当、日程、材料注文、お客様への連絡を一つの表で管理する。",
   R04: "外注費、材料代、追加工事、入金時期、完成時に残る利益を工事ごとに更新する。",
-  R05: "引渡し検査、クレーム、手直し、保証対応を案件単位で記録する。",
+  R05: "完成確認、苦情、手直し、保証対応を工事ごとに記録する。",
   SC01: "足場材と部品に番号を付け、現場への持ち出し、返却、破損、紛失を記録する。",
   SC02: "面積、高さ、形状、運搬距離、人員を含む標準見積基準を作る。",
   SC03: "資格、作業手順、落下防止、作業前点検を記録し、安全上の不足を最初に直す。",

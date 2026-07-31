@@ -5,6 +5,7 @@ import type { ConstructionManagementDiagnosis } from "@/lib/construction-diagnos
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   DIAGNOSIS_V2_SECTIONS,
+  isSpecialtyConstructionDiagnosisVersion,
   type DiagnosisV2ScoringContext
 } from "@/lib/construction-diagnosis-v2/questions";
 import { buildDiagnosisV2Result } from "@/lib/construction-diagnosis-v2/results";
@@ -26,8 +27,9 @@ export function DiagnosisV2ResultView({
   diagnosis: ConstructionManagementDiagnosis;
   printMode?: boolean;
 }) {
-  const isV21 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
-  const context: DiagnosisV2ScoringContext = isV21
+  const hasSpecialty = isSpecialtyConstructionDiagnosisVersion(diagnosis.diagnosis_version);
+  const isV22 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+  const context: DiagnosisV2ScoringContext = hasSpecialty
     ? {
         primaryTrade: diagnosis.primary_trade,
         publicWorkIntent: diagnosis.public_work_intent,
@@ -47,7 +49,7 @@ export function DiagnosisV2ResultView({
     );
   }
 
-  const result = isV21
+  const result = hasSpecialty
     ? buildDiagnosisV2Result(diagnosis.detailed_answers, scoring, context)
     : diagnosis.diagnosis_result ?? buildDiagnosisV2Result(diagnosis.detailed_answers, scoring, context);
   const shouldRecommendConsultation = [
@@ -115,27 +117,27 @@ export function DiagnosisV2ResultView({
           </div>
         </ResultSection>
 
-        {isV21 && result.specialty ? (
-          <ResultSection title="御社の業態別重要指標" icon={<Building2 className="h-5 w-5 text-brand-700" />}>
+        {hasSpecialty && result.specialty ? (
+          <ResultSection title={isV22 ? "この工事業種で確認すること" : "御社の業態別重要指標"} icon={<Building2 className="h-5 w-5 text-brand-700" />}>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <ProfileMetric label="主な業態" value={getPrimaryTradeLabel(diagnosis.primary_trade)} />
               <ProfileMetric label="主な受注形態" value={diagnosis.order_models.length > 0 ? diagnosis.order_models.map(getOrderModelLabel).join(" / ") : "未回答"} />
-              <ProfileMetric label="自社施工比率" value={diagnosis.self_perform_ratio ?? "未回答"} />
-              <ProfileMetric label="主な工事金額" value={diagnosis.average_project_size ?? "未回答"} />
+              {!isV22 ? <ProfileMetric label="自社施工比率" value={diagnosis.self_perform_ratio ?? "未回答"} /> : null}
+              {!isV22 ? <ProfileMetric label="主な工事金額" value={diagnosis.average_project_size ?? "未回答"} /> : null}
               <ProfileMetric label="公共工事への意向" value={getPublicWorkIntentLabel(diagnosis.public_work_intent)} />
               <ProfileMetric label="業態別質問の評価" value={`${result.specialty.score.toFixed(1)}点`} />
             </div>
-            <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4">
+            {!isV22 ? <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4">
               <h3 className="text-sm font-black text-slate-950">売上構成</h3>
               <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">お客様から直接受ける工事 {formatRatio(diagnosis.prime_ratio)} / 他の建設会社から受ける工事 {formatRatio(diagnosis.subcontract_ratio)} / 公共工事 {formatRatio(diagnosis.public_ratio)} / 個人客 {formatRatio(diagnosis.consumer_ratio)}</p>
-            </div>
+            </div> : null}
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
               <div>
-                <h3 className="text-sm font-black text-slate-950">業態特有の強み</h3>
+                <h3 className="text-sm font-black text-slate-950">{isV22 ? "この工事業種の強み" : "業態特有の強み"}</h3>
                 <ResultItemList items={result.specialty.strengths} tone="positive" />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-950">業態特有の優先課題</h3>
+                <h3 className="text-sm font-black text-slate-950">{isV22 ? "この工事業種で先に確認すること" : "業態特有の優先課題"}</h3>
                 <ResultItemList items={result.specialty.priorities} tone="warning" />
               </div>
             </div>
@@ -145,7 +147,7 @@ export function DiagnosisV2ResultView({
                 <ResultItemList items={result.specialty.kpis} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-950">90日間の業態別改善策</h3>
+                <h3 className="text-sm font-black text-slate-950">{isV22 ? "この工事業種で90日間に行うこと" : "90日間の業態別改善策"}</h3>
                 <ResultItemList items={result.specialty.plan90Days} />
               </div>
             </div>
@@ -224,7 +226,7 @@ export function DiagnosisV2ResultView({
           </section>
         ) : null}
 
-        {!printMode && isV21 ? (
+        {!printMode && (hasSpecialty || isV22) ? (
           <DiagnosisV21FeedbackForm diagnosisId={diagnosis.id} submitted={Boolean(diagnosis.feedback_submitted_at)} />
         ) : null}
 

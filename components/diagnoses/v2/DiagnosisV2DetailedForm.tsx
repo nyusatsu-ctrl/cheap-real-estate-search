@@ -35,20 +35,28 @@ export function DiagnosisV2DetailedForm({
   diagnosisId,
   primaryTrade,
   publicWorkIntent,
-  includeSpecialty
+  includeSpecialty,
+  initialAnswers,
+  skippedQuestionIds,
+  trackProgress
 }: {
   diagnosisId: string;
   primaryTrade: PrimaryTrade | null;
   publicWorkIntent: PublicWorkIntent | null;
   includeSpecialty: boolean;
+  initialAnswers: Record<string, string>;
+  skippedQuestionIds: string[];
+  trackProgress: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(submitDiagnosisV2DetailedAction, INITIAL_STATE);
-  const storageKey = `construction-management-diagnosis-v2-1-details-${diagnosisId}`;
+  const storageKey = `construction-management-diagnosis-v2-2-details-${diagnosisId}`;
   const sectionStorageKey = `${storageKey}-section`;
   const [sectionIndex, setSectionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [storageRestored, setStorageRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const [progressError, setProgressError] = useState("");
+  const [savingProgress, setSavingProgress] = useState(false);
   const submittingRef = useRef(false);
   const fieldErrors = useMemo(
     () => ({ ...(state.fieldErrors ?? {}), ...clientErrors }),
@@ -61,9 +69,12 @@ export function DiagnosisV2DetailedForm({
   }), [includeSpecialty, primaryTrade, publicWorkIntent]);
   const publicWorksMode = publicWorkIntent ? getPublicWorksScoringMode(publicWorkIntent) : "included";
   const applicableQuestions = useMemo(() => getApplicableDetailedQuestions(context), [context]);
+  const skippedIds = useMemo(() => new Set(skippedQuestionIds), [skippedQuestionIds]);
+  const displayedQuestions = useMemo(() => applicableQuestions.filter((question) => !skippedIds.has(question.id)), [applicableQuestions, skippedIds]);
   const steps = useMemo<DetailedStep[]>(() => {
     const commonSteps = DIAGNOSIS_V2_SECTIONS.flatMap((section) => {
       const questions = getApplicableQuestionsForSection(section.id, context)
+        .filter((question) => !skippedIds.has(question.id))
         .filter((question) => !getSpecialtyQuestions(primaryTrade).some((specialty) => specialty.id === question.id));
       return questions.length > 0 ? [{
         id: section.id,
@@ -78,9 +89,9 @@ export function DiagnosisV2DetailedForm({
       id: "specialty",
       label: `${getPrimaryTradeLabel(primaryTrade)}の業態別診断`,
       description: "この工事業種でかかる費用、工事の進め方、仕事の取り方、安全、書類の管理を確認します。",
-      questions: getSpecialtyQuestions(primaryTrade)
+      questions: getSpecialtyQuestions(primaryTrade).filter((question) => !skippedIds.has(question.id))
     }];
-  }, [context, includeSpecialty, primaryTrade, publicWorksMode]);
+  }, [context, includeSpecialty, primaryTrade, publicWorksMode, skippedIds]);
   const questionPages = useMemo(() => steps.flatMap((step, stepIndex) =>
     Array.from({ length: Math.ceil(step.questions.length / QUESTIONS_PER_PAGE) }, (_, pageIndex) => ({
       step,
@@ -92,14 +103,15 @@ export function DiagnosisV2DetailedForm({
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const applicableIds = new Set(applicableQuestions.map((question) => question.id));
-      setAnswers(Object.fromEntries(
-        Object.entries(readStoredAnswers(storageKey)).filter(([questionId]) => applicableIds.has(questionId))
-      ));
+      setAnswers({
+        ...initialAnswers,
+        ...Object.fromEntries(Object.entries(readStoredAnswers(storageKey)).filter(([questionId]) => applicableIds.has(questionId)))
+      });
       setSectionIndex(readStoredSection(sectionStorageKey, questionPages.length));
       setStorageRestored(true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [applicableQuestions, questionPages.length, sectionStorageKey, storageKey]);
+  }, [applicableQuestions, initialAnswers, questionPages.length, sectionStorageKey, storageKey]);
 
   useEffect(() => {
     if (storageRestored) writeSessionStorage(storageKey, JSON.stringify(answers));
@@ -111,7 +123,7 @@ export function DiagnosisV2DetailedForm({
 
   const currentPage = questionPages[sectionIndex] ?? questionPages[0];
   const currentStep = currentPage?.step;
-  const completedCount = applicableQuestions.filter((question) => Boolean(answers[question.id])).length;
+  const completedCount = displayedQuestions.filter((question) => Boolean(answers[question.id])).length;
 
   const validatePage = (index: number) => {
     const errors: Record<string, string> = {};
@@ -123,8 +135,20 @@ export function DiagnosisV2DetailedForm({
     return Object.keys(errors).length === 0;
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     if (!validatePage(sectionIndex)) return;
+    if (trackProgress) {
+      setSavingProgress(true);
+      setProgressError("");
+      try {
+        await saveDetailedProgress(diagnosisId, sectionIndex + 1, answers, currentPage.questions.at(-1)?.id);
+      } catch (error) {
+        setProgressError(error instanceof Error ? error.message : "途中の回答を保存できませんでした。回答はこの画面に残っています。もう一度押してください。");
+        setSavingProgress(false);
+        return;
+      }
+      setSavingProgress(false);
+    }
     setSectionIndex((current) => Math.min(current + 1, questionPages.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -183,7 +207,7 @@ export function DiagnosisV2DetailedForm({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-black text-brand-700">詳細診断 8分野＋業態別・{applicableQuestions.length}問</p>
+              <p className="text-sm font-black text-brand-700">詳しい診断 8分野＋業態別・追加{displayedQuestions.length}問</p>
               <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-black text-amber-800">テスト版</span>
             </div>
             <h1 className="mt-1 text-2xl font-black text-slate-950">{currentStep.label}</h1>
@@ -193,7 +217,7 @@ export function DiagnosisV2DetailedForm({
             ) : null}
           </div>
           <div className="text-sm font-bold text-slate-600">
-            <p>{completedCount} / {applicableQuestions.length}問 回答済み</p>
+            <p>{completedCount} / {displayedQuestions.length}問 回答済み</p>
             <p className="mt-1 text-brand-800">{sectionIndex + 1} / {questionPages.length}ページ</p>
           </div>
         </div>
@@ -216,6 +240,8 @@ export function DiagnosisV2DetailedForm({
           {state.formError}
         </div>
       ) : null}
+
+      {progressError ? <div className="mt-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800" role="alert">{progressError}</div> : null}
 
       {Object.keys(clientErrors).length > 0 ? (
         <div className="mt-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
@@ -278,8 +304,8 @@ export function DiagnosisV2DetailedForm({
           前の質問
         </button>
         {sectionIndex < questionPages.length - 1 ? (
-          <button type="button" onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring">
-            次の質問へ
+          <button type="button" disabled={savingProgress} onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
+            {savingProgress ? "保存中です…" : "次の質問へ"}
             <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
@@ -335,6 +361,17 @@ function writeSessionStorage(storageKey: string, value: string) {
   } catch {
     // Form input remains usable when storage is unavailable or full.
   }
+}
+
+async function saveDetailedProgress(sessionId: string, step: number, answers: Record<string, string>, questionId?: string) {
+  const response = await fetch("/api/diagnosis/v2-progress", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "progress", stage: "detailed", sessionId, step, answers, questionId })
+  });
+  if (response.ok) return;
+  const result = await response.json().catch(() => ({})) as { error?: string };
+  throw new Error(result.error || "途中の回答を保存できませんでした。回答はこの画面に残っています。もう一度押してください。");
 }
 
 function scrollToDetailedError(errors: Record<string, string>) {

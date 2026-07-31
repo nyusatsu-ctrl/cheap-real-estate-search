@@ -5,7 +5,9 @@ import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
+  LEAD_SOURCE_LABELS,
   type AdminDiagnosisFilters,
+  type LeadSource,
   formatDiagnosisDate,
   getConstructionDiagnoses,
   getLeadSourceLabel,
@@ -31,6 +33,7 @@ const JUDGMENTS: DiagnosisV2Judgment[] = [
 ];
 
 const SOURCES = ["テレアポ", "ダイレクトメール", "紹介", "Web広告", "SEO", "YouTube", "その他"];
+const LEAD_SOURCES = Object.entries(LEAD_SOURCE_LABELS) as [LeadSource, string][];
 
 export default async function AdminDiagnosesPage({ searchParams }: { searchParams: AdminDiagnosesSearchParams }) {
   const admin = await getCurrentDiagnosisAdmin();
@@ -60,7 +63,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
           <TextFilter name="date_from" label="診断日（開始）" type="date" defaultValue={firstParam(params.date_from)} />
           <TextFilter name="date_to" label="診断日（終了）" type="date" defaultValue={firstParam(params.date_to)} />
           <TextFilter name="prefecture" label="都道府県" defaultValue={filters.prefecture ?? ""} placeholder="例: 熊本県" />
-          <SelectFilter name="source" label="流入経路" defaultValue={filters.source ?? ""}>
+          <SelectFilter name="lead_source" label="URL流入元" defaultValue={filters.leadSource ?? ""}>
+            {LEAD_SOURCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </SelectFilter>
+          <SelectFilter name="source" label="申告経路" defaultValue={filters.source ?? ""}>
             {SOURCES.map((source) => <option key={source} value={source}>{source}</option>)}
           </SelectFilter>
           <SelectFilter name="judgment" label="支援判定" defaultValue={filters.judgment ?? ""}>
@@ -91,7 +97,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
           <table className="min-w-[1900px] divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
               <tr>
-                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "流入経路", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
+                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "URL流入元", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
                   <th key={header} className="whitespace-nowrap px-3 py-3">{header}</th>
                 ))}
               </tr>
@@ -108,7 +114,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                       <Cell>{diagnosis.prefecture}</Cell>
                       <Cell>{diagnosis.phone}</Cell>
                       <Cell>{diagnosis.email}</Cell>
-                      <Cell>{diagnosis.source ?? getLeadSourceLabel(diagnosis.lead_source)}</Cell>
+                      <Cell>{getLeadSourceLabel(diagnosis.lead_source)}</Cell>
                       <Cell>{diagnosis.quick_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell>{diagnosis.detailed_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell bold>{diagnosis.total_score === null ? "-" : Number(diagnosis.total_score).toFixed(1)}</Cell>
@@ -169,6 +175,9 @@ function getFilters(params: Record<string, string | string[] | undefined>): Admi
     dateFrom,
     dateTo,
     prefecture: firstParam(params.prefecture) || undefined,
+    leadSource: LEAD_SOURCES.some(([value]) => value === firstParam(params.lead_source))
+      ? firstParam(params.lead_source) as LeadSource
+      : undefined,
     source: SOURCES.includes(firstParam(params.source)) ? firstParam(params.source) : undefined,
     judgment: JUDGMENTS.includes(firstParam(params.judgment) as DiagnosisV2Judgment) ? firstParam(params.judgment) : undefined,
     consultationRequested: consultation === "true" ? true : consultation === "false" ? false : undefined,
@@ -182,6 +191,7 @@ function getFilterQuery(filters: AdminDiagnosisFilters) {
   if (filters.dateFrom) params.set("date_from", filters.dateFrom.slice(0, 10));
   if (filters.dateTo) params.set("date_to", filters.dateTo.slice(0, 10));
   if (filters.prefecture) params.set("prefecture", filters.prefecture);
+  if (filters.leadSource) params.set("lead_source", filters.leadSource);
   if (filters.source) params.set("source", filters.source);
   if (filters.judgment) params.set("judgment", filters.judgment);
   if (typeof filters.consultationRequested === "boolean") params.set("consultation_requested", String(filters.consultationRequested));

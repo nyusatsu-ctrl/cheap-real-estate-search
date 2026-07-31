@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     "主な工事業種",
     "年商区分",
     "流入経路",
-    "広告流入元",
+    "URL流入元",
     "キャンペーン",
     "簡易診断完了日時",
     "詳細診断完了日時",

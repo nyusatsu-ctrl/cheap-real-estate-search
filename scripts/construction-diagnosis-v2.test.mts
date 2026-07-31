@@ -6,6 +6,10 @@ import {
   scoreDetailedDiagnosis,
   type DiagnosisV2AnswerMap
 } from "../lib/construction-diagnosis-v2/questions.ts";
+import {
+  getLeadSourceLabel,
+  normalizeLeadSource
+} from "../lib/diagnosis-lead-source.ts";
 
 function answersWithScore(score: number): DiagnosisV2AnswerMap {
   return Object.fromEntries(DETAILED_DIAGNOSIS_QUESTIONS.map((question) => [question.id, String(score)]));
@@ -49,6 +53,15 @@ test("case 1b: detailed diagnosis has the specified 8 sections and 34-question d
     Array.from({ length: 34 }, (_, index) => index + 1)
   );
   assert.equal(new Set(DETAILED_DIAGNOSIS_QUESTIONS.map((question) => question.id)).size, 34);
+});
+
+test("referral, aidma, and missing diagnosis sources are normalized without overlap", () => {
+  assert.equal(normalizeLeadSource("referral"), "referral");
+  assert.equal(getLeadSourceLabel("referral"), "紹介");
+  assert.equal(normalizeLeadSource("aidma"), "aidma");
+  assert.equal(getLeadSourceLabel("aidma"), "アイドマHD");
+  assert.equal(normalizeLeadSource(""), "direct");
+  assert.equal(getLeadSourceLabel(undefined), "直接");
 });
 
 test("case 2: critical controls score 0 even when other answers are high", () => {

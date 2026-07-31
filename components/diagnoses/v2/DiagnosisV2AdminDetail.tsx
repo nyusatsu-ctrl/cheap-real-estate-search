@@ -45,7 +45,8 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="創業年" value={diagnosis.founding_year ? String(diagnosis.founding_year) : "-"} />
             <Info label="主な工事業種" value={diagnosis.main_business ?? "-"} />
             <Info label="年商区分" value={diagnosis.sales_range ?? "-"} />
-            <Info label="流入経路" value={diagnosis.source ?? getLeadSourceLabel(diagnosis.lead_source)} />
+            <Info label="URL流入元" value={getLeadSourceLabel(diagnosis.lead_source)} />
+            <Info label="診断を知ったきっかけ" value={diagnosis.source ?? "-"} />
           </AdminSection>
 
           <AdminSection title="相談・商談管理">

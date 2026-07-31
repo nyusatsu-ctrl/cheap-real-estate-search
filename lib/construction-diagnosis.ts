@@ -1,7 +1,15 @@
 import { createDiagnosisSupabaseServerClient, createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
+import {
+  getLeadSourceLabel,
+  LEAD_SOURCE_LABELS,
+  normalizeLeadSource,
+  type LeadSource
+} from "@/lib/diagnosis-lead-source";
+
+export { getLeadSourceLabel, LEAD_SOURCE_LABELS, normalizeLeadSource };
+export type { LeadSource };
 
 export type DiagnosisTypeCode = "A" | "B" | "C" | "D" | "E" | "F" | "G";
-export type LeadSource = "aidma" | "meta" | "lp" | "referral" | "direct" | "other";
 export type SeminarInterest = "wants_to_join" | "wants_schedule" | "undecided" | "not_interested";
 export type LeadStatus =
   | "new"
@@ -205,15 +213,6 @@ export const CONSULTATION_LABELS: Record<string, string> = {
   maybe: "内容次第で検討したい",
   overview: "まずは全体像だけ知りたい",
   no: "今は不要"
-};
-
-export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
-  aidma: "アイドマHD",
-  meta: "Meta広告",
-  lp: "自社LP",
-  referral: "紹介",
-  direct: "直接",
-  other: "その他"
 };
 
 export const SEMINAR_INTEREST_LABELS: Record<SeminarInterest, string> = {
@@ -617,7 +616,6 @@ const FALLBACK_ANSWER_LABELS: Record<string, Record<string, string>> = {
 };
 
 const TYPE_ORDER: DiagnosisTypeCode[] = ["A", "B", "C", "D", "E", "F", "G"];
-const LEAD_SOURCE_VALUES = new Set<LeadSource>(["aidma", "meta", "lp", "referral", "direct", "other"]);
 const SEMINAR_INTEREST_VALUES = new Set<SeminarInterest>(["wants_to_join", "wants_schedule", "undecided", "not_interested"]);
 const LEAD_STATUS_VALUES = new Set<LeadStatus>([
   "new",
@@ -695,12 +693,6 @@ export function formatAnswerValue(value: DiagnosisAnswerValue | null | undefined
   return getAnswerValues(value).join("、");
 }
 
-export function normalizeLeadSource(value: string | null | undefined): LeadSource {
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (!normalized) return "direct";
-  return LEAD_SOURCE_VALUES.has(normalized as LeadSource) ? normalized as LeadSource : "other";
-}
-
 export function normalizeSeminarInterest(value: string | null | undefined): SeminarInterest {
   const normalized = String(value ?? "").trim();
   return SEMINAR_INTEREST_VALUES.has(normalized as SeminarInterest) ? normalized as SeminarInterest : "undecided";
@@ -709,10 +701,6 @@ export function normalizeSeminarInterest(value: string | null | undefined): Semi
 export function normalizeLeadStatus(value: string | null | undefined): LeadStatus {
   const normalized = String(value ?? "").trim();
   return LEAD_STATUS_VALUES.has(normalized as LeadStatus) ? normalized as LeadStatus : "new";
-}
-
-export function getLeadSourceLabel(value: string | null | undefined) {
-  return LEAD_SOURCE_LABELS[normalizeLeadSource(value)];
 }
 
 export function getSeminarInterestLabel(value: string | null | undefined) {

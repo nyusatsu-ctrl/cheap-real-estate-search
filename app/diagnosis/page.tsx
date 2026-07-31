@@ -29,10 +29,10 @@ export default async function DiagnosisFormPage({ searchParams }: { searchParams
               </div>
               <h1 className="mt-3 text-3xl font-black leading-tight text-slate-950 md:text-4xl">建設会社向け 経営診断・再成長戦略</h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
-                経営課題、利益管理、組織体制、公共工事への参入余地を無料で診断します。最初に基本情報と簡易診断10問へご回答ください。
+                会社のお金、工事で残る利益、社内の役割、公共工事の準備を無料で診断します。最初に基本情報と短縮診断へご回答ください。
               </p>
             </div>
-            <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">簡易診断: 約3分</div>
+            <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">短縮診断: 約5分</div>
           </div>
         </div>
       </section>

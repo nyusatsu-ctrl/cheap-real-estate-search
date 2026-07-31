@@ -24,6 +24,10 @@ import {
   type DiagnosisV2Judgment
 } from "@/lib/construction-diagnosis-v2/questions";
 import {
+  ALL_SHORT_DIAGNOSIS_QUESTIONS,
+  getShortDiagnosisOptionLabel
+} from "@/lib/construction-diagnosis-v2/short-questions";
+import {
   ALL_SPECIALTY_QUESTIONS,
   PRIMARY_TRADE_OPTIONS,
   PUBLIC_WORK_INTENT_OPTIONS,
@@ -71,8 +75,8 @@ export async function GET(request: Request) {
     "主な業態",
     "副業種",
     "主な受注形態",
-    "元請比率",
-    "下請比率",
+    "お客様から直接受ける工事の比率",
+    "他の建設会社から受ける工事の比率",
     "公共工事比率",
     "個人客比率",
     "自社施工比率",
@@ -89,7 +93,7 @@ export async function GET(request: Request) {
     "業態別スコア",
     "業態別の強み",
     "業態別の優先課題",
-    "業態別KPI",
+    "工事業種ごとに毎月確認する数字",
     "業態別90日改善策",
     "支援判定",
     "重大フラグ",
@@ -111,7 +115,8 @@ export async function GET(request: Request) {
     "フィードバック・相談意向",
     "フィードバック・自由入力",
     "フィードバック回答日時",
-    ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
+    ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => `旧簡易 ${question.id} ${question.question}`),
+    ...ALL_SHORT_DIAGNOSIS_QUESTIONS.map((question) => `短縮 ${question.id} ${question.question}`),
     ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
     ...ALL_SPECIALTY_QUESTIONS.map((question) => `${question.id} ${question.question}`),
     "旧診断タイプ",
@@ -183,7 +188,8 @@ export async function GET(request: Request) {
         formatFeedbackInterest(diagnosis.feedback_consultation_interest),
         diagnosis.feedback_comment ?? "",
         formatNullableDate(diagnosis.feedback_submitted_at),
-        ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
+        ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => diagnosis.quick_answers[question.id] === undefined ? "" : getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
+        ...ALL_SHORT_DIAGNOSIS_QUESTIONS.map((question) => diagnosis.quick_answers[question.id] === undefined ? "" : getShortDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
         ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => getDiagnosisV2OptionLabel(question.id, diagnosis.detailed_answers[question.id])),
         ...ALL_SPECIALTY_QUESTIONS.map((question) => diagnosis.specialty_answers[question.id] === undefined ? "" : getSpecialtyQuestionLabel(question.id, diagnosis.specialty_answers[question.id])),
         "", "", "", "", "", "",
@@ -229,6 +235,7 @@ export async function GET(request: Request) {
       rawDiagnosis.admin_memo ?? "",
       ...Array(6).fill(""),
       ...QUICK_DIAGNOSIS_QUESTIONS.map(() => ""),
+      ...ALL_SHORT_DIAGNOSIS_QUESTIONS.map(() => ""),
       ...DETAILED_DIAGNOSIS_QUESTIONS.map(() => ""),
       ...ALL_SPECIALTY_QUESTIONS.map(() => ""),
       DIAGNOSIS_TYPES[rawDiagnosis.main_type].name,

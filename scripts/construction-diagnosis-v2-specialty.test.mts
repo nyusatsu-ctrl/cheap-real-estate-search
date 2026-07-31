@@ -37,9 +37,9 @@ test("demolition without public works omits K questions and does not lose points
   assert.equal(scoring.complete, true);
   assert.equal(scoring.publicWorksMode, "excluded");
   assert.equal(scoring.axisScores.public_works, undefined);
-  assert.match(result.publicWorks.summary, /総合評価の対象外/);
+  assert.match(result.publicWorks.summary, /総合点に入れていません/);
   assert.equal(result.specialty?.trade, "demolition");
-  assert.ok(result.specialty?.plan90Days.some((item) => item.includes("標準見積表")));
+  assert.ok(result.specialty?.plan90Days.some((item) => item.includes("見積表")));
 });
 
 test("painting public interest is reference-only and exposes painting KPIs", () => {
@@ -54,7 +54,7 @@ test("painting public interest is reference-only and exposes painting KPIs", () 
   assert.equal(scoring.totalScore, 100);
   assert.equal(scoring.axisScores.public_works, 0);
   assert.equal(result.publicWorks.mode, "reference");
-  assert.ok(result.specialty?.kpis.includes("見積成約率"));
+  assert.ok(result.specialty?.kpis.includes("見積もりから契約になった割合"));
   assert.deepEqual(getSpecialtyQuestions("painting").map((question) => question.id), ["PA01", "PA02", "PA03", "PA04", "PA05"]);
 });
 
@@ -92,9 +92,9 @@ test("interior branch exposes labor, productivity, loss, and rework indicators",
   const scoring = scoreDetailedDiagnosis(answers, scoringContext);
   const result = buildDiagnosisV2Result(answers, scoring, scoringContext);
   assert.deepEqual(getSpecialtyQuestions("interior").map((question) => question.id), ["IN01", "IN02", "IN03", "IN04", "IN05"]);
-  assert.ok(result.specialty?.kpis.includes("1日当たり施工量"));
-  assert.ok(result.specialty?.kpis.includes("材料ロス率"));
-  assert.ok(result.specialty?.kpis.includes("手直し率"));
+  assert.ok(result.specialty?.kpis.includes("1日にできた作業量"));
+  assert.ok(result.specialty?.kpis.includes("無駄になった材料の割合"));
+  assert.ok(result.specialty?.kpis.includes("手直しの割合"));
 });
 
 test("other trades safely use the five common specialty questions", () => {

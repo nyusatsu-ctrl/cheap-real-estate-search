@@ -15,6 +15,11 @@ import {
   getQuickDiagnosisOptionLabel
 } from "@/lib/construction-diagnosis-v2/questions";
 import {
+  getShortDiagnosisOptionLabel,
+  getShortDiagnosisQuestions,
+  hasShortDiagnosisAnswers
+} from "@/lib/construction-diagnosis-v2/short-questions";
+import {
   getOrderModelLabel,
   getPrimaryTradeLabel,
   getPublicWorkIntentLabel,
@@ -30,6 +35,13 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
     ? { primaryTrade: diagnosis.primary_trade, publicWorkIntent: diagnosis.public_work_intent, includeSpecialty: true }
     : { includeSpecialty: false });
   const specialtyQuestionIds = new Set(isV21 ? getSpecialtyQuestions(diagnosis.primary_trade).map((question) => question.id) : []);
+  const usesShortDiagnosis = hasShortDiagnosisAnswers(diagnosis.quick_answers);
+  const quickQuestions = usesShortDiagnosis
+    ? getShortDiagnosisQuestions({
+        primaryTrade: diagnosis.primary_trade,
+        publicWorkIntent: diagnosis.public_work_intent
+      })
+    : QUICK_DIAGNOSIS_QUESTIONS;
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -62,7 +74,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
                 <Info label="主な業態" value={getPrimaryTradeLabel(diagnosis.primary_trade)} />
                 <Info label="副業種" value={diagnosis.secondary_trades.length > 0 ? diagnosis.secondary_trades.map(getPrimaryTradeLabel).join(" / ") : "-"} />
                 <Info label="受注形態" value={diagnosis.order_models.length > 0 ? diagnosis.order_models.map(getOrderModelLabel).join(" / ") : "-"} />
-                <Info label="売上構成" value={`元請 ${formatRatio(diagnosis.prime_ratio)} / 下請 ${formatRatio(diagnosis.subcontract_ratio)} / 公共 ${formatRatio(diagnosis.public_ratio)} / 個人客 ${formatRatio(diagnosis.consumer_ratio)}`} />
+                <Info label="売上構成" value={`直接受ける工事 ${formatRatio(diagnosis.prime_ratio)} / 他社から受ける工事 ${formatRatio(diagnosis.subcontract_ratio)} / 公共 ${formatRatio(diagnosis.public_ratio)} / 個人客 ${formatRatio(diagnosis.consumer_ratio)}`} />
                 <Info label="自社施工比率" value={diagnosis.self_perform_ratio ?? "-"} />
                 <Info label="主な工事金額" value={diagnosis.average_project_size ?? "-"} />
                 <Info label="公共工事への意向" value={getPublicWorkIntentLabel(diagnosis.public_work_intent)} />
@@ -124,7 +136,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
               <ResultBlock title="推奨アクション" items={[...result.plan90Days.month1, ...result.plan90Days.month2, ...result.plan90Days.month3]} />
               {result.specialty ? (
                 <>
-                  <ResultBlock title={`業態別重要指標（${result.specialty.score.toFixed(1)}点）`} items={result.specialty.kpis} />
+                  <ResultBlock title={`工事業種ごとに毎月確認する数字（${result.specialty.score.toFixed(1)}点）`} items={result.specialty.kpis} />
                   <ResultBlock title="業態別の強み" items={result.specialty.strengths} />
                   <ResultBlock title="業態別の優先課題" items={result.specialty.priorities} />
                   <ResultBlock title="業態別90日改善策" items={result.specialty.plan90Days} />
@@ -152,10 +164,17 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="備考" value={diagnosis.consultation_notes ?? "-"} />
           </AdminSection>
 
-          <AdminSection title="簡易診断回答">
+          <AdminSection title={usesShortDiagnosis ? "短縮診断回答" : "旧簡易診断回答"}>
             <div className="divide-y divide-slate-200">
-              {QUICK_DIAGNOSIS_QUESTIONS.map((question) => (
-                <AnswerRow key={question.id} id={question.id} question={question.question} answer={getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])} />
+              {quickQuestions.map((question) => (
+                <AnswerRow
+                  key={question.id}
+                  id={question.id}
+                  question={question.question}
+                  answer={usesShortDiagnosis
+                    ? getShortDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])
+                    : getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])}
+                />
               ))}
             </div>
           </AdminSection>

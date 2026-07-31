@@ -78,7 +78,7 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
             <h2 className="text-lg font-black text-slate-950">個別相談</h2>
           </div>
           <p className="mt-3 text-sm leading-7 text-slate-700">
-            診断結果をもとに、オープンカウンターから始めるべきか、建設業許可・経審・全省庁資格まで進めるべきかを整理できます。
+            診断結果をもとに、少額案件を簡単な手続きで申し込める方法から始めるか、建設業の許可、公共工事に必要な会社の審査、国の機関への登録まで進めるかを整理できます。
           </p>
           <a
             href={`mailto:${diagnosis.email}?subject=${encodeURIComponent("建設業売上アップ診断の個別相談")}`}
@@ -99,7 +99,7 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
             <p className="text-sm font-bold text-brand-700">公共工事参入支援</p>
             <h2 className="mt-2 text-xl font-black text-slate-950">御社に合う公共工事参入ルートを無料説明会で確認できます</h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700">
-              診断結果をもとに、オープンカウンターから始めるべきか、建設業許可・経審・全省庁資格まで進めるべきかを整理できます。
+              診断結果をもとに、少額案件を簡単な手続きで申し込める方法から始めるか、建設業の許可、公共工事に必要な会社の審査、国の機関への登録まで進めるかを整理できます。
             </p>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 md:mt-0 md:min-w-80 md:grid-cols-1">

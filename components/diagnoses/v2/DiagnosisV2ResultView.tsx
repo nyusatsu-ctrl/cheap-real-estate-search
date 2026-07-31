@@ -17,7 +17,7 @@ import {
 import { formatDiagnosisDate } from "@/lib/construction-diagnosis";
 import { AlertTriangle, ArrowRight, BarChart3, Building2, CalendarRange, CheckCircle2, ClipboardList, Route, ShieldCheck } from "lucide-react";
 
-const DISCLAIMER = "本診断は、入力内容に基づき、経営課題と今後の行動方針を整理するものです。税務、法務、労務、金融、建設業許可、入札参加資格等について、個別の専門判断を代替するものではありません。また、売上増加、利益改善、入札参加、落札等を保証するものではありません。";
+const DISCLAIMER = "この診断は、入力内容から会社の課題と、これから行うことを整理するものです。税金、法律、雇用、銀行、建設業の許可、公共工事への登録などについて、専門家の判断に代わるものではありません。売上や利益が増えること、公共工事に参加・受注できることを保証するものでもありません。";
 
 export function DiagnosisV2ResultView({
   diagnosis,
@@ -83,7 +83,7 @@ export function DiagnosisV2ResultView({
           {scoring.criticalFlags.length > 0 ? (
             <div className="mt-4 flex gap-3 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-7 text-red-900">
               <AlertTriangle className="mt-1 h-5 w-5 shrink-0" />
-              重大項目が{scoring.criticalFlags.length}件あります。受注拡大より先に、該当する経営基盤・法令・内部統制の事実確認を優先してください。
+              急いで確認する項目が{scoring.criticalFlags.length}件あります。仕事を増やす前に、会社のお金、安全、法律、お金や書類の確認方法を先に確認してください。
             </div>
           ) : null}
         </div>
@@ -99,7 +99,7 @@ export function DiagnosisV2ResultView({
                 <div key={section.id}>
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="font-bold text-slate-700">
-                      {section.label}
+                      {section.shortLabel}
                       {section.id === "public_works" && scoring.publicWorksMode === "reference" ? <span className="ml-2 text-xs text-sky-700">参考</span> : null}
                     </span>
                     <span className="font-black text-slate-950">{excluded || score === undefined ? "対象外" : `${score.toFixed(1)}点`}</span>
@@ -127,7 +127,7 @@ export function DiagnosisV2ResultView({
             </div>
             <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4">
               <h3 className="text-sm font-black text-slate-950">売上構成</h3>
-              <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">元請 {formatRatio(diagnosis.prime_ratio)} / 下請 {formatRatio(diagnosis.subcontract_ratio)} / 公共工事 {formatRatio(diagnosis.public_ratio)} / 個人客 {formatRatio(diagnosis.consumer_ratio)}</p>
+              <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">お客様から直接受ける工事 {formatRatio(diagnosis.prime_ratio)} / 他の建設会社から受ける工事 {formatRatio(diagnosis.subcontract_ratio)} / 公共工事 {formatRatio(diagnosis.public_ratio)} / 個人客 {formatRatio(diagnosis.consumer_ratio)}</p>
             </div>
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
               <div>
@@ -141,7 +141,7 @@ export function DiagnosisV2ResultView({
             </div>
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
               <div>
-                <h3 className="text-sm font-black text-slate-950">業態別に見るべきKPI</h3>
+                <h3 className="text-sm font-black text-slate-950">この工事業種で毎月確認する数字</h3>
                 <ResultItemList items={result.specialty.kpis} />
               </div>
               <div>
@@ -181,11 +181,11 @@ export function DiagnosisV2ResultView({
           <p className="mt-5 rounded border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-semibold leading-7 text-brand-950">{result.publicWorks.expansionPotential}</p>
         </ResultSection>
 
-        <ResultSection title="90日再成長戦略" icon={<CalendarRange className="h-5 w-5 text-brand-700" />}>
+        <ResultSection title="これから90日間に行うこと" icon={<CalendarRange className="h-5 w-5 text-brand-700" />}>
           <div className="grid gap-4 md:grid-cols-3">
             <MonthPlan month="1か月目" subtitle="事実確認・不足項目の一覧化" items={result.plan90Days.month1} />
-            <MonthPlan month="2か月目" subtitle="担当者・権限・申請・管理体制の整備" items={result.plan90Days.month2} />
-            <MonthPlan month="3か月目" subtitle="申請・案件探索・入札準備・KPI運用開始" items={result.plan90Days.month3} />
+            <MonthPlan month="2か月目" subtitle="担当者と社内の決まりを整える" items={result.plan90Days.month2} />
+            <MonthPlan month="3か月目" subtitle="申請、案件探し、毎月の確認を始める" items={result.plan90Days.month3} />
           </div>
         </ResultSection>
 

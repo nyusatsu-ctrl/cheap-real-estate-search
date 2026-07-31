@@ -8,13 +8,15 @@ import { normalizeLeadSource } from "@/lib/construction-diagnosis";
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
-  QUICK_DIAGNOSIS_QUESTIONS,
   getApplicableDetailedQuestions,
   scoreDetailedDiagnosis,
-  scoreQuickDiagnosis,
   type DiagnosisV2AnswerMap,
   type DiagnosisV2ScoringContext
 } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  getShortDiagnosisQuestions,
+  scoreShortDiagnosis
+} from "@/lib/construction-diagnosis-v2/short-questions";
 import { buildDiagnosisV2Result } from "@/lib/construction-diagnosis-v2/results";
 import {
   ALL_SPECIALTY_QUESTIONS,
@@ -92,18 +94,22 @@ export async function submitDiagnosisV2QuickAction(
   const consumerRatio = nullablePercentage(formData, "consumer_ratio", fieldErrors);
 
   const quickAnswers: DiagnosisV2AnswerMap = {};
-  for (const question of QUICK_DIAGNOSIS_QUESTIONS) {
+  const quickContext: DiagnosisV2ScoringContext = {
+    primaryTrade: primaryTrade ?? undefined,
+    publicWorkIntent: publicWorkIntent ?? undefined
+  };
+  for (const question of getShortDiagnosisQuestions(quickContext)) {
     const answer = getString(formData, question.id);
     if (!question.options.some((option) => option.value === answer)) {
-      fieldErrors[question.id] = "回答を選択してください";
+      fieldErrors[question.id] = "この質問に回答してください";
     } else {
       quickAnswers[question.id] = answer;
     }
   }
 
-  const quickResult = scoreQuickDiagnosis(quickAnswers);
+  const quickResult = scoreShortDiagnosis(quickAnswers, quickContext);
   if (!quickResult.complete) {
-    for (const id of quickResult.unanswered) fieldErrors[id] = "回答を選択してください";
+    for (const id of quickResult.unanswered) fieldErrors[id] = "この質問に回答してください";
   }
   if (Object.keys(fieldErrors).length > 0) {
     return {
@@ -115,7 +121,7 @@ export async function submitDiagnosisV2QuickAction(
   const supabase = createDiagnosisSupabaseServiceRoleClient();
   if (!supabase) {
     console.error("[diagnosis-v2] quick_submit_missing_service_client");
-    return { ...EMPTY_STATE, formError: "診断を保存できませんでした。時間をおいて再度お試しください。" };
+    return { ...EMPTY_STATE, formError: "診断を保存できませんでした。入力内容は消えていません。時間をおいて、もう一度押してください。" };
   }
 
   const now = new Date().toISOString();
@@ -198,7 +204,7 @@ export async function submitDiagnosisV2QuickAction(
       details: error.details,
       hint: error.hint
     });
-    return { ...EMPTY_STATE, formError: "診断を保存できませんでした。時間をおいて再度お試しください。" };
+    return { ...EMPTY_STATE, formError: "診断を保存できませんでした。入力内容は消えていません。時間をおいて、もう一度押してください。" };
   }
 
   await setDiagnosisV2Session(id);

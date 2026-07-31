@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:property-access": "node --no-warnings --test --experimental-strip-types scripts/property-access.test.mts",
-    "test:diagnosis-v2": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2.test.mts scripts/construction-diagnosis-v2-specialty.test.mts scripts/construction-diagnosis-v2-start-form.test.mts",
+    "test:diagnosis-v2": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2.test.mts scripts/construction-diagnosis-v2-specialty.test.mts scripts/construction-diagnosis-v2-start-form.test.mts scripts/construction-diagnosis-v2-short.test.mts",
     "test:diagnosis-v2-specialty": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2-specialty.test.mts",
     "crawl:properties": "node scripts/crawlers/run.mjs",
     "import:properties": "node scripts/import-properties.mjs",

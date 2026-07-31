@@ -6,6 +6,7 @@ import {
   DIAGNOSIS_V2_SECTIONS,
   getApplicableDetailedQuestions,
   getApplicableQuestionsForSection,
+  getDetailedQuestionHelp,
   type DiagnosisV2Question,
   type DiagnosisV2ScoringContext
 } from "@/lib/construction-diagnosis-v2/questions";
@@ -17,8 +18,10 @@ import {
   type PublicWorkIntent
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { ArrowLeft, ArrowRight, Save } from "lucide-react";
+import { QuestionHelp } from "./QuestionHelp";
 
 const INITIAL_STATE: DiagnosisV2FormState = { fieldErrors: {} };
+const QUESTIONS_PER_PAGE = 2;
 
 type DetailedStep = {
   id: string;
@@ -64,7 +67,7 @@ export function DiagnosisV2DetailedForm({
         .filter((question) => !getSpecialtyQuestions(primaryTrade).some((specialty) => specialty.id === question.id));
       return questions.length > 0 ? [{
         id: section.id,
-        label: section.label,
+        label: section.shortLabel,
         description: section.description,
         questions,
         referenceOnly: section.id === "public_works" && publicWorksMode === "reference"
@@ -74,10 +77,17 @@ export function DiagnosisV2DetailedForm({
     return [...commonSteps, {
       id: "specialty",
       label: `${getPrimaryTradeLabel(primaryTrade)}の業態別診断`,
-      description: "業態固有の原価、施工、受注、安全・管理状況を確認します。回答は既存8分野と業態別重要指標へ反映します。",
+      description: "この工事業種でかかる費用、工事の進め方、仕事の取り方、安全、書類の管理を確認します。",
       questions: getSpecialtyQuestions(primaryTrade)
     }];
   }, [context, includeSpecialty, primaryTrade, publicWorksMode]);
+  const questionPages = useMemo(() => steps.flatMap((step, stepIndex) =>
+    Array.from({ length: Math.ceil(step.questions.length / QUESTIONS_PER_PAGE) }, (_, pageIndex) => ({
+      step,
+      stepIndex,
+      questions: step.questions.slice(pageIndex * QUESTIONS_PER_PAGE, (pageIndex + 1) * QUESTIONS_PER_PAGE)
+    }))
+  ), [steps]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -85,11 +95,11 @@ export function DiagnosisV2DetailedForm({
       setAnswers(Object.fromEntries(
         Object.entries(readStoredAnswers(storageKey)).filter(([questionId]) => applicableIds.has(questionId))
       ));
-      setSectionIndex(readStoredSection(sectionStorageKey, steps.length));
+      setSectionIndex(readStoredSection(sectionStorageKey, questionPages.length));
       setStorageRestored(true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [applicableQuestions, sectionStorageKey, steps.length, storageKey]);
+  }, [applicableQuestions, questionPages.length, sectionStorageKey, storageKey]);
 
   useEffect(() => {
     if (storageRestored) writeSessionStorage(storageKey, JSON.stringify(answers));
@@ -99,13 +109,14 @@ export function DiagnosisV2DetailedForm({
     if (storageRestored) writeSessionStorage(sectionStorageKey, String(sectionIndex));
   }, [sectionIndex, sectionStorageKey, storageRestored]);
 
-  const currentStep = steps[sectionIndex] ?? steps[0];
+  const currentPage = questionPages[sectionIndex] ?? questionPages[0];
+  const currentStep = currentPage?.step;
   const completedCount = applicableQuestions.filter((question) => Boolean(answers[question.id])).length;
 
-  const validateSection = (index: number) => {
+  const validatePage = (index: number) => {
     const errors: Record<string, string> = {};
-    for (const question of steps[index]?.questions ?? []) {
-      if (!answers[question.id]) errors[question.id] = "回答を選択してください";
+    for (const question of questionPages[index]?.questions ?? []) {
+      if (!answers[question.id]) errors[question.id] = "この質問に回答してください";
     }
     setClientErrors(errors);
     if (Object.keys(errors).length > 0) scrollToDetailedError(errors);
@@ -113,8 +124,8 @@ export function DiagnosisV2DetailedForm({
   };
 
   const goNext = () => {
-    if (!validateSection(sectionIndex)) return;
-    setSectionIndex((current) => Math.min(current + 1, steps.length - 1));
+    if (!validatePage(sectionIndex)) return;
+    setSectionIndex((current) => Math.min(current + 1, questionPages.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -125,7 +136,7 @@ export function DiagnosisV2DetailedForm({
     }
     const errors: Record<string, string> = {};
     for (const question of applicableQuestions) {
-      if (!answers[question.id]) errors[question.id] = "回答を選択してください";
+      if (!answers[question.id]) errors[question.id] = "この質問に回答してください";
     }
     if (Object.keys(errors).length === 0) {
       submittingRef.current = true;
@@ -134,11 +145,11 @@ export function DiagnosisV2DetailedForm({
     event.preventDefault();
     setClientErrors(errors);
     const firstErrorId = Object.keys(errors)[0];
-    const targetSection = steps.findIndex((step) =>
-      step.questions.some((question) => question.id === firstErrorId)
+    const targetSection = questionPages.findIndex((page) =>
+      page.questions.some((question) => question.id === firstErrorId)
     );
     if (targetSection >= 0) setSectionIndex(targetSection);
-    scrollToDetailedError(errors);
+    window.setTimeout(() => scrollToDetailedError(errors), 0);
   };
 
   useEffect(() => {
@@ -150,21 +161,24 @@ export function DiagnosisV2DetailedForm({
     const firstErrorId = Object.keys(serverErrors)[0];
     const timeout = window.setTimeout(() => {
       if (firstErrorId) {
-        const targetSection = steps.findIndex((step) =>
-          step.questions.some((question) => question.id === firstErrorId)
+        const targetSection = questionPages.findIndex((page) =>
+          page.questions.some((question) => question.id === firstErrorId)
         );
         if (targetSection >= 0) setSectionIndex(targetSection);
-        scrollToDetailedError(serverErrors);
+        window.setTimeout(() => scrollToDetailedError(serverErrors), 0);
       }
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [state, steps]);
+  }, [questionPages, state]);
 
   if (!currentStep) return null;
 
   return (
     <form action={formAction} onSubmit={handleSubmit} noValidate className="mx-auto max-w-5xl px-4 py-8">
       <input type="hidden" name="id" value={diagnosisId} />
+      {applicableQuestions.map((question) => (
+        <input key={question.id} type="hidden" name={question.id} value={answers[question.id] ?? ""} />
+      ))}
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -172,21 +186,24 @@ export function DiagnosisV2DetailedForm({
               <p className="text-sm font-black text-brand-700">詳細診断 8分野＋業態別・{applicableQuestions.length}問</p>
               <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-black text-amber-800">テスト版</span>
             </div>
-            <h1 className="mt-1 text-2xl font-black text-slate-950">{sectionIndex + 1}. {currentStep.label}</h1>
+            <h1 className="mt-1 text-2xl font-black text-slate-950">{currentStep.label}</h1>
             <p className="mt-2 text-sm leading-7 text-slate-600">{currentStep.description}</p>
             {currentStep.referenceOnly ? (
               <p className="mt-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold leading-6 text-sky-900">この分野は参考診断として表示し、総合点には含めません。</p>
             ) : null}
           </div>
-          <p className="text-sm font-bold text-slate-600">{completedCount} / {applicableQuestions.length}問 回答済み</p>
+          <div className="text-sm font-bold text-slate-600">
+            <p>{completedCount} / {applicableQuestions.length}問 回答済み</p>
+            <p className="mt-1 text-brand-800">{sectionIndex + 1} / {questionPages.length}ページ</p>
+          </div>
         </div>
         <div className="mt-4 grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
           {steps.map((step, index) => (
             <button
               key={step.id}
               type="button"
-              onClick={() => setSectionIndex(index)}
-              className={`h-2 rounded ${index === sectionIndex ? "bg-brand-700" : index < sectionIndex ? "bg-emerald-500" : "bg-slate-200"}`}
+              onClick={() => setSectionIndex(questionPages.findIndex((page) => page.stepIndex === index))}
+              className={`h-2 rounded ${index === currentPage.stepIndex ? "bg-brand-700" : index < currentPage.stepIndex ? "bg-emerald-500" : "bg-slate-200"}`}
               aria-label={`${step.label}へ移動`}
               title={step.label}
             />
@@ -207,25 +224,25 @@ export function DiagnosisV2DetailedForm({
         </div>
       ) : null}
 
-      {steps.map((step, index) => (
-        <section key={step.id} className={index === sectionIndex ? "mt-5 space-y-4" : "hidden"} aria-hidden={index !== sectionIndex}>
-          {step.questions.map((question) => (
+      <section className="mt-5 space-y-4">
+          {currentPage.questions.map((question) => (
             <fieldset
               key={question.id}
               data-diagnosis-field={question.id}
+              aria-invalid={Boolean(fieldErrors[question.id])}
               className={`rounded-lg border bg-white p-5 shadow-sm ${fieldErrors[question.id] ? "border-red-500 ring-1 ring-red-200" : "border-slate-200"}`}
             >
               <legend className="text-base font-black leading-7 text-slate-950">
                 <span className="mr-2 text-brand-700">{question.id}</span>
                 {question.question}
-                <span className="ml-2 text-xs font-bold text-slate-400">重み{question.weight}{question.critical ? "・重大項目" : ""}</span>
               </legend>
+              {getDetailedQuestionHelp(question.id) ? <QuestionHelp>{getDetailedQuestionHelp(question.id)}</QuestionHelp> : null}
               <div className="mt-4 grid gap-2">
                 {question.options.map((answerOption) => (
                   <label key={answerOption.value} className={`flex cursor-pointer items-start gap-3 rounded border px-3 py-3 text-sm font-semibold leading-6 ${answers[question.id] === answerOption.value ? "border-brand-600 bg-brand-50 text-brand-950" : "border-slate-200 bg-slate-50 text-slate-800"}`}>
                     <input
                       type="radio"
-                      name={question.id}
+                      name={`display_${question.id}`}
                       value={answerOption.value}
                       checked={answers[question.id] === answerOption.value}
                       onChange={() => {
@@ -245,8 +262,7 @@ export function DiagnosisV2DetailedForm({
               {fieldErrors[question.id] ? <p className="mt-3 text-xs font-bold text-red-700">{fieldErrors[question.id]}</p> : null}
             </fieldset>
           ))}
-        </section>
-      ))}
+      </section>
 
       <div className="sticky bottom-0 mt-6 flex flex-col gap-3 border-t border-slate-200 bg-slate-50/95 py-4 backdrop-blur sm:flex-row sm:justify-between">
         <button
@@ -259,11 +275,11 @@ export function DiagnosisV2DetailedForm({
           className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ArrowLeft className="h-4 w-4" />
-          前の分野
+          前の質問
         </button>
-        {sectionIndex < steps.length - 1 ? (
+        {sectionIndex < questionPages.length - 1 ? (
           <button type="button" onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring">
-            次の分野
+            次の質問へ
             <ArrowRight className="h-4 w-4" />
           </button>
         ) : (

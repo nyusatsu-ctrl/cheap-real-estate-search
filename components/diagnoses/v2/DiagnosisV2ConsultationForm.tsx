@@ -41,7 +41,7 @@ export function DiagnosisV2ConsultationForm({ diagnosisId }: { diagnosisId: stri
       {state.fieldErrors?.preferred_meeting_dates ? <p className="mt-2 text-xs font-bold text-red-700">{state.fieldErrors.preferred_meeting_dates}</p> : null}
       <label className="mt-4 grid gap-1 text-sm font-bold text-slate-700">
         相談内容
-        <textarea name="consultation_topic" rows={4} placeholder="例: 経審と国の発注機関への参加手順を相談したい" className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
+        <textarea name="consultation_topic" rows={4} placeholder="例: 公共工事に必要な会社の審査と、国の工事へ参加する手順を相談したい" className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
         {state.fieldErrors?.consultation_topic ? <span className="text-xs font-bold text-red-700">{state.fieldErrors.consultation_topic}</span> : null}
       </label>
       <label className="mt-4 grid gap-1 text-sm font-bold text-slate-700">

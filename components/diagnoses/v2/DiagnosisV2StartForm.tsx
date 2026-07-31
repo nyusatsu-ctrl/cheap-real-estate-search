@@ -2,10 +2,11 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { submitDiagnosisV2QuickAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
+import { QUICK_CATEGORY_LABELS } from "@/lib/construction-diagnosis-v2/questions";
 import {
-  QUICK_DIAGNOSIS_QUESTIONS,
-  QUICK_CATEGORY_LABELS
-} from "@/lib/construction-diagnosis-v2/questions";
+  getShortDiagnosisQuestions,
+  type ShortDiagnosisQuestion
+} from "@/lib/construction-diagnosis-v2/short-questions";
 import {
   ORDER_MODEL_OPTIONS,
   PRIMARY_TRADE_OPTIONS,
@@ -21,6 +22,7 @@ import {
   type DiagnosisV2StartFormValues
 } from "@/lib/construction-diagnosis-v2/start-form";
 import { ArrowLeft, ArrowRight, Building2, ClipboardCheck, ShieldCheck } from "lucide-react";
+import { QuestionHelp } from "./QuestionHelp";
 
 const PREFECTURES = [
   "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
@@ -46,6 +48,8 @@ const SOURCE_OPTIONS = ["テレアポ", "ダイレクトメール", "紹介", "W
 const INITIAL_STATE: DiagnosisV2FormState = { fieldErrors: {} };
 const STORAGE_KEY = "construction-management-diagnosis-v2-1-start";
 const STEP_STORAGE_KEY = "construction-management-diagnosis-v2-1-start-step";
+const SHORT_PAGE_STORAGE_KEY = "construction-management-diagnosis-v2-1-short-page";
+const QUESTIONS_PER_PAGE = 2;
 
 export function DiagnosisV2StartForm({
   leadSource,
@@ -56,6 +60,7 @@ export function DiagnosisV2StartForm({
 }) {
   const [state, formAction, isPending] = useActionState(submitDiagnosisV2QuickAction, INITIAL_STATE);
   const [step, setStep] = useState(0);
+  const [shortPage, setShortPage] = useState(0);
   const [values, setValues] = useState<DiagnosisV2StartFormValues>({});
   const [storageRestored, setStorageRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
@@ -71,11 +76,22 @@ export function DiagnosisV2StartForm({
   const enteredRatioCount = ["prime_ratio", "subcontract_ratio", "public_ratio", "consumer_ratio"]
     .filter((field) => Boolean(values[field])).length;
   const ratioNeedsReview = enteredRatioCount >= 2 && (ratioTotal < 70 || ratioTotal > 130);
+  const shortQuestions = useMemo(() => getShortDiagnosisQuestions({
+    primaryTrade: values.primary_trade,
+    publicWorkIntent: values.public_work_intent
+  }), [values.primary_trade, values.public_work_intent]);
+  const shortPageCount = Math.max(1, Math.ceil(shortQuestions.length / QUESTIONS_PER_PAGE));
+  const safeShortPage = Math.min(shortPage, shortPageCount - 1);
+  const visibleShortQuestions = shortQuestions.slice(
+    safeShortPage * QUESTIONS_PER_PAGE,
+    (safeShortPage + 1) * QUESTIONS_PER_PAGE
+  );
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setValues(readStoredValues(STORAGE_KEY));
       setStep(readStoredStep(STEP_STORAGE_KEY, 1));
+      setShortPage(readStoredStep(SHORT_PAGE_STORAGE_KEY, 20));
       setStorageRestored(true);
     }, 0);
     return () => window.clearTimeout(timeout);
@@ -88,6 +104,10 @@ export function DiagnosisV2StartForm({
   useEffect(() => {
     if (storageRestored) writeSessionStorage(STEP_STORAGE_KEY, String(step));
   }, [step, storageRestored]);
+
+  useEffect(() => {
+    if (storageRestored) writeSessionStorage(SHORT_PAGE_STORAGE_KEY, String(shortPage));
+  }, [shortPage, storageRestored]);
 
   const setValue = (name: string, value: string) => {
     setValues((current) => ({ ...current, [name]: value }));
@@ -112,6 +132,7 @@ export function DiagnosisV2StartForm({
     setClientErrors(errors);
     if (Object.keys(errors).length === 0) {
       setStep(1);
+      setShortPage(0);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       scrollToDiagnosisError(errors);
@@ -124,15 +145,15 @@ export function DiagnosisV2StartForm({
       return;
     }
     const errors: Record<string, string> = {};
-    for (const question of QUICK_DIAGNOSIS_QUESTIONS) {
+    for (const question of shortQuestions) {
       if (!question.options.some((option) => option.value === values[question.id])) {
-        errors[question.id] = "回答を選択してください";
+        errors[question.id] = "この質問に回答してください";
       }
     }
     if (Object.keys(errors).length > 0) {
       event.preventDefault();
       setClientErrors(errors);
-      scrollToDiagnosisError(errors);
+      showShortQuestionError(errors, shortQuestions, setShortPage);
       return;
     }
     submittingRef.current = true;
@@ -148,21 +169,44 @@ export function DiagnosisV2StartForm({
       if (Object.keys(serverErrors).length > 0) {
         const hasBasicError = DIAGNOSIS_V2_BASIC_FIELD_ORDER.some((name) => serverErrors[name]);
         setStep(hasBasicError ? 0 : 1);
-        scrollToDiagnosisError(serverErrors);
+        if (hasBasicError) {
+          scrollToDiagnosisError(serverErrors);
+        } else {
+          showShortQuestionError(serverErrors, shortQuestions, setShortPage);
+        }
       } else if (state.formError) {
         document.getElementById("diagnosis-v2-form-error")?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [state]);
+  }, [shortQuestions, state]);
+
+  const goToNextShortPage = () => {
+    const errors: Record<string, string> = {};
+    for (const question of visibleShortQuestions) {
+      if (!question.options.some((option) => option.value === values[question.id])) {
+        errors[question.id] = "この質問に回答してください";
+      }
+    }
+    setClientErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      scrollToDiagnosisError(errors);
+      return;
+    }
+    setShortPage(Math.min(safeShortPage + 1, shortPageCount - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <form action={formAction} onSubmit={handleSubmit} noValidate className="mx-auto max-w-5xl px-4 py-8">
       <input type="hidden" name="lead_source" value={leadSource} />
       <input type="hidden" name="source_campaign" value={campaign} />
+      {shortQuestions.map((question) => (
+        <input key={question.id} type="hidden" name={question.id} value={values[question.id] ?? ""} />
+      ))}
 
       <div className="mb-6 grid grid-cols-2 gap-2" aria-label="診断の進行状況">
-        {["基本情報", "簡易診断10問"].map((label, index) => (
+        {["基本情報", "短縮診断"].map((label, index) => (
           <div key={label} className={`rounded border px-3 py-3 text-center text-sm font-black ${index === step ? "border-brand-700 bg-brand-50 text-brand-800" : index < step ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-500"}`}>
             {index + 1}. {label}
           </div>
@@ -229,8 +273,8 @@ export function DiagnosisV2StartForm({
               <legend className="px-1 text-sm font-black text-slate-800">売上構成（概算・任意）</legend>
               <p className="mt-1 text-xs leading-6 text-slate-500">合計が厳密に100％でなくても入力できます。分かる範囲で入力してください。</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <RatioInput name="prime_ratio" label="元請比率" value={values.prime_ratio} onChange={setValue} error={fieldErrors.prime_ratio} />
-                <RatioInput name="subcontract_ratio" label="下請比率" value={values.subcontract_ratio} onChange={setValue} error={fieldErrors.subcontract_ratio} />
+                <RatioInput name="prime_ratio" label="お客様から直接受ける工事" value={values.prime_ratio} onChange={setValue} error={fieldErrors.prime_ratio} />
+                <RatioInput name="subcontract_ratio" label="他の建設会社から受ける工事" value={values.subcontract_ratio} onChange={setValue} error={fieldErrors.subcontract_ratio} />
                 <RatioInput name="public_ratio" label="公共工事比率" value={values.public_ratio} onChange={setValue} error={fieldErrors.public_ratio} />
                 <RatioInput name="consumer_ratio" label="個人客比率" value={values.consumer_ratio} onChange={setValue} error={fieldErrors.consumer_ratio} />
               </div>
@@ -269,7 +313,7 @@ export function DiagnosisV2StartForm({
         </label>
 
         <button type="button" onClick={goToQuickDiagnosis} className="inline-flex w-full items-center justify-center gap-2 rounded bg-brand-700 px-5 py-4 font-black text-white focus-ring sm:w-auto">
-          簡易診断へ進む
+          短縮診断へ進む
           <ArrowRight className="h-4 w-4" />
         </button>
       </section>
@@ -278,9 +322,12 @@ export function DiagnosisV2StartForm({
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
             <ClipboardCheck className="h-5 w-5 text-brand-700" />
-            <h1 className="text-xl font-black text-slate-950">簡易診断10問</h1>
+            <h1 className="text-xl font-black text-slate-950">短縮診断</h1>
           </div>
-          <p className="mt-2 text-sm leading-7 text-slate-600">現在の状態に最も近い回答を選んでください。結果は断定ではなく、詳細診断へ進むための整理として表示します。</p>
+          <p className="mt-2 text-sm leading-7 text-slate-600">今の会社に最も近い回答を選んでください。1画面に2問ずつ表示します。</p>
+          <p className="mt-2 text-sm font-black text-brand-800">
+            {safeShortPage * QUESTIONS_PER_PAGE + 1}～{Math.min((safeShortPage + 1) * QUESTIONS_PER_PAGE, shortQuestions.length)}問目 / 全{shortQuestions.length}問
+          </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {Object.values(QUICK_CATEGORY_LABELS).map((label) => (
               <span key={label} className="rounded bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{label}</span>
@@ -288,22 +335,26 @@ export function DiagnosisV2StartForm({
           </div>
         </div>
 
-        {QUICK_DIAGNOSIS_QUESTIONS.map((question, index) => (
+        {visibleShortQuestions.map((question) => {
+          const index = shortQuestions.findIndex((candidate) => candidate.id === question.id);
+          return (
           <fieldset
             key={question.id}
             data-diagnosis-field={question.id}
+            aria-invalid={Boolean(fieldErrors[question.id])}
             className={`rounded-lg border bg-white p-5 shadow-sm ${fieldErrors[question.id] ? "border-red-500 ring-1 ring-red-200" : "border-slate-200"}`}
           >
             <legend className="text-base font-black leading-7 text-slate-950">
               <span className="mr-2 text-brand-700">Q{index + 1}</span>
               {question.question}
             </legend>
+            {question.helpText ? <QuestionHelp>{question.helpText}</QuestionHelp> : null}
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {question.options.map((answerOption) => (
                 <label key={answerOption.value} className={`flex min-h-12 cursor-pointer items-center gap-3 rounded border px-3 py-3 text-sm font-semibold ${values[question.id] === answerOption.value ? "border-brand-600 bg-brand-50 text-brand-950" : "border-slate-200 bg-slate-50 text-slate-800"}`}>
                   <input
                     type="radio"
-                    name={question.id}
+                    name={`display_${question.id}`}
                     value={answerOption.value}
                     checked={values[question.id] === answerOption.value}
                     onChange={() => setValue(question.id, answerOption.value)}
@@ -315,14 +366,28 @@ export function DiagnosisV2StartForm({
             </div>
             {fieldErrors[question.id] ? <p className="mt-3 text-xs font-bold text-red-700">{fieldErrors[question.id]}</p> : null}
           </fieldset>
-        ))}
+          );
+        })}
 
         <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-slate-50/95 py-4 backdrop-blur sm:flex-row">
-          <button type="button" onClick={() => { setClientErrors({}); setStep(0); }} className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
+          <button type="button" onClick={() => {
+            setClientErrors({});
+            if (safeShortPage > 0) {
+              setShortPage(safeShortPage - 1);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              setStep(0);
+            }
+          }} className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
             <ArrowLeft className="h-4 w-4" />
-            基本情報へ戻る
+            {safeShortPage > 0 ? "前の質問へ戻る" : "基本情報へ戻る"}
           </button>
-          <QuickSubmitButton pending={isPending} />
+          {safeShortPage < shortPageCount - 1 ? (
+            <button type="button" onClick={goToNextShortPage} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring">
+              次の質問へ
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : <QuickSubmitButton pending={isPending} />}
         </div>
       </section>
     </form>
@@ -508,7 +573,7 @@ function QuickSubmitButton({ pending }: { pending: boolean }) {
   return (
     <button disabled={pending} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
       <ShieldCheck className="h-4 w-4" />
-      {pending ? "送信中です…" : "簡易診断結果を見る"}
+      {pending ? "送信中です…" : "短縮診断の結果を見る"}
     </button>
   );
 }
@@ -559,4 +624,16 @@ function scrollToDiagnosisError(errors: Record<string, string>) {
     target.scrollIntoView({ behavior: "smooth", block: "center" });
     target.querySelector<HTMLElement>("input, select, textarea, button")?.focus({ preventScroll: true });
   });
+}
+
+function showShortQuestionError(
+  errors: Record<string, string>,
+  questions: ShortDiagnosisQuestion[],
+  setPage: (page: number) => void
+) {
+  const firstQuestionIndex = questions.findIndex((question) => errors[question.id]);
+  if (firstQuestionIndex >= 0) {
+    setPage(Math.floor(firstQuestionIndex / QUESTIONS_PER_PAGE));
+  }
+  window.setTimeout(() => scrollToDiagnosisError(errors), 0);
 }

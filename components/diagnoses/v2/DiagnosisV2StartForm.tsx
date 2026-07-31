@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import { submitDiagnosisV2QuickAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
 import {
   QUICK_DIAGNOSIS_QUESTIONS,
@@ -14,9 +13,14 @@ import {
   PUBLIC_WORK_INTENT_OPTIONS,
   SELF_PERFORM_OPTIONS
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
+import {
+  DIAGNOSIS_V2_BASIC_FIELD_ORDER,
+  readDiagnosisV2MultiValue,
+  sanitizeDiagnosisV2StartValues,
+  validateDiagnosisV2BasicStep,
+  type DiagnosisV2StartFormValues
+} from "@/lib/construction-diagnosis-v2/start-form";
 import { ArrowLeft, ArrowRight, Building2, ClipboardCheck, ShieldCheck } from "lucide-react";
-
-type FormValues = Record<string, string>;
 
 const PREFECTURES = [
   "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
@@ -50,9 +54,9 @@ export function DiagnosisV2StartForm({
   leadSource: string;
   campaign: string;
 }) {
-  const [state, formAction] = useActionState(submitDiagnosisV2QuickAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useActionState(submitDiagnosisV2QuickAction, INITIAL_STATE);
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState<FormValues>({});
+  const [values, setValues] = useState<DiagnosisV2StartFormValues>({});
   const [storageRestored, setStorageRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const submittingRef = useRef(false);
@@ -78,11 +82,11 @@ export function DiagnosisV2StartForm({
   }, []);
 
   useEffect(() => {
-    if (storageRestored) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(values));
+    if (storageRestored) writeSessionStorage(STORAGE_KEY, JSON.stringify(values));
   }, [storageRestored, values]);
 
   useEffect(() => {
-    if (storageRestored) sessionStorage.setItem(STEP_STORAGE_KEY, String(step));
+    if (storageRestored) writeSessionStorage(STEP_STORAGE_KEY, String(step));
   }, [step, storageRestored]);
 
   const setValue = (name: string, value: string) => {
@@ -96,7 +100,7 @@ export function DiagnosisV2StartForm({
   };
 
   const setMultiValue = (name: string, value: string, checked: boolean) => {
-    const current = readMultiValue(values[name]);
+    const current = readDiagnosisV2MultiValue(values[name]);
     const next = checked
       ? [...new Set([...current, value])]
       : current.filter((item) => item !== value);
@@ -104,25 +108,13 @@ export function DiagnosisV2StartForm({
   };
 
   const goToQuickDiagnosis = () => {
-    const errors: Record<string, string> = {};
-    for (const field of ["company_name", "respondent_name", "prefecture", "phone", "email", "primary_trade", "public_work_intent"]) {
-      if (!values[field]?.trim()) errors[field] = "入力してください";
-    }
-    if (readMultiValue(values.order_models).length === 0) errors.order_models = "主な受注形態を1つ以上選択してください";
-    if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
-      errors.email = "メールアドレスの形式を確認してください";
-    }
-    if (values.privacy_consent !== "agreed") errors.privacy_consent = "同意が必要です";
-    for (const field of ["prime_ratio", "subcontract_ratio", "public_ratio", "consumer_ratio"]) {
-      const value = values[field];
-      if (value && (!/^\d{1,3}$/.test(value) || Number(value) < 0 || Number(value) > 100)) {
-        errors[field] = "0～100の範囲で入力してください";
-      }
-    }
+    const errors = validateDiagnosisV2BasicStep(values);
     setClientErrors(errors);
     if (Object.keys(errors).length === 0) {
       setStep(1);
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      scrollToDiagnosisError(errors);
     }
   };
 
@@ -140,18 +132,32 @@ export function DiagnosisV2StartForm({
     if (Object.keys(errors).length > 0) {
       event.preventDefault();
       setClientErrors(errors);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToDiagnosisError(errors);
       return;
     }
     submittingRef.current = true;
   };
 
   useEffect(() => {
-    submittingRef.current = false;
+    if (!isPending) submittingRef.current = false;
+  }, [isPending, state]);
+
+  useEffect(() => {
+    const serverErrors = state.fieldErrors ?? {};
+    const timeout = window.setTimeout(() => {
+      if (Object.keys(serverErrors).length > 0) {
+        const hasBasicError = DIAGNOSIS_V2_BASIC_FIELD_ORDER.some((name) => serverErrors[name]);
+        setStep(hasBasicError ? 0 : 1);
+        scrollToDiagnosisError(serverErrors);
+      } else if (state.formError) {
+        document.getElementById("diagnosis-v2-form-error")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [state]);
 
   return (
-    <form action={formAction} onSubmit={handleSubmit} className="mx-auto max-w-5xl px-4 py-8">
+    <form action={formAction} onSubmit={handleSubmit} noValidate className="mx-auto max-w-5xl px-4 py-8">
       <input type="hidden" name="lead_source" value={leadSource} />
       <input type="hidden" name="source_campaign" value={campaign} />
 
@@ -164,8 +170,15 @@ export function DiagnosisV2StartForm({
       </div>
 
       {state.formError ? (
-        <div className="mb-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800" role="alert">
+        <div id="diagnosis-v2-form-error" className="mb-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800" role="alert">
           {state.formError}
+        </div>
+      ) : null}
+
+      {Object.keys(clientErrors).length > 0 ? (
+        <div className="mb-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
+          <p className="font-black">未入力または確認が必要な項目があります。</p>
+          <p className="mt-1">{clientErrors[Object.keys(clientErrors)[0]]}</p>
         </div>
       ) : null}
 
@@ -184,9 +197,9 @@ export function DiagnosisV2StartForm({
             <TextInput name="address" label="所在地" value={values.address} onChange={setValue} />
             <TextInput name="phone" label="電話番号" type="tel" required value={values.phone} onChange={setValue} error={fieldErrors.phone} />
             <TextInput name="email" label="メールアドレス" type="email" required value={values.email} onChange={setValue} error={fieldErrors.email} />
-            <TextInput name="website_url" label="ホームページURL" type="url" value={values.website_url} onChange={setValue} placeholder="https://example.jp" />
+            <TextInput name="website_url" label="ホームページURL" type="url" value={values.website_url} onChange={setValue} placeholder="https://example.jp" error={fieldErrors.website_url} />
             <SelectInput name="employee_range" label="従業員数" value={values.employee_range} onChange={setValue} options={EMPLOYEE_OPTIONS} />
-            <TextInput name="founding_year" label="創業年" type="number" value={values.founding_year} onChange={setValue} placeholder="例: 2005" />
+            <TextInput name="founding_year" label="創業年" type="number" value={values.founding_year} onChange={setValue} placeholder="例: 2005" error={fieldErrors.founding_year} />
             <ValueSelectInput name="primary_trade" label="主な業態・工事業種" required value={values.primary_trade} onChange={setValue} options={PRIMARY_TRADE_OPTIONS} error={fieldErrors.primary_trade} />
             <SelectInput name="sales_range" label="年商区分" value={values.sales_range} onChange={setValue} options={SALES_OPTIONS} />
             <SelectInput name="source" label="診断を知ったきっかけ" value={values.source} onChange={setValue} options={SOURCE_OPTIONS} />
@@ -196,7 +209,7 @@ export function DiagnosisV2StartForm({
             <MultiCheckboxInput
               name="secondary_trades"
               label="副業種"
-              values={readMultiValue(values.secondary_trades)}
+              values={readDiagnosisV2MultiValue(values.secondary_trades)}
               onChange={setMultiValue}
               options={PRIMARY_TRADE_OPTIONS.filter((option) => option.value !== values.primary_trade)}
               description="複数業種を行っている場合のみ選択してください。"
@@ -205,7 +218,7 @@ export function DiagnosisV2StartForm({
               name="order_models"
               label="主な受注形態"
               required
-              values={readMultiValue(values.order_models)}
+              values={readDiagnosisV2MultiValue(values.order_models)}
               onChange={setMultiValue}
               options={ORDER_MODEL_OPTIONS}
               error={fieldErrors.order_models}
@@ -236,13 +249,17 @@ export function DiagnosisV2StartForm({
           </div>
         </div>
 
-        <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-5 text-sm font-semibold leading-7 text-slate-700 shadow-sm">
+        <label
+          data-diagnosis-field="privacy_consent"
+          className={`flex items-start gap-3 rounded-lg border bg-white p-5 text-sm font-semibold leading-7 text-slate-700 shadow-sm ${fieldErrors.privacy_consent ? "border-red-500 ring-1 ring-red-200" : "border-slate-200"}`}
+        >
           <input
             type="checkbox"
             name="privacy_consent"
             value="agreed"
             checked={values.privacy_consent === "agreed"}
             onChange={(event) => setValue("privacy_consent", event.target.checked ? "agreed" : "")}
+            aria-invalid={Boolean(fieldErrors.privacy_consent)}
             className="mt-1 h-5 w-5 accent-brand-700"
           />
           <span>
@@ -272,7 +289,11 @@ export function DiagnosisV2StartForm({
         </div>
 
         {QUICK_DIAGNOSIS_QUESTIONS.map((question, index) => (
-          <fieldset key={question.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <fieldset
+            key={question.id}
+            data-diagnosis-field={question.id}
+            className={`rounded-lg border bg-white p-5 shadow-sm ${fieldErrors[question.id] ? "border-red-500 ring-1 ring-red-200" : "border-slate-200"}`}
+          >
             <legend className="text-base font-black leading-7 text-slate-950">
               <span className="mr-2 text-brand-700">Q{index + 1}</span>
               {question.question}
@@ -297,11 +318,11 @@ export function DiagnosisV2StartForm({
         ))}
 
         <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-slate-50/95 py-4 backdrop-blur sm:flex-row">
-          <button type="button" onClick={() => setStep(0)} className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
+          <button type="button" onClick={() => { setClientErrors({}); setStep(0); }} className="inline-flex items-center justify-center gap-2 rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">
             <ArrowLeft className="h-4 w-4" />
             基本情報へ戻る
           </button>
-          <QuickSubmitButton />
+          <QuickSubmitButton pending={isPending} />
         </div>
       </section>
     </form>
@@ -328,7 +349,7 @@ function TextInput({
   error?: string;
 }) {
   return (
-    <label className="grid gap-1 text-sm font-bold text-slate-700">
+    <label data-diagnosis-field={name} className="grid gap-1 text-sm font-bold text-slate-700">
       <span>{label}{required ? <span className="ml-1 text-red-700">必須</span> : <span className="ml-1 text-xs font-normal text-slate-400">任意</span>}</span>
       <input
         name={name}
@@ -336,7 +357,8 @@ function TextInput({
         value={value}
         onChange={(event) => onChange(name, event.target.value)}
         placeholder={placeholder}
-        className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring"
+        aria-invalid={Boolean(error)}
+        className={`rounded border px-3 py-2 font-normal focus-ring ${error ? "border-red-500 bg-red-50/30" : "border-slate-300"}`}
       />
       {error ? <span className="text-xs font-bold text-red-700">{error}</span> : null}
     </label>
@@ -361,9 +383,9 @@ function SelectInput({
   error?: string;
 }) {
   return (
-    <label className="grid gap-1 text-sm font-bold text-slate-700">
+    <label data-diagnosis-field={name} className="grid gap-1 text-sm font-bold text-slate-700">
       <span>{label}{required ? <span className="ml-1 text-red-700">必須</span> : <span className="ml-1 text-xs font-normal text-slate-400">任意</span>}</span>
-      <select name={name} value={value} onChange={(event) => onChange(name, event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring">
+      <select name={name} value={value} onChange={(event) => onChange(name, event.target.value)} aria-invalid={Boolean(error)} className={`rounded border bg-white px-3 py-2 font-normal focus-ring ${error ? "border-red-500" : "border-slate-300"}`}>
         <option value="">選択してください</option>
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -390,9 +412,9 @@ function ValueSelectInput<T extends string>({
   error?: string;
 }) {
   return (
-    <label className="grid gap-1 text-sm font-bold text-slate-700">
+    <label data-diagnosis-field={name} className="grid gap-1 text-sm font-bold text-slate-700">
       <span>{label}{required ? <span className="ml-1 text-red-700">必須</span> : <span className="ml-1 text-xs font-normal text-slate-400">任意</span>}</span>
-      <select name={name} value={value} onChange={(event) => onChange(name, event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 font-normal focus-ring">
+      <select name={name} value={value} onChange={(event) => onChange(name, event.target.value)} aria-invalid={Boolean(error)} className={`rounded border bg-white px-3 py-2 font-normal focus-ring ${error ? "border-red-500" : "border-slate-300"}`}>
         <option value="">選択してください</option>
         {options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
       </select>
@@ -421,7 +443,7 @@ function MultiCheckboxInput<T extends string>({
   error?: string;
 }) {
   return (
-    <fieldset className="rounded border border-slate-200 bg-slate-50 p-4">
+    <fieldset data-diagnosis-field={name} className={`rounded border bg-slate-50 p-4 ${error ? "border-red-500 ring-1 ring-red-200" : "border-slate-200"}`}>
       <legend className="px-1 text-sm font-black text-slate-800">
         {label}{required ? <span className="ml-1 text-red-700">必須</span> : <span className="ml-1 text-xs font-normal text-slate-400">任意</span>}
       </legend>
@@ -460,7 +482,7 @@ function RatioInput({
   error?: string;
 }) {
   return (
-    <label className="grid gap-1 text-xs font-bold text-slate-700">
+    <label data-diagnosis-field={name} className="grid gap-1 text-xs font-bold text-slate-700">
       {label}
       <span className="relative">
         <input
@@ -472,7 +494,8 @@ function RatioInput({
           inputMode="numeric"
           value={value}
           onChange={(event) => onChange(name, event.target.value)}
-          className="w-full rounded border border-slate-300 bg-white py-2 pl-3 pr-8 text-sm font-normal focus-ring"
+          aria-invalid={Boolean(error)}
+          className={`w-full rounded border bg-white py-2 pl-3 pr-8 text-sm font-normal focus-ring ${error ? "border-red-500" : "border-slate-300"}`}
         />
         <span className="pointer-events-none absolute right-3 top-2 text-sm text-slate-500">%</span>
       </span>
@@ -481,39 +504,59 @@ function RatioInput({
   );
 }
 
-function QuickSubmitButton() {
-  const { pending } = useFormStatus();
+function QuickSubmitButton({ pending }: { pending: boolean }) {
   return (
     <button disabled={pending} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
       <ShieldCheck className="h-4 w-4" />
-      {pending ? "簡易結果を作成中..." : "簡易診断結果を見る"}
+      {pending ? "送信中です…" : "簡易診断結果を見る"}
     </button>
   );
 }
 
-function readStoredValues(storageKey: string): FormValues {
+function readStoredValues(storageKey: string): DiagnosisV2StartFormValues {
   if (typeof window === "undefined") return {};
   try {
     const stored = sessionStorage.getItem(storageKey);
-    return stored ? JSON.parse(stored) as FormValues : {};
+    return stored ? sanitizeDiagnosisV2StartValues(JSON.parse(stored) as unknown) : {};
   } catch {
-    sessionStorage.removeItem(storageKey);
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {
+      // Some in-app browsers block storage access entirely.
+    }
     return {};
   }
 }
 
 function readStoredStep(storageKey: string, maximum: number) {
   if (typeof window === "undefined") return 0;
-  const value = Number(sessionStorage.getItem(storageKey));
-  return Number.isInteger(value) && value >= 0 && value <= maximum ? value : 0;
+  try {
+    const value = Number(sessionStorage.getItem(storageKey));
+    return Number.isInteger(value) && value >= 0 && value <= maximum ? value : 0;
+  } catch {
+    return 0;
+  }
 }
 
-function readMultiValue(value: string | undefined) {
-  if (!value) return [] as string[];
+function writeSessionStorage(storageKey: string, value: string) {
   try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+    sessionStorage.setItem(storageKey, value);
   } catch {
-    return [];
+    // Form input remains usable when storage is unavailable or full.
   }
+}
+
+function scrollToDiagnosisError(errors: Record<string, string>) {
+  const firstError = Object.keys(errors)[0];
+  if (!firstError) return;
+  window.requestAnimationFrame(() => {
+    const target = Array.from(document.querySelectorAll<HTMLElement>("[data-diagnosis-field]"))
+      .find((element) => element.dataset.diagnosisField === firstError);
+    if (!target) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.querySelector<HTMLElement>("input, select, textarea, button")?.focus({ preventScroll: true });
+  });
 }

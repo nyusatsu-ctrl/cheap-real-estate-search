@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import { submitDiagnosisV2DetailedAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
 import {
   DIAGNOSIS_V2_SECTIONS,
@@ -40,7 +39,7 @@ export function DiagnosisV2DetailedForm({
   publicWorkIntent: PublicWorkIntent | null;
   includeSpecialty: boolean;
 }) {
-  const [state, formAction] = useActionState(submitDiagnosisV2DetailedAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useActionState(submitDiagnosisV2DetailedAction, INITIAL_STATE);
   const storageKey = `construction-management-diagnosis-v2-1-details-${diagnosisId}`;
   const sectionStorageKey = `${storageKey}-section`;
   const [sectionIndex, setSectionIndex] = useState(0);
@@ -93,11 +92,11 @@ export function DiagnosisV2DetailedForm({
   }, [applicableQuestions, sectionStorageKey, steps.length, storageKey]);
 
   useEffect(() => {
-    if (storageRestored) sessionStorage.setItem(storageKey, JSON.stringify(answers));
+    if (storageRestored) writeSessionStorage(storageKey, JSON.stringify(answers));
   }, [answers, storageKey, storageRestored]);
 
   useEffect(() => {
-    if (storageRestored) sessionStorage.setItem(sectionStorageKey, String(sectionIndex));
+    if (storageRestored) writeSessionStorage(sectionStorageKey, String(sectionIndex));
   }, [sectionIndex, sectionStorageKey, storageRestored]);
 
   const currentStep = steps[sectionIndex] ?? steps[0];
@@ -109,6 +108,7 @@ export function DiagnosisV2DetailedForm({
       if (!answers[question.id]) errors[question.id] = "回答を選択してください";
     }
     setClientErrors(errors);
+    if (Object.keys(errors).length > 0) scrollToDetailedError(errors);
     return Object.keys(errors).length === 0;
   };
 
@@ -138,17 +138,32 @@ export function DiagnosisV2DetailedForm({
       step.questions.some((question) => question.id === firstErrorId)
     );
     if (targetSection >= 0) setSectionIndex(targetSection);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollToDetailedError(errors);
   };
 
   useEffect(() => {
-    submittingRef.current = false;
-  }, [state]);
+    if (!isPending) submittingRef.current = false;
+  }, [isPending, state]);
+
+  useEffect(() => {
+    const serverErrors = state.fieldErrors ?? {};
+    const firstErrorId = Object.keys(serverErrors)[0];
+    const timeout = window.setTimeout(() => {
+      if (firstErrorId) {
+        const targetSection = steps.findIndex((step) =>
+          step.questions.some((question) => question.id === firstErrorId)
+        );
+        if (targetSection >= 0) setSectionIndex(targetSection);
+        scrollToDetailedError(serverErrors);
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [state, steps]);
 
   if (!currentStep) return null;
 
   return (
-    <form action={formAction} onSubmit={handleSubmit} className="mx-auto max-w-5xl px-4 py-8">
+    <form action={formAction} onSubmit={handleSubmit} noValidate className="mx-auto max-w-5xl px-4 py-8">
       <input type="hidden" name="id" value={diagnosisId} />
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -185,10 +200,21 @@ export function DiagnosisV2DetailedForm({
         </div>
       ) : null}
 
+      {Object.keys(clientErrors).length > 0 ? (
+        <div className="mt-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
+          <p className="font-black">未入力または確認が必要な項目があります。</p>
+          <p className="mt-1">{clientErrors[Object.keys(clientErrors)[0]]}</p>
+        </div>
+      ) : null}
+
       {steps.map((step, index) => (
         <section key={step.id} className={index === sectionIndex ? "mt-5 space-y-4" : "hidden"} aria-hidden={index !== sectionIndex}>
           {step.questions.map((question) => (
-            <fieldset key={question.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <fieldset
+              key={question.id}
+              data-diagnosis-field={question.id}
+              className={`rounded-lg border bg-white p-5 shadow-sm ${fieldErrors[question.id] ? "border-red-500 ring-1 ring-red-200" : "border-slate-200"}`}
+            >
               <legend className="text-base font-black leading-7 text-slate-950">
                 <span className="mr-2 text-brand-700">{question.id}</span>
                 {question.question}
@@ -241,19 +267,18 @@ export function DiagnosisV2DetailedForm({
             <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <DetailedSubmitButton />
+          <DetailedSubmitButton pending={isPending} />
         )}
       </div>
     </form>
   );
 }
 
-function DetailedSubmitButton() {
-  const { pending } = useFormStatus();
+function DetailedSubmitButton({ pending }: { pending: boolean }) {
   return (
     <button disabled={pending} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
       <Save className="h-4 w-4" />
-      {pending ? "結果を作成中..." : "詳細診断結果を見る"}
+      {pending ? "送信中です…" : "詳細診断結果を見る"}
     </button>
   );
 }
@@ -262,15 +287,51 @@ function readStoredAnswers(storageKey: string): Record<string, string> {
   if (typeof window === "undefined") return {};
   try {
     const stored = sessionStorage.getItem(storageKey);
-    return stored ? JSON.parse(stored) as Record<string, string> : {};
+    if (!stored) return {};
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    );
   } catch {
-    sessionStorage.removeItem(storageKey);
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {
+      // Some in-app browsers block storage access entirely.
+    }
     return {};
   }
 }
 
 function readStoredSection(storageKey: string, stepCount: number) {
   if (typeof window === "undefined") return 0;
-  const value = Number(sessionStorage.getItem(storageKey));
-  return Number.isInteger(value) && value >= 0 && value < stepCount ? value : 0;
+  try {
+    const value = Number(sessionStorage.getItem(storageKey));
+    return Number.isInteger(value) && value >= 0 && value < stepCount ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeSessionStorage(storageKey: string, value: string) {
+  try {
+    sessionStorage.setItem(storageKey, value);
+  } catch {
+    // Form input remains usable when storage is unavailable or full.
+  }
+}
+
+function scrollToDetailedError(errors: Record<string, string>) {
+  const firstError = Object.keys(errors)[0];
+  if (!firstError) return;
+  window.requestAnimationFrame(() => {
+    const target = Array.from(document.querySelectorAll<HTMLElement>("[data-diagnosis-field]"))
+      .find((element) => element.dataset.diagnosisField === firstError);
+    if (!target) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.querySelector<HTMLElement>("input, select, textarea, button")?.focus({ preventScroll: true });
+  });
 }

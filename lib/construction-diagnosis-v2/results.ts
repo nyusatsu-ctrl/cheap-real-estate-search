@@ -167,6 +167,8 @@ export function buildDiagnosisV2Result(
       score: scoring.axisScores[sectionId],
       detail: criticalFlag
         ? CRITICAL_DETAILS[criticalFlag]
+        : scoring.axisScores[sectionId] >= 70
+          ? `${getStrengthDetail(sectionId)} 現在の水準を維持し、記録と定期確認によって再現性を高めてください。`
         : QUESTION_DETAILS[lowQuestion?.id ?? ""] ?? AXIS_ACTIONS[sectionId].issue
     };
   });

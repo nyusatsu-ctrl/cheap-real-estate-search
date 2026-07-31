@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitDiagnosisV2QuickAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
 import {
@@ -48,6 +48,7 @@ export function DiagnosisV2StartForm({
   const [values, setValues] = useState<FormValues>({});
   const [storageRestored, setStorageRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const submittingRef = useRef(false);
   const fieldErrors = useMemo(
     () => ({ ...(state.fieldErrors ?? {}), ...clientErrors }),
     [clientErrors, state.fieldErrors]
@@ -97,6 +98,10 @@ export function DiagnosisV2StartForm({
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (submittingRef.current) {
+      event.preventDefault();
+      return;
+    }
     const errors: Record<string, string> = {};
     for (const question of QUICK_DIAGNOSIS_QUESTIONS) {
       if (!question.options.some((option) => option.value === values[question.id])) {
@@ -107,8 +112,14 @@ export function DiagnosisV2StartForm({
       event.preventDefault();
       setClientErrors(errors);
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
+    submittingRef.current = true;
   };
+
+  useEffect(() => {
+    submittingRef.current = false;
+  }, [state]);
 
   return (
     <form action={formAction} onSubmit={handleSubmit} className="mx-auto max-w-5xl px-4 py-8">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitDiagnosisV2DetailedAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
 import {
@@ -20,6 +20,7 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [storageRestored, setStorageRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const submittingRef = useRef(false);
   const fieldErrors = useMemo(
     () => ({ ...(state.fieldErrors ?? {}), ...clientErrors }),
     [clientErrors, state.fieldErrors]
@@ -61,11 +62,18 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (submittingRef.current) {
+      event.preventDefault();
+      return;
+    }
     const errors: Record<string, string> = {};
     for (const question of DETAILED_DIAGNOSIS_QUESTIONS) {
       if (!answers[question.id]) errors[question.id] = "回答を選択してください";
     }
-    if (Object.keys(errors).length === 0) return;
+    if (Object.keys(errors).length === 0) {
+      submittingRef.current = true;
+      return;
+    }
     event.preventDefault();
     setClientErrors(errors);
     const firstErrorId = Object.keys(errors)[0];
@@ -75,6 +83,10 @@ export function DiagnosisV2DetailedForm({ diagnosisId }: { diagnosisId: string }
     if (targetSection >= 0) setSectionIndex(targetSection);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  useEffect(() => {
+    submittingRef.current = false;
+  }, [state]);
 
   return (
     <form action={formAction} onSubmit={handleSubmit} className="mx-auto max-w-5xl px-4 py-8">

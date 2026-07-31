@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DETAILED_DIAGNOSIS_QUESTIONS,
+  DIAGNOSIS_V2_SECTIONS,
   scoreDetailedDiagnosis,
   type DiagnosisV2AnswerMap
 } from "../lib/construction-diagnosis-v2/questions.ts";
@@ -14,8 +15,40 @@ test("case 1: all answers score 4", () => {
   const result = scoreDetailedDiagnosis(answersWithScore(4));
   assert.equal(result.complete, true);
   assert.equal(result.totalScore, 100);
+  assert.equal(Object.keys(result.axisScores).length, 8);
+  for (const section of DIAGNOSIS_V2_SECTIONS) {
+    assert.equal(result.axisScores[section.id], 100, `${section.label} should be 100`);
+  }
   assert.deepEqual(result.criticalFlags, []);
   assert.equal(result.judgment, "自社対応可能＋必要時スポット支援");
+});
+
+test("case 1b: detailed diagnosis has the specified 8 sections and 34-question distribution", () => {
+  assert.equal(DIAGNOSIS_V2_SECTIONS.length, 8);
+  assert.equal(DETAILED_DIAGNOSIS_QUESTIONS.length, 34);
+  assert.deepEqual(
+    Object.fromEntries(
+      DIAGNOSIS_V2_SECTIONS.map((section) => [
+        section.label,
+        DETAILED_DIAGNOSIS_QUESTIONS.filter((question) => question.section === section.id).length
+      ])
+    ),
+    {
+      "財務・資金繰り": 5,
+      "原価・収益管理": 5,
+      "受注基盤・営業": 4,
+      "公共工事参入体制": 5,
+      "施工・技術体制": 4,
+      "組織・人材": 4,
+      "内部統制・管理": 4,
+      "成長実行力・DX": 3
+    }
+  );
+  assert.deepEqual(
+    DETAILED_DIAGNOSIS_QUESTIONS.map((question) => question.displayOrder),
+    Array.from({ length: 34 }, (_, index) => index + 1)
+  );
+  assert.equal(new Set(DETAILED_DIAGNOSIS_QUESTIONS.map((question) => question.id)).size, 34);
 });
 
 test("case 2: critical controls score 0 even when other answers are high", () => {

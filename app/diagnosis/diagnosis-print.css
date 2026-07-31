@@ -1,0 +1,30 @@
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body:has(.diagnosis-print-page) {
+    background: #fff !important;
+  }
+
+  body:has(.diagnosis-print-page) > header,
+  body:has(.diagnosis-print-page) > footer {
+    display: none !important;
+  }
+
+  .diagnosis-print-page {
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .diagnosis-print-page .diagnosis-result-section {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .diagnosis-print-page a,
+  .diagnosis-print-page button {
+    text-decoration: none !important;
+  }
+}

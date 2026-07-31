@@ -90,7 +90,7 @@ function DiagnosisHeader({ priority = false }: { priority?: boolean }) {
         <Link href="/construction-sales-diagnosis" className="min-w-0">
           <EcoloopAdminBrand
             showSystemName
-            systemName="建設業売上アップ診断"
+            systemName="建設会社向け 経営診断・再成長戦略"
             className="gap-2 sm:gap-3"
             textClassName="text-xs sm:text-sm"
             priority={priority}
@@ -102,7 +102,7 @@ function DiagnosisHeader({ priority = false }: { priority?: boolean }) {
         </Link>
         <nav className="flex shrink-0 items-center gap-2 text-xs font-medium text-slate-700 sm:gap-3 sm:text-sm">
           <Link href="/diagnosis" className="hover:text-brand-700">
-            診断フォーム
+            無料診断
           </Link>
           <Link href="/admin/login" className="hover:text-brand-700">
             管理者ログイン

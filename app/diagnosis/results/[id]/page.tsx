@@ -10,6 +10,11 @@ import {
   getConstructionDiagnosis,
   getPublicWorksRoutePlan
 } from "@/lib/construction-diagnosis";
+import { DiagnosisV2ResultView } from "@/components/diagnoses/v2/DiagnosisV2ResultView";
+import {
+  isConstructionManagementDiagnosis,
+  normalizeConstructionManagementDiagnosis
+} from "@/lib/construction-diagnosis-v2/data";
 import { ArrowRight, CalendarCheck, ClipboardList, Hammer, PhoneCall, Route } from "lucide-react";
 
 const SEMINAR_GUIDE_HREF = "/diagnosis?source=direct&campaign=seminar_guide";
@@ -19,6 +24,9 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
   const { id } = await params;
   const diagnosis = await getConstructionDiagnosis(id) ?? await getCachedDiagnosis(id);
   if (!diagnosis) notFound();
+  if (isConstructionManagementDiagnosis(diagnosis)) {
+    return <DiagnosisV2ResultView diagnosis={normalizeConstructionManagementDiagnosis(diagnosis)} />;
+  }
 
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];
   const sub = DIAGNOSIS_TYPES[diagnosis.sub_type];

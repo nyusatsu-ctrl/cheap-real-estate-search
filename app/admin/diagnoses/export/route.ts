@@ -11,13 +11,30 @@ import {
   getConstructionDiagnoses,
   getLeadSourceLabel,
   getLeadStatusLabel,
-  getPublicWorksRoutePlan,
-  getSeminarInterestLabel,
-  normalizeLeadSource,
-  normalizeLeadStatus,
-  normalizeSeminarInterest,
-  type DiagnosisTypeCode
+  getSeminarInterestLabel
 } from "@/lib/construction-diagnosis";
+import {
+  DETAILED_DIAGNOSIS_QUESTIONS,
+  QUICK_DIAGNOSIS_QUESTIONS,
+  getDiagnosisV2OptionLabel,
+  getQuickDiagnosisOptionLabel,
+  type DiagnosisV2Judgment
+} from "@/lib/construction-diagnosis-v2/questions";
+import {
+  DIAGNOSIS_V2_DEAL_STATUS_LABELS,
+  DIAGNOSIS_V2_SALES_STATUS_LABELS,
+  isConstructionManagementDiagnosis,
+  normalizeConstructionManagementDiagnosis
+} from "@/lib/construction-diagnosis-v2/data";
+
+const JUDGMENTS: DiagnosisV2Judgment[] = [
+  "経営基盤の整備を優先",
+  "自社対応可能＋必要時スポット支援",
+  "一部支援推奨",
+  "段階的な専門支援推奨",
+  "現時点では保留"
+];
+const SOURCES = ["テレアポ", "ダイレクトメール", "紹介", "Web広告", "SEO", "YouTube", "その他"];
 
 export async function GET(request: Request) {
   const admin = await getCurrentDiagnosisAdmin();
@@ -26,59 +43,124 @@ export async function GET(request: Request) {
   const filters = getFilters(new URL(request.url).searchParams);
   const diagnoses = await getConstructionDiagnoses(filters);
   const headers = [
-    "氏名",
+    "診断バージョン",
+    "診断日時",
     "会社名",
+    "回答者",
+    "代表者",
+    "都道府県",
+    "所在地",
     "電話番号",
-    "メール",
-    "業種",
-    "平均年商",
-    "今一番困っていること",
-    ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => field.label),
-    "診断タイプ",
-    "サブ課題",
-    "推奨参入ルート",
-    "推奨アクション",
-    "platform提案",
-    "相談意欲",
-    "説明会意向",
-    "流入元",
+    "メールアドレス",
+    "ホームページURL",
+    "従業員数",
+    "創業年",
+    "主な工事業種",
+    "年商区分",
+    "流入経路",
+    "広告流入元",
     "キャンペーン",
-    "希望連絡時間",
-    "対応ステータス",
+    "簡易診断完了日時",
+    "詳細診断完了日時",
+    "総合点",
+    "支援判定",
+    "重大フラグ",
+    "相談希望",
+    "相談希望日時",
+    "相談内容",
+    "電話連絡可能時間",
+    "相談備考",
+    "面談予定日",
+    "商談状況",
+    "成約状況",
+    "契約金額",
+    "失注理由",
+    "次回対応日",
     "管理者メモ",
-    "メモ更新日時",
-    "最終接触日時",
-    "リード更新日時",
-    "診断日時"
+    ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
+    ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
+    "旧診断タイプ",
+    "旧サブ課題",
+    "旧相談意欲",
+    "旧説明会意向",
+    "旧対応ステータス",
+    "旧・今一番困っていること",
+    ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => `旧補足 ${field.label}`)
   ];
-  const rows = diagnoses.map((diagnosis) => {
-    const routePlan = getPublicWorksRoutePlan(diagnosis);
+
+  const rows = diagnoses.map((rawDiagnosis) => {
+    if (isConstructionManagementDiagnosis(rawDiagnosis)) {
+      const diagnosis = normalizeConstructionManagementDiagnosis(rawDiagnosis);
+      return [
+        diagnosis.diagnosis_version,
+        formatDiagnosisDate(diagnosis.created_at),
+        diagnosis.company_name,
+        diagnosis.respondent_name,
+        diagnosis.representative_name ?? "",
+        diagnosis.prefecture,
+        diagnosis.address ?? "",
+        diagnosis.phone,
+        diagnosis.email,
+        diagnosis.website_url ?? "",
+        diagnosis.employee_range ?? "",
+        diagnosis.founding_year ?? "",
+        diagnosis.main_business ?? "",
+        diagnosis.sales_range ?? "",
+        diagnosis.source ?? "",
+        getLeadSourceLabel(diagnosis.lead_source),
+        diagnosis.source_campaign ?? "",
+        formatNullableDate(diagnosis.quick_completed_at),
+        formatNullableDate(diagnosis.detailed_completed_at),
+        diagnosis.total_score ?? "",
+        diagnosis.judgment ?? "",
+        diagnosis.critical_flags.join(" / "),
+        diagnosis.consultation_requested ? "希望あり" : "希望なし",
+        diagnosis.preferred_meeting_dates.map(formatNullableDate).join(" / "),
+        diagnosis.consultation_topic ?? "",
+        diagnosis.consultation_contact_time ?? "",
+        diagnosis.consultation_notes ?? "",
+        formatNullableDate(diagnosis.meeting_at),
+        DIAGNOSIS_V2_SALES_STATUS_LABELS[diagnosis.sales_status],
+        DIAGNOSIS_V2_DEAL_STATUS_LABELS[diagnosis.deal_status],
+        diagnosis.deal_amount ?? "",
+        diagnosis.loss_reason ?? "",
+        formatNullableDate(diagnosis.next_action_at),
+        diagnosis.admin_notes ?? "",
+        ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
+        ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => getDiagnosisV2OptionLabel(question.id, diagnosis.detailed_answers[question.id])),
+        "", "", "", "", "", "",
+        ...SUPPLEMENTAL_ANSWER_FIELDS.map(() => "")
+      ];
+    }
 
     return [
-      diagnosis.name,
-      diagnosis.company_name ?? "",
-      diagnosis.phone ?? "",
-      diagnosis.email,
-      getAnswerLabel("business_type", diagnosis.business_type),
-      getAnswerLabel("monthly_sales", diagnosis.monthly_sales),
-      getAnswerLabel("biggest_problem", diagnosis.answers.biggest_problem),
-      ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => formatAnswerValue(diagnosis.answers[field.key])),
-      DIAGNOSIS_TYPES[diagnosis.main_type].name,
-      DIAGNOSIS_TYPES[diagnosis.sub_type].name,
-      routePlan.routeTitle,
-      routePlan.firstActions.join(" / "),
-      routePlan.platformSuggestions.join(" / "),
-      CONSULTATION_LABELS[diagnosis.wants_consultation] ?? diagnosis.wants_consultation,
-      getSeminarInterestLabel(diagnosis.seminar_interest),
-      getLeadSourceLabel(diagnosis.lead_source),
-      diagnosis.source_campaign ?? "",
-      diagnosis.preferred_contact_time ?? "",
-      getLeadStatusLabel(diagnosis.lead_status),
-      diagnosis.admin_memo ?? "",
-      formatNullableDiagnosisDate(diagnosis.admin_memo_updated_at),
-      formatNullableDiagnosisDate(diagnosis.last_contacted_at),
-      formatNullableDiagnosisDate(diagnosis.lead_updated_at),
-      formatDiagnosisDate(diagnosis.created_at)
+      "construction_sales_diagnosis_v1",
+      formatDiagnosisDate(rawDiagnosis.created_at),
+      rawDiagnosis.company_name ?? "",
+      rawDiagnosis.name,
+      "", "", "",
+      rawDiagnosis.phone ?? "",
+      rawDiagnosis.email,
+      "", "", "",
+      getAnswerLabel("business_type", rawDiagnosis.business_type),
+      getAnswerLabel("monthly_sales", rawDiagnosis.monthly_sales),
+      "",
+      getLeadSourceLabel(rawDiagnosis.lead_source),
+      rawDiagnosis.source_campaign ?? "",
+      "", "", "", "", "",
+      CONSULTATION_LABELS[rawDiagnosis.wants_consultation] ?? rawDiagnosis.wants_consultation,
+      "", "", rawDiagnosis.preferred_contact_time ?? "", "",
+      "", getLeadStatusLabel(rawDiagnosis.lead_status), "", "", "", "",
+      rawDiagnosis.admin_memo ?? "",
+      ...QUICK_DIAGNOSIS_QUESTIONS.map(() => ""),
+      ...DETAILED_DIAGNOSIS_QUESTIONS.map(() => ""),
+      DIAGNOSIS_TYPES[rawDiagnosis.main_type].name,
+      DIAGNOSIS_TYPES[rawDiagnosis.sub_type].name,
+      CONSULTATION_LABELS[rawDiagnosis.wants_consultation] ?? rawDiagnosis.wants_consultation,
+      getSeminarInterestLabel(rawDiagnosis.seminar_interest),
+      getLeadStatusLabel(rawDiagnosis.lead_status),
+      getAnswerLabel("biggest_problem", rawDiagnosis.answers.biggest_problem),
+      ...SUPPLEMENTAL_ANSWER_FIELDS.map((field) => formatAnswerValue(rawDiagnosis.answers[field.key]))
     ];
   });
 
@@ -86,51 +168,43 @@ export async function GET(request: Request) {
   return new NextResponse(`\uFEFF${csv}`, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="construction-diagnoses-${new Date().toISOString().slice(0, 10)}.csv"`
+      "Content-Disposition": `attachment; filename="construction-management-diagnoses-${new Date().toISOString().slice(0, 10)}.csv"`
     }
   });
 }
 
-function csvCell(value: string) {
-  return `"${value.replaceAll("\"", "\"\"")}"`;
-}
-
-function formatNullableDiagnosisDate(value: string | null | undefined) {
-  return value ? formatDiagnosisDate(value) : "";
-}
-
 function getFilters(params: URLSearchParams): AdminDiagnosisFilters {
+  const consultation = params.get("consultation_requested") ?? "";
+  const dateFrom = normalizeDateStart(params.get("date_from") ?? "");
+  const dateTo = normalizeDateEnd(params.get("date_to") ?? "");
+  const source = params.get("source") ?? "";
+  const judgment = params.get("judgment") ?? "";
+  const salesStatus = params.get("sales_status") ?? "";
+  const dealStatus = params.get("deal_status") ?? "";
   return {
-    mainType: normalizeDiagnosisType(params.get("main_type") ?? ""),
-    wantsConsultation: normalizeConsultation(params.get("wants_consultation") ?? ""),
-    seminarInterest: normalizeOptionalSeminarInterest(params.get("seminar_interest") ?? ""),
-    leadSource: normalizeOptionalLeadSource(params.get("lead_source") ?? ""),
-    leadStatus: normalizeOptionalLeadStatus(params.get("lead_status") ?? "")
+    dateFrom,
+    dateTo,
+    prefecture: params.get("prefecture") || undefined,
+    source: SOURCES.includes(source) ? source : undefined,
+    judgment: JUDGMENTS.includes(judgment as DiagnosisV2Judgment) ? judgment : undefined,
+    consultationRequested: consultation === "true" ? true : consultation === "false" ? false : undefined,
+    salesStatus: salesStatus in DIAGNOSIS_V2_SALES_STATUS_LABELS ? salesStatus : undefined,
+    dealStatus: dealStatus in DIAGNOSIS_V2_DEAL_STATUS_LABELS ? dealStatus : undefined
   };
 }
 
-function normalizeDiagnosisType(value: string): DiagnosisTypeCode | undefined {
-  return value in DIAGNOSIS_TYPES ? (value as DiagnosisTypeCode) : undefined;
+function csvCell(value: unknown) {
+  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
 }
 
-function normalizeConsultation(value: string) {
-  return value && value in CONSULTATION_LABELS ? value : undefined;
+function formatNullableDate(value: string | null | undefined) {
+  return value ? formatDiagnosisDate(value) : "";
 }
 
-function normalizeOptionalLeadSource(value: string) {
-  if (!value) return undefined;
-  const normalized = normalizeLeadSource(value);
-  return normalized === "other" && value !== "other" ? undefined : normalized;
+function normalizeDateStart(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00+09:00` : undefined;
 }
 
-function normalizeOptionalSeminarInterest(value: string) {
-  if (!value) return undefined;
-  const normalized = normalizeSeminarInterest(value);
-  return normalized === "undecided" && value !== "undecided" ? undefined : normalized;
-}
-
-function normalizeOptionalLeadStatus(value: string) {
-  if (!value) return undefined;
-  const normalized = normalizeLeadStatus(value);
-  return normalized === "new" && value !== "new" ? undefined : normalized;
+function normalizeDateEnd(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T23:59:59.999+09:00` : undefined;
 }

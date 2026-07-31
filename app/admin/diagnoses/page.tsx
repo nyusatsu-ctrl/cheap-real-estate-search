@@ -1,28 +1,36 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/admin/actions";
-import { LeadStatusSelect } from "@/components/diagnoses/LeadStatusSelect";
 import { getCurrentDiagnosisAdmin } from "@/lib/diagnosis-admin";
 import {
   CONSULTATION_LABELS,
   DIAGNOSIS_TYPES,
-  LEAD_SOURCE_OPTIONS,
-  LEAD_STATUS_OPTIONS,
-  SEMINAR_INTEREST_OPTIONS,
   type AdminDiagnosisFilters,
   formatDiagnosisDate,
-  getAnswerLabel,
   getConstructionDiagnoses,
   getLeadSourceLabel,
-  getSeminarInterestLabel,
-  normalizeLeadSource,
-  normalizeLeadStatus,
-  normalizeSeminarInterest,
-  type DiagnosisTypeCode
+  getLeadStatusLabel
 } from "@/lib/construction-diagnosis";
+import type { DiagnosisV2Judgment } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  DIAGNOSIS_V2_DEAL_STATUS_LABELS,
+  DIAGNOSIS_V2_SALES_STATUS_LABELS,
+  isConstructionManagementDiagnosis,
+  normalizeConstructionManagementDiagnosis
+} from "@/lib/construction-diagnosis-v2/data";
 import { Download, Filter, LogOut } from "lucide-react";
 
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+const JUDGMENTS: DiagnosisV2Judgment[] = [
+  "経営基盤の整備を優先",
+  "自社対応可能＋必要時スポット支援",
+  "一部支援推奨",
+  "段階的な専門支援推奨",
+  "現時点では保留"
+];
+
+const SOURCES = ["テレアポ", "ダイレクトメール", "紹介", "Web広告", "SEO", "YouTube", "その他"];
 
 export default async function AdminDiagnosesPage({ searchParams }: { searchParams: AdminDiagnosesSearchParams }) {
   const admin = await getCurrentDiagnosisAdmin();
@@ -34,12 +42,12 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
   const exportHref = `/admin/diagnoses/export${getFilterQuery(filters)}`;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-6">
       <AdminHeader email={admin.email} />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-950">診断者一覧</h1>
-          <p className="mt-1 text-sm text-slate-600">公共工事参入支援の見込み客、診断タイプ、説明会意向、対応状況を確認できます。</p>
+          <p className="mt-1 text-sm text-slate-600">旧診断データを維持しながら、v2の診断進捗、支援判定、相談、商談、成約状況を管理します。</p>
         </div>
         <Link href={exportHref} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
           <Download className="h-4 w-4" />
@@ -48,41 +56,25 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
       </div>
 
       <form className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-5">
-          <SelectFilter name="main_type" label="診断タイプ" defaultValue={filters.mainType ?? ""}>
-            {Object.values(DIAGNOSIS_TYPES).map((type) => (
-              <option key={type.code} value={type.code}>
-                {type.name}
-              </option>
-            ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <TextFilter name="date_from" label="診断日（開始）" type="date" defaultValue={firstParam(params.date_from)} />
+          <TextFilter name="date_to" label="診断日（終了）" type="date" defaultValue={firstParam(params.date_to)} />
+          <TextFilter name="prefecture" label="都道府県" defaultValue={filters.prefecture ?? ""} placeholder="例: 熊本県" />
+          <SelectFilter name="source" label="流入経路" defaultValue={filters.source ?? ""}>
+            {SOURCES.map((source) => <option key={source} value={source}>{source}</option>)}
           </SelectFilter>
-          <SelectFilter name="wants_consultation" label="相談意欲" defaultValue={filters.wantsConsultation ?? ""}>
-            {Object.entries(CONSULTATION_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
+          <SelectFilter name="judgment" label="支援判定" defaultValue={filters.judgment ?? ""}>
+            {JUDGMENTS.map((judgment) => <option key={judgment} value={judgment}>{judgment}</option>)}
           </SelectFilter>
-          <SelectFilter name="seminar_interest" label="説明会意向" defaultValue={filters.seminarInterest ?? ""}>
-            {SEMINAR_INTEREST_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+          <SelectFilter name="consultation_requested" label="相談希望" defaultValue={typeof filters.consultationRequested === "boolean" ? String(filters.consultationRequested) : ""}>
+            <option value="true">希望あり</option>
+            <option value="false">希望なし</option>
           </SelectFilter>
-          <SelectFilter name="lead_source" label="流入元" defaultValue={filters.leadSource ?? ""}>
-            {LEAD_SOURCE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+          <SelectFilter name="sales_status" label="商談状況" defaultValue={filters.salesStatus ?? ""}>
+            {Object.entries(DIAGNOSIS_V2_SALES_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectFilter>
-          <SelectFilter name="lead_status" label="対応ステータス" defaultValue={filters.leadStatus ?? ""}>
-            {LEAD_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+          <SelectFilter name="deal_status" label="成約状況" defaultValue={filters.dealStatus ?? ""}>
+            {Object.entries(DIAGNOSIS_V2_DEAL_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectFilter>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -90,62 +82,75 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
             <Filter className="h-4 w-4" />
             絞り込み
           </button>
-          <Link href="/admin/diagnoses" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
-            クリア
-          </Link>
+          <Link href="/admin/diagnoses" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">クリア</Link>
         </div>
       </form>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-[1900px] divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
               <tr>
-                <th className="px-3 py-3">氏名</th>
-                <th className="px-3 py-3">会社名</th>
-                <th className="px-3 py-3">電話番号</th>
-                <th className="px-3 py-3">メール</th>
-                <th className="px-3 py-3">業種</th>
-                <th className="px-3 py-3">平均年商</th>
-                <th className="px-3 py-3">診断タイプ</th>
-                <th className="px-3 py-3">相談意欲</th>
-                <th className="px-3 py-3">説明会意向</th>
-                <th className="px-3 py-3">流入元</th>
-                <th className="px-3 py-3">対応ステータス</th>
-                <th className="px-3 py-3">診断日時</th>
-                <th className="px-3 py-3">詳細</th>
+                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "流入経路", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
+                  <th key={header} className="whitespace-nowrap px-3 py-3">{header}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {diagnoses.map((diagnosis) => (
-                <tr key={diagnosis.id}>
-                  <td className="whitespace-nowrap px-3 py-3 font-bold text-slate-950">{diagnosis.name}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{diagnosis.company_name ?? "-"}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{diagnosis.phone ?? "-"}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{diagnosis.email}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{getAnswerLabel("business_type", diagnosis.business_type)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{getAnswerLabel("monthly_sales", diagnosis.monthly_sales)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 font-bold text-slate-950">{DIAGNOSIS_TYPES[diagnosis.main_type].name}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{CONSULTATION_LABELS[diagnosis.wants_consultation] ?? diagnosis.wants_consultation}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{getSeminarInterestLabel(diagnosis.seminar_interest)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{getLeadSourceLabel(diagnosis.lead_source)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">
-                    <LeadStatusSelect diagnosisId={diagnosis.id} currentStatus={diagnosis.lead_status} options={LEAD_STATUS_OPTIONS} />
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{formatDiagnosisDate(diagnosis.created_at)}</td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <Link href={`/admin/diagnoses/${diagnosis.id}`} className="font-bold text-brand-700">
-                      表示
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {diagnoses.map((rawDiagnosis) => {
+                if (isConstructionManagementDiagnosis(rawDiagnosis)) {
+                  const diagnosis = normalizeConstructionManagementDiagnosis(rawDiagnosis);
+                  return (
+                    <tr key={diagnosis.id}>
+                      <Cell>{formatDiagnosisDate(diagnosis.created_at)}</Cell>
+                      <Cell bold>{diagnosis.company_name}</Cell>
+                      <Cell>{diagnosis.respondent_name}</Cell>
+                      <Cell>{diagnosis.prefecture}</Cell>
+                      <Cell>{diagnosis.phone}</Cell>
+                      <Cell>{diagnosis.email}</Cell>
+                      <Cell>{diagnosis.source ?? getLeadSourceLabel(diagnosis.lead_source)}</Cell>
+                      <Cell>{diagnosis.quick_completed_at ? "完了" : "未完了"}</Cell>
+                      <Cell>{diagnosis.detailed_completed_at ? "完了" : "未完了"}</Cell>
+                      <Cell bold>{diagnosis.total_score === null ? "-" : Number(diagnosis.total_score).toFixed(1)}</Cell>
+                      <Cell bold>{diagnosis.judgment ?? "-"}</Cell>
+                      <Cell>{diagnosis.critical_flags.length}件</Cell>
+                      <Cell>{diagnosis.consultation_requested ? "希望あり" : "希望なし"}</Cell>
+                      <Cell>{formatNullableDate(diagnosis.meeting_at)}</Cell>
+                      <Cell>{DIAGNOSIS_V2_SALES_STATUS_LABELS[diagnosis.sales_status]}</Cell>
+                      <Cell>{DIAGNOSIS_V2_DEAL_STATUS_LABELS[diagnosis.deal_status]}</Cell>
+                      <Cell>{diagnosis.deal_amount === null ? "-" : `${Number(diagnosis.deal_amount).toLocaleString("ja-JP")}円`}</Cell>
+                      <Cell>{formatNullableDate(diagnosis.next_action_at)}</Cell>
+                      <DetailCell id={diagnosis.id} />
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={rawDiagnosis.id} className="bg-slate-50/60">
+                    <Cell>{formatDiagnosisDate(rawDiagnosis.created_at)}</Cell>
+                    <Cell bold>{rawDiagnosis.company_name ?? "-"}</Cell>
+                    <Cell>{rawDiagnosis.name}</Cell>
+                    <Cell>-</Cell>
+                    <Cell>{rawDiagnosis.phone ?? "-"}</Cell>
+                    <Cell>{rawDiagnosis.email}</Cell>
+                    <Cell>{getLeadSourceLabel(rawDiagnosis.lead_source)}</Cell>
+                    <Cell>旧診断</Cell>
+                    <Cell>旧診断</Cell>
+                    <Cell>-</Cell>
+                    <Cell>{DIAGNOSIS_TYPES[rawDiagnosis.main_type].name}</Cell>
+                    <Cell>-</Cell>
+                    <Cell>{CONSULTATION_LABELS[rawDiagnosis.wants_consultation] ?? rawDiagnosis.wants_consultation}</Cell>
+                    <Cell>-</Cell>
+                    <Cell>{getLeadStatusLabel(rawDiagnosis.lead_status)}</Cell>
+                    <Cell>-</Cell>
+                    <Cell>-</Cell>
+                    <Cell>-</Cell>
+                    <DetailCell id={rawDiagnosis.id} />
+                  </tr>
+                );
+              })}
               {diagnoses.length === 0 ? (
-                <tr>
-                  <td colSpan={13} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">
-                    診断データはまだありません。
-                  </td>
-                </tr>
+                <tr><td colSpan={19} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">条件に一致する診断データはありません。</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -153,6 +158,37 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
       </div>
     </div>
   );
+}
+
+function getFilters(params: Record<string, string | string[] | undefined>): AdminDiagnosisFilters {
+  const consultation = firstParam(params.consultation_requested);
+  const dateFrom = normalizeDateStart(firstParam(params.date_from));
+  const dateTo = normalizeDateEnd(firstParam(params.date_to));
+  return {
+    diagnosisVersion: undefined,
+    dateFrom,
+    dateTo,
+    prefecture: firstParam(params.prefecture) || undefined,
+    source: SOURCES.includes(firstParam(params.source)) ? firstParam(params.source) : undefined,
+    judgment: JUDGMENTS.includes(firstParam(params.judgment) as DiagnosisV2Judgment) ? firstParam(params.judgment) : undefined,
+    consultationRequested: consultation === "true" ? true : consultation === "false" ? false : undefined,
+    salesStatus: firstParam(params.sales_status) in DIAGNOSIS_V2_SALES_STATUS_LABELS ? firstParam(params.sales_status) : undefined,
+    dealStatus: firstParam(params.deal_status) in DIAGNOSIS_V2_DEAL_STATUS_LABELS ? firstParam(params.deal_status) : undefined
+  };
+}
+
+function getFilterQuery(filters: AdminDiagnosisFilters) {
+  const params = new URLSearchParams();
+  if (filters.dateFrom) params.set("date_from", filters.dateFrom.slice(0, 10));
+  if (filters.dateTo) params.set("date_to", filters.dateTo.slice(0, 10));
+  if (filters.prefecture) params.set("prefecture", filters.prefecture);
+  if (filters.source) params.set("source", filters.source);
+  if (filters.judgment) params.set("judgment", filters.judgment);
+  if (typeof filters.consultationRequested === "boolean") params.set("consultation_requested", String(filters.consultationRequested));
+  if (filters.salesStatus) params.set("sales_status", filters.salesStatus);
+  if (filters.dealStatus) params.set("deal_status", filters.dealStatus);
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }
 
 function SelectFilter({ name, label, defaultValue, children }: { name: string; label: string; defaultValue: string; children: ReactNode }) {
@@ -167,74 +203,50 @@ function SelectFilter({ name, label, defaultValue, children }: { name: string; l
   );
 }
 
-function getFilters(params: Record<string, string | string[] | undefined>): AdminDiagnosisFilters {
-  return {
-    mainType: normalizeDiagnosisType(firstParam(params.main_type)),
-    wantsConsultation: normalizeConsultation(firstParam(params.wants_consultation)),
-    seminarInterest: normalizeOptionalSeminarInterest(firstParam(params.seminar_interest)),
-    leadSource: normalizeOptionalLeadSource(firstParam(params.lead_source)),
-    leadStatus: normalizeOptionalLeadStatus(firstParam(params.lead_status))
-  };
+function TextFilter({ name, label, defaultValue, type = "text", placeholder }: { name: string; label: string; defaultValue: string; type?: string; placeholder?: string }) {
+  return (
+    <label className="grid gap-1 text-xs font-bold text-slate-600">
+      {label}
+      <input name={name} type={type} defaultValue={defaultValue} placeholder={placeholder} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus-ring" />
+    </label>
+  );
 }
 
-function getFilterQuery(filters: AdminDiagnosisFilters) {
-  const params = new URLSearchParams();
-  if (filters.mainType) params.set("main_type", filters.mainType);
-  if (filters.wantsConsultation) params.set("wants_consultation", filters.wantsConsultation);
-  if (filters.seminarInterest) params.set("seminar_interest", filters.seminarInterest);
-  if (filters.leadSource) params.set("lead_source", filters.leadSource);
-  if (filters.leadStatus) params.set("lead_status", filters.leadStatus);
+function Cell({ children, bold = false }: { children: ReactNode; bold?: boolean }) {
+  return <td className={`whitespace-nowrap px-3 py-3 text-slate-700 ${bold ? "font-black text-slate-950" : ""}`}>{children}</td>;
+}
 
-  const query = params.toString();
-  return query ? `?${query}` : "";
+function DetailCell({ id }: { id: string }) {
+  return <td className="whitespace-nowrap px-3 py-3"><Link href={`/admin/diagnoses/${id}`} className="font-bold text-brand-700">表示</Link></td>;
 }
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-function normalizeDiagnosisType(value: string): DiagnosisTypeCode | undefined {
-  return value in DIAGNOSIS_TYPES ? (value as DiagnosisTypeCode) : undefined;
+function normalizeDateStart(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00+09:00` : undefined;
 }
 
-function normalizeConsultation(value: string) {
-  return value && value in CONSULTATION_LABELS ? value : undefined;
+function normalizeDateEnd(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T23:59:59.999+09:00` : undefined;
 }
 
-function normalizeOptionalLeadSource(value: string) {
-  if (!value) return undefined;
-  const normalized = normalizeLeadSource(value);
-  return normalized === "other" && value !== "other" ? undefined : normalized;
-}
-
-function normalizeOptionalSeminarInterest(value: string) {
-  if (!value) return undefined;
-  const normalized = normalizeSeminarInterest(value);
-  return normalized === "undecided" && value !== "undecided" ? undefined : normalized;
-}
-
-function normalizeOptionalLeadStatus(value: string) {
-  if (!value) return undefined;
-  const normalized = normalizeLeadStatus(value);
-  return normalized === "new" && value !== "new" ? undefined : normalized;
+function formatNullableDate(value: string | null) {
+  return value ? formatDiagnosisDate(value) : "-";
 }
 
 function AdminHeader({ email }: { email: string }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-slate-500">建設業売上アップ診断</p>
+        <p className="text-sm font-semibold text-slate-500">建設会社向け 経営診断・再成長戦略</p>
         <p className="mt-1 text-xs text-slate-500">{email}</p>
       </div>
       <div className="flex items-center gap-2">
-        <Link href="/construction-sales-diagnosis" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
-          公開ページ
-        </Link>
+        <Link href="/construction-sales-diagnosis" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">公開ページ</Link>
         <form action={signOutAction}>
-          <button className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
-            <LogOut className="h-4 w-4" />
-            ログアウト
-          </button>
+          <button className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring"><LogOut className="h-4 w-4" />ログアウト</button>
         </form>
       </div>
     </div>
@@ -247,9 +259,7 @@ function LoginRequired() {
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-2xl font-black text-slate-950">管理画面</h1>
         <p className="mt-2 text-slate-700">診断者一覧を見るには管理者ログインが必要です。</p>
-        <Link href="/admin/login" className="mt-5 inline-block rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring">
-          ログインへ
-        </Link>
+        <Link href="/admin/login" className="mt-5 inline-block rounded bg-brand-700 px-4 py-2 font-bold text-white focus-ring">ログインへ</Link>
       </div>
     </div>
   );

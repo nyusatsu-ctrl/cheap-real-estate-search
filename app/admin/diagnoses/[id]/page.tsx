@@ -17,6 +17,11 @@ import {
   getSupplementalAnswerEntries,
   getQuestionLabel
 } from "@/lib/construction-diagnosis";
+import { DiagnosisV2AdminDetail } from "@/components/diagnoses/v2/DiagnosisV2AdminDetail";
+import {
+  isConstructionManagementDiagnosis,
+  normalizeConstructionManagementDiagnosis
+} from "@/lib/construction-diagnosis-v2/data";
 
 export default async function AdminDiagnosisDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const admin = await getCurrentDiagnosisAdmin();
@@ -37,6 +42,9 @@ export default async function AdminDiagnosisDetailPage({ params }: { params: Pro
   const { id } = await params;
   const diagnosis = await getConstructionDiagnosis(id);
   if (!diagnosis) notFound();
+  if (isConstructionManagementDiagnosis(diagnosis)) {
+    return <DiagnosisV2AdminDetail diagnosis={normalizeConstructionManagementDiagnosis(diagnosis)} />;
+  }
 
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];
   const sub = DIAGNOSIS_TYPES[diagnosis.sub_type];

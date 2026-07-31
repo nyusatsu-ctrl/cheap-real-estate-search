@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { DiagnosisForm, type DiagnosisFormQuestion } from "@/components/diagnoses/DiagnosisForm";
-import { DIAGNOSIS_QUESTIONS, getSupplementalFieldsForQuestion, normalizeLeadSource } from "@/lib/construction-diagnosis";
-import { HardHat } from "lucide-react";
+import { DiagnosisV2StartForm } from "@/components/diagnoses/v2/DiagnosisV2StartForm";
+import { normalizeLeadSource } from "@/lib/construction-diagnosis";
+import { ClipboardList } from "lucide-react";
 
 type DiagnosisSearchParams = Promise<{
   source?: string | string[];
@@ -10,53 +10,33 @@ type DiagnosisSearchParams = Promise<{
 
 export default async function DiagnosisFormPage({ searchParams }: { searchParams: DiagnosisSearchParams }) {
   const params = await searchParams;
-  const rawSource = firstParam(params.source);
+  const leadSource = normalizeLeadSource(firstParam(params.source));
   const campaign = firstParam(params.campaign);
-  const leadSource = normalizeLeadSource(rawSource);
-  const questions: DiagnosisFormQuestion[] = DIAGNOSIS_QUESTIONS.map((question) => ({
-    key: question.key,
-    label: question.label,
-    type: question.type,
-    options: question.options?.map((option) => ({
-      value: option.value,
-      label: option.label
-    })),
-    supplementalFields: getSupplementalFieldsForQuestion(question.key).map((field) => ({
-      key: field.key,
-      label: field.label,
-      placeholder: field.placeholder,
-      triggerValues: field.triggerValues,
-      requiredWhenTriggered: field.requiredWhenTriggered
-    }))
-  }));
 
   return (
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-8">
-          <Link href="/construction-sales-diagnosis" className="text-sm font-bold text-brand-700">
-            トップへ戻る
-          </Link>
+          <Link href="/construction-sales-diagnosis" className="text-sm font-bold text-brand-700">トップへ戻る</Link>
           <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="inline-flex items-center gap-2 rounded bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700">
-                <HardHat className="h-4 w-4" />
-                20項目診断
-              </p>
-              <h1 className="mt-3 text-3xl font-black leading-tight text-slate-950 md:text-4xl">建設業売上アップ診断</h1>
-              <p className="mt-2 text-sm font-bold text-slate-600">株式会社エコループ</p>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700">
-                現在の受注状況、集客、利益管理、公共工事への参入状況などを入力すると、売上アップに向けた優先課題と、株式会社エコループのサポート活用方法を診断します。
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="inline-flex items-center gap-2 rounded bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700">
+                  <ClipboardList className="h-4 w-4" />
+                  無料診断
+                </p>
+                <span className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800">テスト版</span>
+              </div>
+              <h1 className="mt-3 text-3xl font-black leading-tight text-slate-950 md:text-4xl">建設会社向け 経営診断・再成長戦略</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
+                経営課題、利益管理、組織体制、公共工事への参入余地を無料で診断します。最初に基本情報と簡易診断10問へご回答ください。
               </p>
             </div>
-            <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
-              入力時間: 約3分
-            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">簡易診断: 約3分</div>
           </div>
         </div>
       </section>
-
-      <DiagnosisForm leadSource={leadSource} campaign={campaign} questions={questions} />
+      <DiagnosisV2StartForm leadSource={leadSource} campaign={campaign} />
     </div>
   );
 }

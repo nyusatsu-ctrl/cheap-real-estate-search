@@ -94,6 +94,15 @@ export type AdminDiagnosisFilters = {
   seminarInterest?: SeminarInterest;
   leadSource?: LeadSource;
   leadStatus?: LeadStatus;
+  diagnosisVersion?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  prefecture?: string;
+  source?: string;
+  judgment?: string;
+  consultationRequested?: boolean;
+  salesStatus?: string;
+  dealStatus?: string;
 };
 
 export type PublicWorksRoutePlan = {
@@ -946,6 +955,15 @@ export async function getConstructionDiagnoses(filters: AdminDiagnosisFilters = 
   if (filters.seminarInterest) query = query.eq("seminar_interest", filters.seminarInterest);
   if (filters.leadSource) query = query.eq("lead_source", filters.leadSource);
   if (filters.leadStatus) query = query.eq("lead_status", filters.leadStatus);
+  if (filters.diagnosisVersion) query = query.eq("diagnosis_version", filters.diagnosisVersion);
+  if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
+  if (filters.dateTo) query = query.lte("created_at", filters.dateTo);
+  if (filters.prefecture) query = query.eq("prefecture", filters.prefecture);
+  if (filters.source) query = query.eq("source", filters.source);
+  if (filters.judgment) query = query.eq("judgment", filters.judgment);
+  if (typeof filters.consultationRequested === "boolean") query = query.eq("consultation_requested", filters.consultationRequested);
+  if (filters.salesStatus) query = query.eq("sales_status", filters.salesStatus);
+  if (filters.dealStatus) query = query.eq("deal_status", filters.dealStatus);
 
   const { data, error } = await query;
 

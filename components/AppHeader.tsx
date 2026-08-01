@@ -19,6 +19,7 @@ type PropertyMemberState =
 
 export function AppHeader() {
   const pathname = usePathname();
+  if (pathname.startsWith("/diagnosis/print")) return null;
   const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities") || pathname.startsWith("/admin/sales-help");
   const isTenderRoute =
     pathname.startsWith("/tenders")

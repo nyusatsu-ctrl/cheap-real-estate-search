@@ -1,7 +1,7 @@
 @media print {
   @page {
     size: A4;
-    margin: 12mm;
+    margin: 14mm 12mm;
   }
 
   body:has(.diagnosis-print-page) {
@@ -16,15 +16,62 @@
   .diagnosis-print-page {
     background: #fff !important;
     color: #111827 !important;
+    font-size: 10.5pt !important;
+  }
+
+  .diagnosis-print-page .diagnosis-print-brand,
+  .diagnosis-print-page .diagnosis-print-keep,
+  .diagnosis-print-page li,
+  .diagnosis-print-page details {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .diagnosis-print-page .diagnosis-result-section > div:first-child,
+  .diagnosis-print-page h1,
+  .diagnosis-print-page h2,
+  .diagnosis-print-page h3,
+  .diagnosis-print-page h4 {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .diagnosis-print-page .diagnosis-result-section {
-    break-inside: avoid;
-    box-shadow: none !important;
+    break-inside: auto;
+    page-break-inside: auto;
+    border-color: #cbd5e1 !important;
+    margin-bottom: 5mm !important;
+  }
+
+  .diagnosis-print-page [class*="bg-brand"],
+  .diagnosis-print-page [class*="bg-emerald"],
+  .diagnosis-print-page [class*="bg-amber"] {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   .diagnosis-print-page a,
   .diagnosis-print-page button {
     text-decoration: none !important;
+  }
+
+  .diagnosis-print-controls,
+  .diagnosis-print-page .print\:hidden {
+    display: none !important;
+  }
+
+  .diagnosis-print-page .max-w-5xl {
+    max-width: none !important;
+  }
+
+  .diagnosis-print-page .px-4 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .diagnosis-print-page .py-8 {
+    padding-top: 4mm !important;
+    padding-bottom: 4mm !important;
   }
 }

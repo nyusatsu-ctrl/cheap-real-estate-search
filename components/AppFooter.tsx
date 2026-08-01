@@ -20,6 +20,7 @@ const tenderFooterLinks = [
 
 export function AppFooter() {
   const pathname = usePathname();
+  if (pathname.startsWith("/diagnosis/print")) return null;
   if (pathname.startsWith("/income-potential")) return <IncomePotentialFooter />;
 
   const links = pathname.startsWith("/tenders") || pathname.startsWith("/favorites") || pathname.startsWith("/notifications")

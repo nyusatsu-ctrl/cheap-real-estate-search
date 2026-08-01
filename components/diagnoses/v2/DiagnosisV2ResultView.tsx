@@ -1,10 +1,12 @@
 import Link from "next/link";
+import Image from "next/image";
 import { DiagnosisV21FeedbackForm } from "@/components/diagnoses/v2/DiagnosisV21FeedbackForm";
-import { PrintButton } from "@/components/diagnoses/v2/PrintButton";
+import { DiagnosisPrintLauncher } from "@/components/diagnoses/v2/DiagnosisPrintLauncher";
 import type { ConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   DIAGNOSIS_V2_SECTIONS,
+  getApplicableDetailedQuestions,
   isSpecialtyConstructionDiagnosisVersion,
   type DiagnosisV2ScoringContext
 } from "@/lib/construction-diagnosis-v2/questions";
@@ -22,10 +24,12 @@ const DISCLAIMER = "この診断は、入力内容から会社の課題と、こ
 
 export function DiagnosisV2ResultView({
   diagnosis,
-  printMode = false
+  printMode = false,
+  printError = false
 }: {
   diagnosis: ConstructionManagementDiagnosis;
   printMode?: boolean;
+  printError?: boolean;
 }) {
   const hasSpecialty = isSpecialtyConstructionDiagnosisVersion(diagnosis.diagnosis_version);
   const isV22 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
@@ -37,6 +41,9 @@ export function DiagnosisV2ResultView({
       }
     : { includeSpecialty: false };
   const scoring = scoreDetailedDiagnosis(diagnosis.detailed_answers, context);
+  const applicableQuestionMap = new Map(
+    getApplicableDetailedQuestions(context).map((question) => [question.id, question.question])
+  );
   if (!scoring.complete || scoring.totalScore === null || !scoring.judgment) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
@@ -62,22 +69,38 @@ export function DiagnosisV2ResultView({
     <div className={`diagnosis-print-page bg-slate-50 ${printMode ? "diagnosis-force-print-layout" : ""}`}>
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-8">
+          {printMode ? (
+            <div className="diagnosis-print-brand mb-6 flex items-center gap-3 border-b border-slate-300 pb-5">
+              <Image
+                src="/images/ecoloop-sales-diagnosis-logo.png"
+                alt="株式会社エコループ"
+                width={1914}
+                height={822}
+                className="h-14 w-auto object-contain sm:h-16"
+                priority
+              />
+              <div>
+                <p className="text-sm font-black text-slate-950">株式会社エコループ</p>
+                <p className="mt-1 text-xs font-bold text-slate-600">建設会社向け 経営診断・再成長戦略</p>
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-black text-brand-700">詳細診断結果</p>
-                <span className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800 print:hidden">テスト版</span>
+                {!printMode ? <span className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800 print:hidden">テスト版</span> : null}
               </div>
               <h1 className="mt-2 break-all text-3xl font-black text-slate-950 md:text-4xl">{diagnosis.company_name}様</h1>
               <p className="mt-2 text-sm text-slate-600">診断日: {formatDiagnosisDate(diagnosis.detailed_completed_at ?? diagnosis.created_at)}</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row print:hidden">
-              <Link href={`/diagnosis/results/${diagnosis.id}/print`} className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800 focus-ring">
-                印刷画面
-              </Link>
-              <PrintButton />
-            </div>
+            {!printMode ? <DiagnosisPrintLauncher diagnosisId={diagnosis.id} className="print:hidden" /> : null}
           </div>
+          {printError ? (
+            <p role="alert" className="mt-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-7 text-red-900 print:hidden">
+              印刷用画面を準備できませんでした。ページを再読み込みして、もう一度お試しください。
+            </p>
+          ) : null}
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <Metric label="総合点" value={`${scoring.totalScore.toFixed(1)}点`} emphasis />
             <Metric label="支援判定" value={scoring.judgment} />
@@ -85,7 +108,14 @@ export function DiagnosisV2ResultView({
           {scoring.criticalFlags.length > 0 ? (
             <div className="mt-4 flex gap-3 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-7 text-red-900">
               <AlertTriangle className="mt-1 h-5 w-5 shrink-0" />
-              急いで確認する項目が{scoring.criticalFlags.length}件あります。仕事を増やす前に、会社のお金、安全、法律、お金や書類の確認方法を先に確認してください。
+              <div>
+                <p>急いで確認する項目が{scoring.criticalFlags.length}件あります。仕事を増やす前に、会社のお金、安全、法律、お金や書類の確認方法を先に確認してください。</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {scoring.criticalFlags.map((questionId) => (
+                    <li key={questionId}>{applicableQuestionMap.get(questionId) ?? questionId}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           ) : null}
         </div>
@@ -98,7 +128,7 @@ export function DiagnosisV2ResultView({
               const score = scoring.axisScores[section.id];
               const excluded = section.id === "public_works" && scoring.publicWorksMode === "excluded";
               return (
-                <div key={section.id}>
+                <div key={section.id} className="diagnosis-print-keep">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="font-bold text-slate-700">
                       {section.shortLabel}
@@ -240,16 +270,17 @@ export function DiagnosisV2ResultView({
         </section>
 
         {!printMode ? (
-          <div className="flex flex-col gap-3 sm:flex-row print:hidden">
-            <Link href="/diagnosis" className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">もう一度診断する</Link>
-            <Link href="/construction-sales-diagnosis" className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 px-5 py-3 font-black text-white focus-ring">
-              トップへ戻る
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          <div className="space-y-3 print:hidden">
+            <DiagnosisPrintLauncher diagnosisId={diagnosis.id} />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link href="/diagnosis" className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-5 py-3 font-bold text-slate-800 focus-ring">もう一度診断する</Link>
+              <Link href="/construction-sales-diagnosis" className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 px-5 py-3 font-black text-white focus-ring">
+                トップへ戻る
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-        ) : (
-          <div className="flex justify-end print:hidden"><PrintButton /></div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -257,7 +288,7 @@ export function DiagnosisV2ResultView({
 
 function Metric({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div className={`rounded border p-4 ${emphasis ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-slate-50"}`}>
+    <div className={`diagnosis-print-keep rounded border p-4 ${emphasis ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-slate-50"}`}>
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className={`mt-2 font-black text-slate-950 ${emphasis ? "text-3xl" : "text-lg"}`}>{value}</p>
     </div>
@@ -292,7 +323,7 @@ function ResultItemList({ items, tone = "default" }: { items: string[]; tone?: "
 
 function MonthPlan({ month, subtitle, items }: { month: string; subtitle: string; items: string[] }) {
   return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-4">
+    <div className="diagnosis-print-keep rounded border border-slate-200 bg-slate-50 p-4">
       <p className="text-sm font-black text-brand-700">{month}</p>
       <h3 className="mt-1 text-base font-black leading-6 text-slate-950">{subtitle}</h3>
       <ResultItemList items={items} />
@@ -302,7 +333,7 @@ function MonthPlan({ month, subtitle, items }: { month: string; subtitle: string
 
 function ProfileMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-3">
+    <div className="diagnosis-print-keep rounded border border-slate-200 bg-slate-50 p-3">
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className="mt-1 text-sm font-black leading-6 text-slate-950">{value}</p>
     </div>

@@ -22,13 +22,20 @@ import { ArrowRight, CalendarCheck, ClipboardList, Hammer, PhoneCall, Route } fr
 const SEMINAR_GUIDE_HREF = "/diagnosis?source=direct&campaign=seminar_guide";
 const CONSULTATION_HREF = "/diagnosis?source=direct&campaign=consultation_cta";
 
-export default async function DiagnosisResultPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DiagnosisResultPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ print_error?: string }>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
   const diagnosis = await getConstructionDiagnosis(id) ?? await getCachedDiagnosis(id);
   if (!diagnosis) notFound();
   if (isConstructionManagementDiagnosis(diagnosis)) {
     if (diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION && !await canAccessDiagnosisV22(id)) notFound();
-    return <DiagnosisV2ResultView diagnosis={normalizeConstructionManagementDiagnosis(diagnosis)} />;
+    return <DiagnosisV2ResultView diagnosis={normalizeConstructionManagementDiagnosis(diagnosis)} printError={query.print_error === "1"} />;
   }
 
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];

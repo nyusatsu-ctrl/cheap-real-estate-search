@@ -15,6 +15,7 @@ import {
   isSpecialtyConstructionDiagnosisVersion
 } from "@/lib/construction-diagnosis-v2/questions";
 import {
+  getShortDiagnosisAnswerScore,
   getShortDiagnosisOptionLabel,
   getShortDiagnosisQuestions,
   hasShortDiagnosisAnswers
@@ -173,7 +174,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
                   id={question.id}
                   question={question.question}
                   answer={usesShortDiagnosis
-                    ? getShortDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])
+                    ? `${getShortDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])}（${getShortDiagnosisAnswerScore(question.id, diagnosis.quick_answers[question.id]) ?? "-"}点）`
                     : getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])}
                 />
               ))}

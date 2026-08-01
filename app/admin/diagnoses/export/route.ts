@@ -25,6 +25,7 @@ import {
 } from "@/lib/construction-diagnosis-v2/questions";
 import {
   ALL_SHORT_DIAGNOSIS_QUESTIONS,
+  getShortDiagnosisAnswerScore,
   getShortDiagnosisOptionLabel
 } from "@/lib/construction-diagnosis-v2/short-questions";
 import {
@@ -124,7 +125,10 @@ export async function GET(request: Request) {
     "フィードバック・自由入力",
     "フィードバック回答日時",
     ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => `旧簡易 ${question.id} ${question.question}`),
-    ...ALL_SHORT_DIAGNOSIS_QUESTIONS.map((question) => `短縮 ${question.id} ${question.question}`),
+    ...ALL_SHORT_DIAGNOSIS_QUESTIONS.flatMap((question) => [
+      `短縮 ${question.id} ${question.question} 回答`,
+      `短縮 ${question.id} 点数`
+    ]),
     ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => `${question.id} ${question.question}`),
     ...ALL_SPECIALTY_QUESTIONS.map((question) => `${question.id} ${question.question}`),
     "旧診断タイプ",
@@ -205,7 +209,12 @@ export async function GET(request: Request) {
         diagnosis.feedback_comment ?? "",
         formatNullableDate(diagnosis.feedback_submitted_at),
         ...QUICK_DIAGNOSIS_QUESTIONS.map((question) => diagnosis.quick_answers[question.id] === undefined ? "" : getQuickDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
-        ...ALL_SHORT_DIAGNOSIS_QUESTIONS.map((question) => diagnosis.quick_answers[question.id] === undefined ? "" : getShortDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id])),
+        ...ALL_SHORT_DIAGNOSIS_QUESTIONS.flatMap((question) => diagnosis.quick_answers[question.id] === undefined
+          ? ["", ""]
+          : [
+              getShortDiagnosisOptionLabel(question.id, diagnosis.quick_answers[question.id]),
+              getShortDiagnosisAnswerScore(question.id, diagnosis.quick_answers[question.id]) ?? ""
+            ]),
         ...DETAILED_DIAGNOSIS_QUESTIONS.map((question) => getDiagnosisV2OptionLabel(question.id, diagnosis.detailed_answers[question.id])),
         ...ALL_SPECIALTY_QUESTIONS.map((question) => diagnosis.specialty_answers[question.id] === undefined ? "" : getSpecialtyQuestionLabel(question.id, diagnosis.specialty_answers[question.id])),
         "", "", "", "", "", "",
@@ -252,7 +261,7 @@ export async function GET(request: Request) {
       rawDiagnosis.admin_memo ?? "",
       ...Array(6).fill(""),
       ...QUICK_DIAGNOSIS_QUESTIONS.map(() => ""),
-      ...ALL_SHORT_DIAGNOSIS_QUESTIONS.map(() => ""),
+      ...ALL_SHORT_DIAGNOSIS_QUESTIONS.flatMap(() => ["", ""]),
       ...DETAILED_DIAGNOSIS_QUESTIONS.map(() => ""),
       ...ALL_SPECIALTY_QUESTIONS.map(() => ""),
       DIAGNOSIS_TYPES[rawDiagnosis.main_type].name,

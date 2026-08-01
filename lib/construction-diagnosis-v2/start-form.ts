@@ -1,5 +1,7 @@
 export type DiagnosisV2StartFormValues = Record<string, string>;
 
+export const DIAGNOSIS_V22_QUESTION_DEFINITION_VERSION = "2026-08-01-short-mappings-v2";
+
 export const DIAGNOSIS_V22_EMPLOYEE_OPTIONS = ["1人", "2～5人", "6～10人", "11～30人", "31～50人", "51人以上"];
 export const DIAGNOSIS_V22_SALES_OPTIONS = [
   "3,000万円未満",
@@ -48,6 +50,38 @@ export function sanitizeDiagnosisV2StartValues(input: unknown): DiagnosisV2Start
     }
   }
   return values;
+}
+
+export function normalizeStoredDiagnosisV2StartValues(input: unknown) {
+  const stored = input && typeof input === "object" && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : {};
+  const hasCurrentVersion = stored.questionDefinitionVersion === DIAGNOSIS_V22_QUESTION_DEFINITION_VERSION;
+  const rawValues = hasCurrentVersion ? stored.values : input;
+  const values = sanitizeDiagnosisV2StartValues(rawValues);
+  if (hasCurrentVersion) return { values, definitionUpdated: false };
+
+  const reusableValues = Object.fromEntries(Object.entries(values).filter(([name]) =>
+    DIAGNOSIS_V2_BASIC_FIELD_ORDER.includes(name as (typeof DIAGNOSIS_V2_BASIC_FIELD_ORDER)[number])
+    || /^C0[1-8]$/.test(name)
+    || /^PW0[1-3]$/.test(name)
+  ));
+  return { values: reusableValues, definitionUpdated: Object.keys(values).length > 0 };
+}
+
+export function serializeDiagnosisV2StartValues(values: DiagnosisV2StartFormValues) {
+  return JSON.stringify({
+    questionDefinitionVersion: DIAGNOSIS_V22_QUESTION_DEFINITION_VERSION,
+    values
+  });
+}
+
+export function pruneDiagnosisV2StartValues(
+  values: DiagnosisV2StartFormValues,
+  allowedQuestionIds: Iterable<string>
+) {
+  const allowed = new Set([...DIAGNOSIS_V2_BASIC_FIELD_ORDER, ...allowedQuestionIds]);
+  return Object.fromEntries(Object.entries(values).filter(([name]) => allowed.has(name as (typeof DIAGNOSIS_V2_BASIC_FIELD_ORDER)[number])));
 }
 
 export function validateDiagnosisV2BasicStep(values: DiagnosisV2StartFormValues) {

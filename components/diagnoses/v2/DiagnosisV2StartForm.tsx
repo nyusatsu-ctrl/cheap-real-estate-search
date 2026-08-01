@@ -6,7 +6,9 @@ import { getShortDiagnosisQuestions, type ShortDiagnosisQuestion } from "@/lib/c
 import {
   DIAGNOSIS_V22_EMPLOYEE_OPTIONS,
   DIAGNOSIS_V22_SALES_OPTIONS,
-  sanitizeDiagnosisV2StartValues,
+  normalizeStoredDiagnosisV2StartValues,
+  pruneDiagnosisV2StartValues,
+  serializeDiagnosisV2StartValues,
   validateDiagnosisV2BasicStep,
   type DiagnosisV2StartFormValues
 } from "@/lib/construction-diagnosis-v2/start-form";
@@ -34,6 +36,7 @@ export function DiagnosisV2StartForm({ leadSource, campaign }: { leadSource: str
   const [restored, setRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [progressError, setProgressError] = useState("");
+  const [definitionUpdated, setDefinitionUpdated] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
   const submittingRef = useRef(false);
   const fieldErrors = useMemo(() => ({ ...(state.fieldErrors ?? {}), ...clientErrors }), [clientErrors, state.fieldErrors]);
@@ -53,10 +56,17 @@ export function DiagnosisV2StartForm({ leadSource, campaign }: { leadSource: str
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const storedSession = readStorage(SESSION_STORAGE_KEY);
-      setValues(readStoredValues());
-      setSessionId(storedSession);
-      setStep(storedSession ? readStoredNumber(STEP_STORAGE_KEY, 1) : 0);
-      setPage(readStoredNumber(PAGE_STORAGE_KEY, 20));
+      const stored = readStoredValues();
+      setValues(stored.values);
+      setDefinitionUpdated(stored.definitionUpdated);
+      setSessionId(stored.definitionUpdated ? "" : storedSession);
+      if (stored.definitionUpdated) {
+        removeStorage(SESSION_STORAGE_KEY);
+        removeStorage(STEP_STORAGE_KEY);
+        removeStorage(PAGE_STORAGE_KEY);
+      }
+      setStep(stored.definitionUpdated ? 0 : storedSession ? readStoredNumber(STEP_STORAGE_KEY, 1) : 0);
+      setPage(stored.definitionUpdated ? 0 : readStoredNumber(PAGE_STORAGE_KEY, 20));
       setRestored(true);
     }, 0);
     return () => window.clearTimeout(timeout);
@@ -64,7 +74,7 @@ export function DiagnosisV2StartForm({ leadSource, campaign }: { leadSource: str
 
   useEffect(() => {
     if (!restored) return;
-    writeStorage(STORAGE_KEY, JSON.stringify(values));
+    writeStorage(STORAGE_KEY, serializeDiagnosisV2StartValues(values));
     writeStorage(STEP_STORAGE_KEY, String(step));
     writeStorage(PAGE_STORAGE_KEY, String(page));
     if (sessionId) writeStorage(SESSION_STORAGE_KEY, sessionId);
@@ -92,7 +102,15 @@ export function DiagnosisV2StartForm({ leadSource, campaign }: { leadSource: str
   }, [shortQuestions, state.fieldErrors]);
 
   const setValue = (name: string, value: string) => {
-    setValues((current) => ({ ...current, [name]: value }));
+    setValues((current) => {
+      const next = { ...current, [name]: value };
+      if (name !== "primary_trade" && name !== "public_work_intent") return next;
+      const applicableIds = getShortDiagnosisQuestions({
+        primaryTrade: next.primary_trade,
+        publicWorkIntent: next.public_work_intent
+      }).map((question) => question.id);
+      return pruneDiagnosisV2StartValues(next, applicableIds);
+    });
     setClientErrors((current) => omitKey(current, name));
     setProgressError("");
   };
@@ -189,6 +207,11 @@ export function DiagnosisV2StartForm({ leadSource, campaign }: { leadSource: str
         <div id="diagnosis-v2-form-error" className="mb-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800" role="alert">
           <p>回答を確認してください</p>
           <p className="mt-1 font-semibold">{progressError || state.formError}</p>
+        </div>
+      ) : null}
+      {definitionUpdated ? (
+        <div className="mb-5 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-900" role="status">
+          診断内容が更新されました。入力済みの内容を確認して、もう一度進めてください。
         </div>
       ) : null}
       {Object.keys(clientErrors).length > 0 ? (
@@ -294,13 +317,22 @@ async function saveProgress(sessionId: string, step: number, answers: DiagnosisV
 }
 
 function readStoredValues() {
-  try { const stored = sessionStorage.getItem(STORAGE_KEY); return stored ? sanitizeDiagnosisV2StartValues(JSON.parse(stored) as unknown) : {}; } catch { return {}; }
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(STORAGE_KEY);
+    if (!stored) return { values: {}, definitionUpdated: false };
+    const normalized = normalizeStoredDiagnosisV2StartValues(JSON.parse(stored) as unknown);
+    if (localStorage.getItem(STORAGE_KEY)) localStorage.removeItem(STORAGE_KEY);
+    return normalized;
+  } catch {
+    return { values: {}, definitionUpdated: false };
+  }
 }
 function readStoredNumber(key: string, maximum: number) {
   try { const value = Number(sessionStorage.getItem(key)); return Number.isInteger(value) && value >= 0 && value <= maximum ? value : 0; } catch { return 0; }
 }
 function readStorage(key: string) { try { return sessionStorage.getItem(key) ?? ""; } catch { return ""; } }
 function writeStorage(key: string, value: string) { try { sessionStorage.setItem(key, value); } catch { /* The form still works when storage is blocked. */ } }
+function removeStorage(key: string) { try { sessionStorage.removeItem(key); } catch { /* The form still works when storage is blocked. */ } }
 function omitKey(values: Record<string, string>, key: string) { if (!values[key]) return values; const next = { ...values }; delete next[key]; return next; }
 function scrollToError(errors: Record<string, string>) { const first = Object.keys(errors)[0]; window.requestAnimationFrame(() => { const target = Array.from(document.querySelectorAll<HTMLElement>("[data-diagnosis-field]")).find((element) => element.dataset.diagnosisField === first); target?.scrollIntoView({ behavior: "smooth", block: "center" }); target?.querySelector<HTMLElement>("input, select, button")?.focus({ preventScroll: true }); }); }
 function showQuestionError(errors: Record<string, string>, questions: ShortDiagnosisQuestion[], setPage: (page: number) => void) { const index = questions.findIndex((question) => errors[question.id]); if (index >= 0) setPage(Math.floor(index / QUESTIONS_PER_PAGE)); window.setTimeout(() => scrollToError(errors), 0); }

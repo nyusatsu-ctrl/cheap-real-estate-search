@@ -6,6 +6,7 @@ import { getShortAxisLabel } from "@/lib/construction-diagnosis-v2/short-result"
 import { QUICK_CATEGORY_LABELS, type QuickDiagnosisCategory } from "@/lib/construction-diagnosis-v2/questions";
 import { getPrimaryTradeLabel, getPublicWorksScoringMode } from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { DiagnosisV22ResultActions } from "@/components/diagnoses/v2/DiagnosisV22ResultActions";
+import { getAdditionalDetailedQuestions } from "@/lib/construction-diagnosis-v2/short-questions";
 import { ArrowRight, CalendarRange, CheckCircle2, CircleAlert, Gauge, ListChecks } from "lucide-react";
 
 export default async function DiagnosisV2QuickResultPage({ params }: { params: Promise<{ id: string }> }) {
@@ -84,6 +85,11 @@ export default async function DiagnosisV2QuickResultPage({ params }: { params: P
 function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) {
   const result = session.short_result!;
   const axisScores = Object.entries(session.short_axis_scores);
+  const additionalQuestionCount = getAdditionalDetailedQuestions(session.short_answers, {
+    primaryTrade: session.primary_trade,
+    publicWorkIntent: session.public_work_intent,
+    includeSpecialty: true
+  }).length;
   return (
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
@@ -110,7 +116,11 @@ function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) 
         <QuickSection title="この工事業種で毎月見る数字" items={result.monthlyNumbers} icon={<ListChecks className="h-5 w-5 text-brand-700" />} />
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><CircleAlert className="h-5 w-5 text-brand-700" /><h2 className="text-xl font-black text-slate-950">公共工事への現在地</h2></div><p className="mt-3 text-sm font-semibold leading-7 text-slate-700">{result.publicWorksStatus}</p></section>
         <QuickSection title="今後30日間に行うこと" items={result.actions30Days} icon={<CalendarRange className="h-5 w-5 text-brand-700" />} />
-        <DiagnosisV22ResultActions sessionId={session.id} alreadySaved={Boolean(session.diagnosis_id)} />
+        <DiagnosisV22ResultActions
+          sessionId={session.id}
+          alreadySaved={Boolean(session.diagnosis_id)}
+          additionalQuestionCount={additionalQuestionCount}
+        />
         <p className="rounded border border-slate-200 bg-white p-4 text-xs font-semibold leading-6 text-slate-600">{result.disclaimer}</p>
       </div>
     </div>

@@ -68,7 +68,7 @@ export function DiagnosisV2ResultView({
                 <p className="text-sm font-black text-brand-700">詳細診断結果</p>
                 <span className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800 print:hidden">テスト版</span>
               </div>
-              <h1 className="mt-2 text-3xl font-black text-slate-950 md:text-4xl">{diagnosis.company_name}様</h1>
+              <h1 className="mt-2 break-all text-3xl font-black text-slate-950 md:text-4xl">{diagnosis.company_name}様</h1>
               <p className="mt-2 text-sm text-slate-600">診断日: {formatDiagnosisDate(diagnosis.detailed_completed_at ?? diagnosis.created_at)}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row print:hidden">

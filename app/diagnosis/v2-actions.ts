@@ -17,6 +17,10 @@ import {
   getShortDiagnosisQuestions,
   scoreShortDiagnosis
 } from "@/lib/construction-diagnosis-v2/short-questions";
+import {
+  validateDiagnosisV22ResultContact,
+  type DiagnosisV22ResultIntent
+} from "@/lib/construction-diagnosis-v2/result-contact";
 import { buildShortDiagnosisResult } from "@/lib/construction-diagnosis-v2/short-result";
 import {
   getDiagnosisV22Session,
@@ -168,17 +172,22 @@ export async function submitDiagnosisV22ResultAction(
     return { ...EMPTY_STATE, formError: "3分診断が完了していません。回答を確認してください。" };
   }
 
-  const fieldErrors: Record<string, string> = {};
-  const companyName = requiredString(formData, "company_name", "会社名", fieldErrors);
-  const email = requiredString(formData, "email", "メールアドレス", fieldErrors);
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fieldErrors.email = "メールアドレスをもう一度確認してください";
-  if (getString(formData, "privacy_consent") !== "agreed") fieldErrors.privacy_consent = "個人情報の取扱いへの同意が必要です";
-
-  const contactName = intent === "consultation" ? requiredString(formData, "contact_name", "氏名", fieldErrors) : nullableString(formData, "contact_name");
-  const phone = intent === "consultation" ? requiredString(formData, "phone", "電話番号", fieldErrors) : nullableString(formData, "phone");
-  const consultationTopic = intent === "consultation" ? requiredString(formData, "consultation_topic", "相談したい内容", fieldErrors) : null;
+  const companyName = getString(formData, "company_name");
+  const email = getString(formData, "email");
+  const contactName = nullableString(formData, "contact_name");
+  const phone = nullableString(formData, "phone");
+  const consultationTopic = nullableString(formData, "consultation_topic");
   const preferredDates = formData.getAll("preferred_meeting_dates").map((value) => String(value).trim()).filter(Boolean);
-  if (intent === "consultation" && preferredDates.length === 0) fieldErrors.preferred_meeting_dates = "希望日時を1つ以上入力してください";
+  const fieldErrors = validateDiagnosisV22ResultContact({
+    intent: intent as DiagnosisV22ResultIntent,
+    companyName,
+    email,
+    privacyConsent: getString(formData, "privacy_consent"),
+    contactName: contactName ?? undefined,
+    phone: phone ?? undefined,
+    consultationTopic: consultationTopic ?? undefined,
+    preferredDates
+  });
   if (Object.keys(fieldErrors).length > 0) return { formError: "入力内容を確認してください。", fieldErrors };
 
   const supabase = createDiagnosisSupabaseServiceRoleClient();

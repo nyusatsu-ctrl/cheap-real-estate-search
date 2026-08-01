@@ -6,6 +6,7 @@ import type {
   QuickDiagnosisCategory,
   QuickDiagnosisResult
 } from "./questions.ts";
+import { getApplicableDetailedQuestions } from "./questions.ts";
 import {
   ALL_SPECIALTY_QUESTIONS,
   getPublicWorksScoringMode,
@@ -33,14 +34,6 @@ export type ShortDiagnosisScoringResult = QuickDiagnosisResult & {
 
 const options = (...labels: string[]): DiagnosisV2Option[] =>
   labels.map((label, score) => ({ value: String(score), label, score }));
-
-const PRACTICE_OPTIONS = options(
-  "全くしていない",
-  "ほとんどしていない",
-  "一部の工事でしている",
-  "ほとんどの工事でしている",
-  "毎回行い、記録も残している"
-);
 
 export const SHORT_COMMON_QUESTIONS: ShortDiagnosisQuestion[] = [
   {
@@ -155,62 +148,61 @@ export const SHORT_PUBLIC_WORK_QUESTIONS: ShortDiagnosisQuestion[] = [
 
 const specialtyQuestion = (
   id: string,
-  question: string,
   categories: QuickDiagnosisCategory[],
   displayOrder: number,
-  customOptions = PRACTICE_OPTIONS,
   helpText?: string
 ): ShortDiagnosisQuestion => {
   const detailedQuestion = ALL_SPECIALTY_QUESTIONS.find((candidate) => candidate.id === id);
+  if (!detailedQuestion) throw new Error(`Unknown specialty diagnosis question: ${id}`);
   return {
     id,
-    question,
+    question: detailedQuestion.question,
     categories,
-    section: detailedQuestion?.section ?? "profit",
-    weight: detailedQuestion?.weight ?? 2,
-    critical: detailedQuestion?.critical ?? false,
+    section: detailedQuestion.section,
+    weight: detailedQuestion.weight,
+    critical: detailedQuestion.critical ?? false,
     displayOrder,
-    options: customOptions,
+    options: detailedQuestion.options,
     helpText
   };
 };
 
 const SHORT_SPECIALTY_QUESTIONS: Record<string, ShortDiagnosisQuestion[]> = {
   demolition: [
-    specialtyQuestion("D01", "見積もりのとき、処分代、運搬代、重機代、職人代などを分けて計算していますか。", ["profit"], 12),
-    specialtyQuestion("D02", "工事前に、アスベスト、地中に埋まっている物、近所への影響などを確認していますか。", ["organization"], 13, PRACTICE_OPTIONS, "アスベストは、古い建物に使われている可能性がある、健康被害を起こすおそれのある建材です。"),
-    specialtyQuestion("D03", "工事中に追加のゴミや地中の障害物が見つかった場合、追加料金を請求できる決まりがありますか。", ["profit"], 14),
-    specialtyQuestion("D04", "ゴミをどこへ、どれだけ運んだかを、工事ごとに記録していますか。", ["management"], 15, PRACTICE_OPTIONS, "産業廃棄物を正しく処分したことを確認する書類も含めて記録しているかを聞いています。")
+    specialtyQuestion("D01", ["profit"], 12),
+    specialtyQuestion("D02", ["organization"], 13, "アスベストは、古い建物に使われている可能性がある、健康被害を起こすおそれのある建材です。"),
+    specialtyQuestion("D03", ["profit"], 14),
+    specialtyQuestion("D04", ["management"], 15, "産業廃棄物を正しく処分したことを確認する書類も含めて記録しているかを聞いています。")
   ],
   painting: [
-    specialtyQuestion("PA01", "問い合わせが何件あり、見積もりを何件出し、何件契約になったか把握していますか。", ["growth"], 12),
-    specialtyQuestion("PA02", "足場代、塗料代、職人代などを、工事ごとに計算していますか。", ["profit"], 13),
-    specialtyQuestion("PA04", "下地処理、作業写真、仕上がり確認、手直しの内容を記録していますか。", ["organization"], 14, PRACTICE_OPTIONS, "下地処理は、塗る前に汚れ、ひび、さびなどを直す作業です。"),
-    specialtyQuestion("PA05", "工事が終わったあともお客様へ連絡し、紹介や次の塗り替えにつなげていますか。", ["growth"], 15)
+    specialtyQuestion("PA01", ["growth"], 12),
+    specialtyQuestion("PA02", ["profit"], 13),
+    specialtyQuestion("PA04", ["organization"], 14, "下地処理は、塗る前に汚れ、ひび、さびなどを直す作業です。"),
+    specialtyQuestion("PA05", ["growth"], 15)
   ],
   renovation: [
-    specialtyQuestion("R01", "問い合わせ、現地確認、見積もり、契約の件数を把握していますか。", ["growth"], 12),
-    specialtyQuestion("R02", "見積もりに入る工事、入らない工事、追加料金になる場合を、契約前に説明していますか。", ["profit"], 13),
-    specialtyQuestion("R03", "大工、電気、水道など、複数の職人の予定をまとめて管理していますか。", ["organization"], 14),
-    specialtyQuestion("R04", "材料代、外注費、追加工事を含めて、完成時にいくら利益が残るか分かりますか。", ["profit"], 15)
+    specialtyQuestion("R01", ["growth"], 12),
+    specialtyQuestion("R02", ["profit"], 13),
+    specialtyQuestion("R03", ["organization"], 14),
+    specialtyQuestion("R04", ["profit"], 15)
   ],
   scaffold: [
-    specialtyQuestion("SC01", "足場材や部品が、どの現場に何個あるか把握していますか。", ["management"], 12),
-    specialtyQuestion("SC02", "足場の高さ、広さ、運ぶ距離、必要人数を、見積もり金額に入れていますか。", ["profit"], 13),
-    specialtyQuestion("SC03", "安全教育、作業前の点検、墜落防止を行い、記録も残していますか。", ["organization"], 14),
-    specialtyQuestion("SC05", "売上が1社の取引先に偏りすぎていないか、支払い条件も含めて確認していますか。", ["growth"], 15, options("1社に大きく偏り、条件も未確認", "1社に大きく偏っている", "偏りは分かるが対策していない", "取引先を増やしている", "売上と支払い条件を毎月確認している"))
+    specialtyQuestion("SC01", ["management"], 12),
+    specialtyQuestion("SC02", ["profit"], 13),
+    specialtyQuestion("SC03", ["organization"], 14),
+    specialtyQuestion("SC05", ["growth"], 15)
   ],
   interior: [
-    specialtyQuestion("IN01", "1平方メートル当たりの金額だけでなく、職人の日数、材料代、移動時間、下地を直す費用まで含めて利益を計算していますか。", ["profit"], 12, PRACTICE_OPTIONS, "1平方メートル当たりの工事金額だけでは、職人代や移動時間が抜けて赤字になることがあります。"),
-    specialtyQuestion("IN02", "職人ごとの作業量、仕上がり、手直しの多さを把握していますか。", ["organization"], 13),
-    specialtyQuestion("IN03", "売上が特定の工務店や管理会社に偏りすぎていませんか。", ["growth"], 14, options("1社に70％以上偏っている", "1社に50％以上偏っている", "1社に30％以上偏っている", "1社への偏りは30％未満", "複数社に分かれ、条件も確認している")),
-    specialtyQuestion("IN04", "追加の下地処理や現場での待ち時間が出たとき、追加料金を請求できますか。", ["profit"], 15)
+    specialtyQuestion("IN01", ["profit"], 12, "1平方メートル当たりの工事金額だけでは、職人代や移動時間が抜けて赤字になることがあります。"),
+    specialtyQuestion("IN02", ["organization"], 13),
+    specialtyQuestion("IN03", ["growth"], 14),
+    specialtyQuestion("IN04", ["profit"], 15)
   ],
   common: [
-    specialtyQuestion("SP01", "材料代、職人代、外注費、車両代を、工事ごとに計算していますか。", ["profit"], 12),
-    specialtyQuestion("SP02", "現場や職人ごとの作業量と、手直しの多さを把握していますか。", ["organization"], 13),
-    specialtyQuestion("SP03", "売上が特定の取引先に偏りすぎていませんか。", ["growth"], 14, options("1社に70％以上偏っている", "1社に50％以上偏っている", "1社に30％以上偏っている", "1社への偏りは30％未満", "複数社に分かれ、条件も確認している")),
-    specialtyQuestion("SP04", "仕事量に対して、職人、資格を持つ人、協力会社が足りているか分かっていますか。", ["organization"], 15)
+    specialtyQuestion("SP01", ["profit"], 12),
+    specialtyQuestion("SP02", ["organization"], 13),
+    specialtyQuestion("SP03", ["growth"], 14),
+    specialtyQuestion("SP04", ["organization"], 15)
   ]
 };
 
@@ -309,9 +301,22 @@ export function getInheritedDetailedQuestionIds(answers: DiagnosisV2AnswerMap) {
   return Object.keys(getInheritedDetailedAnswers(answers));
 }
 
+export function getAdditionalDetailedQuestions(
+  answers: DiagnosisV2AnswerMap,
+  context: DiagnosisV2ScoringContext
+) {
+  const inheritedIds = new Set(getInheritedDetailedQuestionIds(answers));
+  return getApplicableDetailedQuestions(context).filter((question) => !inheritedIds.has(question.id));
+}
+
 export function getShortDiagnosisOptionLabel(questionId: string, value: string | undefined) {
   const question = ALL_SHORT_DIAGNOSIS_QUESTIONS.find((candidate) => candidate.id === questionId);
   return question?.options.find((option) => option.value === value)?.label ?? "未回答";
+}
+
+export function getShortDiagnosisAnswerScore(questionId: string, value: string | undefined) {
+  const question = ALL_SHORT_DIAGNOSIS_QUESTIONS.find((candidate) => candidate.id === questionId);
+  return question?.options.find((option) => option.value === value)?.score ?? null;
 }
 
 export function hasShortDiagnosisAnswers(answers: DiagnosisV2AnswerMap) {

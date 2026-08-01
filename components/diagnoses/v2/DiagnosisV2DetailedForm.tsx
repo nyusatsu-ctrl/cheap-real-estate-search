@@ -17,7 +17,8 @@ import {
   type PrimaryTrade,
   type PublicWorkIntent
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
-import { ArrowLeft, ArrowRight, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardCopy, RotateCw, Save } from "lucide-react";
+import { copyTextToClipboard } from "@/lib/construction-diagnosis-v2/client-copy";
 import { QuestionHelp } from "./QuestionHelp";
 
 const INITIAL_STATE: DiagnosisV2FormState = { fieldErrors: {} };
@@ -38,7 +39,10 @@ export function DiagnosisV2DetailedForm({
   includeSpecialty,
   initialAnswers,
   skippedQuestionIds,
-  trackProgress
+  trackProgress,
+  initialAnsweredCount = 0,
+  initialSavedAt = null,
+  resumePath = null
 }: {
   diagnosisId: string;
   primaryTrade: PrimaryTrade | null;
@@ -47,17 +51,28 @@ export function DiagnosisV2DetailedForm({
   initialAnswers: Record<string, string>;
   skippedQuestionIds: string[];
   trackProgress: boolean;
+  initialAnsweredCount?: number;
+  initialSavedAt?: string | null;
+  resumePath?: string | null;
 }) {
   const [state, formAction, isPending] = useActionState(submitDiagnosisV2DetailedAction, INITIAL_STATE);
   const storageKey = `construction-management-diagnosis-v2-2-details-${diagnosisId}`;
   const sectionStorageKey = `${storageKey}-section`;
   const [sectionIndex, setSectionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({ ...initialAnswers });
   const [storageRestored, setStorageRestored] = useState(false);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [progressError, setProgressError] = useState("");
   const [savingProgress, setSavingProgress] = useState(false);
+  const [progressSaved, setProgressSaved] = useState(Boolean(initialSavedAt));
+  const [copiedResumeLink, setCopiedResumeLink] = useState(false);
+  const [copyResumeError, setCopyResumeError] = useState(false);
+  const [copyFallbackUrl, setCopyFallbackUrl] = useState("");
+  const [showResumeNotice, setShowResumeNotice] = useState(initialAnsweredCount > 0);
   const submittingRef = useRef(false);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingSaveCountRef = useRef(0);
+  const latestAnswersRef = useRef<Record<string, string>>({ ...initialAnswers });
   const fieldErrors = useMemo(
     () => ({ ...(state.fieldErrors ?? {}), ...clientErrors }),
     [clientErrors, state.fieldErrors]
@@ -103,15 +118,22 @@ export function DiagnosisV2DetailedForm({
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const applicableIds = new Set(applicableQuestions.map((question) => question.id));
-      setAnswers({
+      const restoredAnswers = {
         ...initialAnswers,
         ...Object.fromEntries(Object.entries(readStoredAnswers(storageKey)).filter(([questionId]) => applicableIds.has(questionId)))
-      });
-      setSectionIndex(readStoredSection(sectionStorageKey, questionPages.length));
+      };
+      setAnswers(restoredAnswers);
+      latestAnswersRef.current = restoredAnswers;
+      const firstUnansweredPage = questionPages.findIndex((page) =>
+        page.questions.some((question) => !restoredAnswers[question.id])
+      );
+      setSectionIndex(initialAnsweredCount > 0 && firstUnansweredPage >= 0
+        ? firstUnansweredPage
+        : readStoredSection(sectionStorageKey, questionPages.length));
       setStorageRestored(true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [applicableQuestions, initialAnswers, questionPages.length, sectionStorageKey, storageKey]);
+  }, [applicableQuestions, initialAnsweredCount, initialAnswers, questionPages, sectionStorageKey, storageKey]);
 
   useEffect(() => {
     if (storageRestored) writeSessionStorage(storageKey, JSON.stringify(answers));
@@ -124,6 +146,46 @@ export function DiagnosisV2DetailedForm({
   const currentPage = questionPages[sectionIndex] ?? questionPages[0];
   const currentStep = currentPage?.step;
   const completedCount = displayedQuestions.filter((question) => Boolean(answers[question.id])).length;
+
+  const queueProgressSave = (nextAnswers: Record<string, string>, questionId?: string, step = sectionIndex) => {
+    if (!trackProgress) return Promise.resolve(true);
+    latestAnswersRef.current = nextAnswers;
+    pendingSaveCountRef.current += 1;
+    setSavingProgress(true);
+    setProgressSaved(false);
+    setProgressError("");
+    const operation = saveChainRef.current.then(() =>
+      saveDetailedProgress(diagnosisId, step, nextAnswers, questionId)
+    );
+    saveChainRef.current = operation.catch(() => undefined);
+    return operation.then(() => {
+      pendingSaveCountRef.current -= 1;
+      if (pendingSaveCountRef.current === 0) {
+        setSavingProgress(false);
+        setProgressSaved(true);
+      }
+      return true;
+    }).catch(() => {
+      pendingSaveCountRef.current = Math.max(0, pendingSaveCountRef.current - 1);
+      setSavingProgress(pendingSaveCountRef.current > 0);
+      setProgressSaved(false);
+      setProgressError("保存できませんでした。入力内容は消えていません。通信状態を確認して、もう一度押してください。");
+      return false;
+    });
+  };
+
+  const handleAnswerChange = (questionId: string, value: string) => {
+    setShowResumeNotice(false);
+    const nextAnswers = { ...latestAnswersRef.current, [questionId]: value };
+    latestAnswersRef.current = nextAnswers;
+    setAnswers(nextAnswers);
+    setClientErrors((current) => {
+      const next = { ...current };
+      delete next[questionId];
+      return next;
+    });
+    void queueProgressSave(nextAnswers, questionId);
+  };
 
   const validatePage = (index: number) => {
     const errors: Record<string, string> = {};
@@ -138,16 +200,8 @@ export function DiagnosisV2DetailedForm({
   const goNext = async () => {
     if (!validatePage(sectionIndex)) return;
     if (trackProgress) {
-      setSavingProgress(true);
-      setProgressError("");
-      try {
-        await saveDetailedProgress(diagnosisId, sectionIndex + 1, answers, currentPage.questions.at(-1)?.id);
-      } catch (error) {
-        setProgressError(error instanceof Error ? error.message : "途中の回答を保存できませんでした。回答はこの画面に残っています。もう一度押してください。");
-        setSavingProgress(false);
-        return;
-      }
-      setSavingProgress(false);
+      const saved = await queueProgressSave(latestAnswersRef.current, currentPage.questions.at(-1)?.id, sectionIndex + 1);
+      if (!saved) return;
     }
     setSectionIndex((current) => Math.min(current + 1, questionPages.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -221,6 +275,48 @@ export function DiagnosisV2DetailedForm({
             <p className="mt-1 text-brand-800">{sectionIndex + 1} / {questionPages.length}ページ</p>
           </div>
         </div>
+        {showResumeNotice ? (
+          <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold leading-6 text-emerald-900">
+            {initialAnsweredCount}問まで保存されています。{Math.min(initialAnsweredCount + 1, displayedQuestions.length)}問目から再開します。
+          </p>
+        ) : null}
+        <div className="mt-4 flex flex-col gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className={progressError ? "text-red-700" : savingProgress ? "text-brand-700" : "text-emerald-700"} role="status" aria-live="polite">
+              {progressError ? progressError : savingProgress ? "保存中です" : progressSaved ? "ここまで保存しました" : "回答すると自動で保存します"}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">この端末では、途中から自動で再開できます。</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {progressError ? (
+              <button type="button" onClick={() => void queueProgressSave(latestAnswersRef.current, currentPage.questions.at(-1)?.id)} className="inline-flex items-center gap-2 rounded border border-red-300 bg-white px-3 py-2 text-xs font-black text-red-700 focus-ring">
+                <RotateCw className="h-3.5 w-3.5" />もう一度保存する
+              </button>
+            ) : null}
+            {resumePath ? (
+              <button type="button" onClick={async () => {
+                const resumeUrl = `${window.location.origin}${resumePath}`;
+                try {
+                  await copyTextToClipboard(resumeUrl);
+                  setCopiedResumeLink(true);
+                  setCopyResumeError(false);
+                  setCopyFallbackUrl("");
+                } catch {
+                  setCopyResumeError(true);
+                  setCopyFallbackUrl(resumeUrl);
+                }
+              }} className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-700 focus-ring">
+                <ClipboardCopy className="h-3.5 w-3.5" />{copiedResumeLink ? "コピーしました" : "再開用リンクをコピー"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {copyResumeError ? (
+          <div className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-6 text-red-700" role="alert">
+            <p>コピーできませんでした。下の再開URLを選択してコピーしてください。</p>
+            <p className="mt-1 select-all break-all font-semibold text-slate-800">{copyFallbackUrl}</p>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
           {steps.map((step, index) => (
             <button
@@ -240,8 +336,6 @@ export function DiagnosisV2DetailedForm({
           {state.formError}
         </div>
       ) : null}
-
-      {progressError ? <div className="mt-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800" role="alert">{progressError}</div> : null}
 
       {Object.keys(clientErrors).length > 0 ? (
         <div className="mt-5 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
@@ -271,14 +365,7 @@ export function DiagnosisV2DetailedForm({
                       name={`display_${question.id}`}
                       value={answerOption.value}
                       checked={answers[question.id] === answerOption.value}
-                      onChange={() => {
-                        setAnswers((current) => ({ ...current, [question.id]: answerOption.value }));
-                        setClientErrors((current) => {
-                          const next = { ...current };
-                          delete next[question.id];
-                          return next;
-                        });
-                      }}
+                      onChange={() => handleAnswerChange(question.id, answerOption.value)}
                       className="mt-1 h-4 w-4 shrink-0 accent-brand-700"
                     />
                     <span><span className="mr-2 font-black text-brand-700">{answerOption.score}</span>{answerOption.label}</span>
@@ -304,21 +391,21 @@ export function DiagnosisV2DetailedForm({
           前の質問
         </button>
         {sectionIndex < questionPages.length - 1 ? (
-          <button type="button" disabled={savingProgress} onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
-            {savingProgress ? "保存中です…" : "次の質問へ"}
+          <button type="button" disabled={savingProgress || Boolean(progressError)} onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
+            {savingProgress ? "保存中です" : "次の質問へ"}
             <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <DetailedSubmitButton pending={isPending} />
+          <DetailedSubmitButton pending={isPending || savingProgress} disabled={Boolean(progressError)} />
         )}
       </div>
     </form>
   );
 }
 
-function DetailedSubmitButton({ pending }: { pending: boolean }) {
+function DetailedSubmitButton({ pending, disabled }: { pending: boolean; disabled: boolean }) {
   return (
-    <button disabled={pending} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
+    <button disabled={pending || disabled} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
       <Save className="h-4 w-4" />
       {pending ? "送信中です…" : "詳細診断結果を見る"}
     </button>
@@ -367,6 +454,7 @@ async function saveDetailedProgress(sessionId: string, step: number, answers: Re
   const response = await fetch("/api/diagnosis/v2-progress", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    keepalive: true,
     body: JSON.stringify({ action: "progress", stage: "detailed", sessionId, step, answers, questionId })
   });
   if (response.ok) return;

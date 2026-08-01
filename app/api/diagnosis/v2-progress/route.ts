@@ -1,7 +1,10 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeLeadSource } from "@/lib/construction-diagnosis";
-import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION } from "@/lib/construction-diagnosis-v2/questions";
+import {
+  CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
+} from "@/lib/construction-diagnosis-v2/questions";
+import { buildDetailedProgress } from "@/lib/construction-diagnosis-v2/progress";
 import {
   DIAGNOSIS_V22_EMPLOYEE_OPTIONS,
   DIAGNOSIS_V22_SALES_OPTIONS,
@@ -63,6 +66,8 @@ export async function POST(request: NextRequest) {
       abandoned_question_id: "C01",
       device_type: client.deviceType,
       browser_family: client.browserFamily,
+      diagnosis_status: "short_in_progress",
+      last_saved_at: now,
       updated_at: now
     };
     let error = null;
@@ -99,9 +104,56 @@ export async function POST(request: NextRequest) {
     const step = Math.max(0, Math.min(100, Number(body.step) || 0));
     const answers = sanitizeAnswers(body.answers);
     const questionId = stringValue(body.questionId) || null;
-    const update = stage === "short"
-      ? { short_last_step: step, short_answers: answers, abandoned_stage: "short", abandoned_question_id: questionId }
-      : { detailed_last_step: step, detailed_answers: answers, abandoned_stage: "detailed", abandoned_question_id: questionId };
+    const now = new Date().toISOString();
+    let update: Record<string, unknown>;
+    let diagnosisUpdate: Record<string, unknown> | null = null;
+    if (stage === "short") {
+      update = {
+        short_last_step: step,
+        short_answers: answers,
+        diagnosis_status: "short_in_progress",
+        last_saved_at: now,
+        abandoned_stage: "short",
+        abandoned_question_id: questionId
+      };
+    } else {
+      const { data: storedSession, error: sessionLookupError } = await supabase
+        .from("construction_diagnosis_sessions")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (sessionLookupError || !storedSession) {
+        return NextResponse.json({ error: "保存した診断を確認できません。再開リンクから開き直してください。" }, { status: 409 });
+      }
+      const context = {
+        primaryTrade: storedSession.primary_trade,
+        publicWorkIntent: storedSession.public_work_intent,
+        includeSpecialty: true
+      };
+      const mergedAnswers = {
+        ...sanitizeAnswers(storedSession.detailed_answers),
+        ...answers
+      };
+      const progress = buildDetailedProgress(storedSession.short_answers ?? {}, mergedAnswers, context, questionId);
+      update = {
+        detailed_last_step: step,
+        detailed_current_step: step,
+        detailed_answers: progress.validAnswers,
+        detailed_answer_labels: progress.labels,
+        detailed_total_questions: progress.total,
+        detailed_answered_count: progress.answered,
+        detailed_last_question_id: progress.lastQuestionId,
+        diagnosis_status: "detailed_in_progress",
+        last_saved_at: now,
+        abandoned_stage: "detailed",
+        abandoned_question_id: progress.lastQuestionId
+      };
+      diagnosisUpdate = {
+        ...update,
+        specialty_answers: progress.specialtyAnswers,
+        updated_at: now
+      };
+    }
     const { data: savedSession, error } = await supabase
       .from("construction_diagnosis_sessions")
       .update(update)
@@ -118,7 +170,7 @@ export async function POST(request: NextRequest) {
     if (stage === "detailed") {
       const { error: diagnosisError } = await supabase
         .from("construction_diagnoses")
-        .update({ detailed_last_step: step, abandoned_stage: "detailed", abandoned_question_id: questionId })
+        .update(diagnosisUpdate ?? {})
         .eq("id", id);
       if (diagnosisError) console.error("[diagnosis-v2.2] diagnosis_progress_save_failed", safeSupabaseError(diagnosisError));
     }

@@ -3,8 +3,10 @@ import { updateDiagnosisV2AdminAction } from "@/app/admin/diagnoses/actions";
 import type { ConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
 import {
   DIAGNOSIS_V2_DEAL_STATUS_LABELS,
+  DIAGNOSIS_V2_PROGRESS_STATUS_LABELS,
   DIAGNOSIS_V2_SALES_STATUS_LABELS
 } from "@/lib/construction-diagnosis-v2/data";
+import { DiagnosisResumeAdminAction } from "./DiagnosisResumeAdminAction";
 import {
   DIAGNOSIS_V2_QUESTION_BY_ID,
   DIAGNOSIS_V2_SECTIONS,
@@ -85,6 +87,17 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="URL流入元" value={getLeadSourceLabel(diagnosis.lead_source)} />
             <Info label="診断を知ったきっかけ" value={diagnosis.source ?? "-"} />
             <Info label="端末・ブラウザ" value={`${diagnosis.device_type ?? "不明"} / ${diagnosis.browser_family ?? "不明"}`} />
+          </AdminSection>
+
+          <AdminSection title="診断の保存・再開状況">
+            <Info label="診断状態" value={diagnosis.diagnosis_status ? DIAGNOSIS_V2_PROGRESS_STATUS_LABELS[diagnosis.diagnosis_status] : "不明"} />
+            <Info label="詳細診断の回答数" value={`${diagnosis.detailed_answered_count} / ${diagnosis.detailed_total_questions}問`} />
+            <Info label="最後に回答した質問" value={diagnosis.detailed_last_question_id ?? "-"} />
+            <Info label="最終保存日時" value={diagnosis.last_saved_at ? formatDiagnosisDate(diagnosis.last_saved_at) : "-"} />
+            <Info label="再開リンク" value={diagnosis.resume_token_created_at ? "発行済み" : "未発行"} />
+            <Info label="再開期限" value={diagnosis.resume_token_expires_at ? formatDiagnosisDate(diagnosis.resume_token_expires_at) : "-"} />
+            <Info label="再開回数" value={`${diagnosis.resume_count}回`} />
+            {!diagnosis.detailed_completed_at ? <DiagnosisResumeAdminAction diagnosisId={diagnosis.id} /> : null}
           </AdminSection>
 
           <AdminSection title="相談・商談管理">

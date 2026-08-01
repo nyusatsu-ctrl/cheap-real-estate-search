@@ -15,6 +15,8 @@ import {
   isConstructionManagementDiagnosis,
   normalizeConstructionManagementDiagnosis
 } from "@/lib/construction-diagnosis-v2/data";
+import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION } from "@/lib/construction-diagnosis-v2/questions";
+import { canAccessDiagnosisV22 } from "@/lib/construction-diagnosis-v2/resume";
 import { ArrowRight, CalendarCheck, ClipboardList, Hammer, PhoneCall, Route } from "lucide-react";
 
 const SEMINAR_GUIDE_HREF = "/diagnosis?source=direct&campaign=seminar_guide";
@@ -25,6 +27,7 @@ export default async function DiagnosisResultPage({ params }: { params: Promise<
   const diagnosis = await getConstructionDiagnosis(id) ?? await getCachedDiagnosis(id);
   if (!diagnosis) notFound();
   if (isConstructionManagementDiagnosis(diagnosis)) {
+    if (diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION && !await canAccessDiagnosisV22(id)) notFound();
     return <DiagnosisV2ResultView diagnosis={normalizeConstructionManagementDiagnosis(diagnosis)} />;
   }
 

@@ -13,6 +13,7 @@ import {
   type DiagnosisV2ScoringContext
 } from "@/lib/construction-diagnosis-v2/questions";
 import {
+  getAdditionalDetailedQuestions,
   getInheritedDetailedAnswers,
   getShortDiagnosisQuestions,
   scoreShortDiagnosis
@@ -26,6 +27,7 @@ import {
   getDiagnosisV22Session,
   hasDiagnosisV22Session
 } from "@/lib/construction-diagnosis-v2/sessions";
+import { issueDiagnosisResumeToken } from "@/lib/construction-diagnosis-v2/resume";
 import { buildDiagnosisV2Result } from "@/lib/construction-diagnosis-v2/results";
 import {
   ALL_SPECIALTY_QUESTIONS,
@@ -140,6 +142,8 @@ export async function submitDiagnosisV2QuickAction(
       short_result: shortResult,
       short_last_step: getShortDiagnosisQuestions(quickContext).length,
       short_completed_at: now,
+      diagnosis_status: "short_completed",
+      last_saved_at: now,
       abandoned_stage: "quick_result",
       abandoned_question_id: lastQuestion
     })
@@ -196,6 +200,11 @@ export async function submitDiagnosisV22ResultAction(
   const respondentName = contactName || "未入力";
   const mainBusiness = getPrimaryTradeLabel(session.primary_trade);
   const consultationRequested = intent === "consultation";
+  const detailedQuestions = getAdditionalDetailedQuestions(session.short_answers, {
+    primaryTrade: session.primary_trade,
+    publicWorkIntent: session.public_work_intent,
+    includeSpecialty: true
+  });
   const contactUpdate = {
     company_name: companyName,
     email,
@@ -204,6 +213,10 @@ export async function submitDiagnosisV22ResultAction(
     phone: phone || "未入力",
     consented_at: now,
     updated_at: now,
+    diagnosis_status: intent === "details" ? "detailed_in_progress" : "short_completed",
+    detailed_total_questions: detailedQuestions.length,
+    detailed_answered_count: session.detailed_answered_count ?? 0,
+    last_saved_at: now,
     ...(consultationRequested ? {
       consultation_requested: true,
       preferred_meeting_dates: preferredDates,
@@ -285,6 +298,12 @@ export async function submitDiagnosisV22ResultAction(
       abandoned_question_id: intent === "details" ? null : session.abandoned_question_id,
       device_type: session.device_type,
       browser_family: session.browser_family,
+      diagnosis_status: intent === "details" ? "detailed_in_progress" : "short_completed",
+      detailed_total_questions: detailedQuestions.length,
+      detailed_answered_count: 0,
+      detailed_current_step: 0,
+      detailed_answer_labels: {},
+      last_saved_at: now,
       updated_at: now
     };
     const { error } = await supabase.from("construction_diagnoses").insert(payload);
@@ -300,11 +319,24 @@ export async function submitDiagnosisV22ResultAction(
     .update({
       diagnosis_id: session.id,
       detailed_started_at: intent === "details" ? now : session.detailed_started_at,
+      diagnosis_status: intent === "details" ? "detailed_in_progress" : "short_completed",
+      detailed_total_questions: detailedQuestions.length,
+      last_saved_at: now,
       abandoned_stage: intent === "details" ? "detailed" : null,
       abandoned_question_id: null
     })
     .eq("id", session.id);
   if (sessionError) console.error("[diagnosis-v2.2] session_promote_update_failed", safeError(sessionError));
+  if (sessionError) return { ...EMPTY_STATE, formError: "途中保存の準備ができませんでした。入力内容は保存されています。もう一度押してください。" };
+
+  try {
+    await issueDiagnosisResumeToken(session.id);
+  } catch (error) {
+    console.error("[diagnosis-v2.2] resume_token_issue_failed", {
+      message: error instanceof Error ? error.message : "unknown"
+    });
+    return { ...EMPTY_STATE, formError: "再開リンクを準備できませんでした。入力内容は保存されています。もう一度押してください。" };
+  }
 
   revalidatePath(`/diagnosis/quick-results/${session.id}`);
   revalidatePath("/admin/diagnoses");
@@ -362,6 +394,7 @@ export async function submitDiagnosisV2DetailedAction(
     ? getInheritedDetailedAnswers((storedDiagnosis?.quick_answers ?? {}) as DiagnosisV2AnswerMap)
     : {};
   const detailedAnswers: DiagnosisV2AnswerMap = { ...inheritedAnswers };
+  const additionalDetailedTotal = applicableQuestions.filter((question) => inheritedAnswers[question.id] === undefined).length;
   const fieldErrors: Record<string, string> = {};
   for (const question of applicableQuestions) {
     const answer = getString(formData, question.id);
@@ -384,6 +417,9 @@ export async function submitDiagnosisV2DetailedAction(
   }
 
   const diagnosisResult = buildDiagnosisV2Result(detailedAnswers, scoring, context);
+  const detailedAnswerLabels = Object.fromEntries(applicableQuestions
+    .filter((question) => inheritedAnswers[question.id] === undefined)
+    .map((question) => [question.id, question.options.find((option) => option.value === detailedAnswers[question.id])?.label ?? "未回答"]));
   const specialtyQuestionIds = new Set(ALL_SPECIALTY_QUESTIONS.map((question) => question.id));
   const specialtyAnswers = Object.fromEntries(
     Object.entries(detailedAnswers).filter(([questionId]) => specialtyQuestionIds.has(questionId))
@@ -406,6 +442,15 @@ export async function submitDiagnosisV2DetailedAction(
       diagnosis_result: diagnosisResult,
       detailed_completed_at: now,
       detailed_last_step: applicableQuestions.length,
+      diagnosis_status: "detailed_completed",
+      detailed_total_questions: additionalDetailedTotal,
+      detailed_answered_count: additionalDetailedTotal,
+      detailed_answer_labels: detailedAnswerLabels,
+      detailed_last_question_id: applicableQuestions.at(-1)?.id ?? null,
+      detailed_current_step: applicableQuestions.length,
+      last_saved_at: now,
+      resume_token_hash: null,
+      resume_token_expires_at: null,
       abandoned_stage: null,
       abandoned_question_id: null,
       updated_at: now,
@@ -432,6 +477,15 @@ export async function submitDiagnosisV2DetailedAction(
         detailed_answers: detailedAnswers,
         detailed_completed_at: now,
         detailed_last_step: applicableQuestions.length,
+        diagnosis_status: "detailed_completed",
+        detailed_total_questions: additionalDetailedTotal,
+        detailed_answered_count: additionalDetailedTotal,
+        detailed_answer_labels: detailedAnswerLabels,
+        detailed_last_question_id: applicableQuestions.at(-1)?.id ?? null,
+        detailed_current_step: applicableQuestions.length,
+        last_saved_at: now,
+        resume_token_hash: null,
+        resume_token_expires_at: null,
         abandoned_stage: null,
         abandoned_question_id: null
       })

@@ -8,6 +8,13 @@ import {
   normalizeDiagnosisV2SalesStatus
 } from "@/lib/construction-diagnosis-v2/data";
 import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
+import { issueDiagnosisResumeToken } from "@/lib/construction-diagnosis-v2/resume";
+
+export type DiagnosisResumeAdminState = {
+  path?: string;
+  expiresAt?: string;
+  error?: string;
+};
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -105,4 +112,20 @@ export async function updateDiagnosisV2AdminAction(formData: FormData) {
 
   revalidatePath("/admin/diagnoses");
   revalidatePath(`/admin/diagnoses/${id}`);
+}
+
+export async function reissueDiagnosisResumeAction(
+  _state: DiagnosisResumeAdminState,
+  formData: FormData
+): Promise<DiagnosisResumeAdminState> {
+  await requireDiagnosisAdmin();
+  const id = requiredString(formData, "id");
+  try {
+    const issued = await issueDiagnosisResumeToken(id, false);
+    revalidatePath("/admin/diagnoses");
+    revalidatePath(`/admin/diagnoses/${id}`);
+    return { path: issued.path, expiresAt: issued.expiresAt };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "再開リンクを発行できませんでした。" };
+  }
 }

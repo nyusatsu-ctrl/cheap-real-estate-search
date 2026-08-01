@@ -2,11 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DiagnosisV2ConsultationForm } from "@/components/diagnoses/v2/DiagnosisV2ConsultationForm";
 import { getConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
+import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION } from "@/lib/construction-diagnosis-v2/questions";
+import { canAccessDiagnosisV22 } from "@/lib/construction-diagnosis-v2/resume";
 
 export default async function DiagnosisV2ConsultationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const diagnosis = await getConstructionManagementDiagnosis(id);
   if (!diagnosis?.detailed_completed_at) notFound();
+  if (diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION && !await canAccessDiagnosisV22(id)) notFound();
 
   return (
     <div className="bg-slate-50">

@@ -27,6 +27,7 @@ export type DiagnosisV2SalesStatus =
   | "on_hold";
 
 export type DiagnosisV2DealStatus = "open" | "won" | "lost" | "on_hold";
+export type DiagnosisV2ProgressStatus = "short_in_progress" | "short_completed" | "detailed_in_progress" | "detailed_completed" | "abandoned" | "expired";
 
 export type ConstructionManagementDiagnosis = {
   id: string;
@@ -100,6 +101,26 @@ export type ConstructionManagementDiagnosis = {
   abandoned_question_id: string | null;
   device_type: string | null;
   browser_family: string | null;
+  diagnosis_status: DiagnosisV2ProgressStatus | null;
+  resume_token_hash: string | null;
+  resume_token_expires_at: string | null;
+  resume_token_created_at: string | null;
+  resume_count: number;
+  last_saved_at: string | null;
+  detailed_total_questions: number;
+  detailed_answered_count: number;
+  detailed_last_question_id: string | null;
+  detailed_current_step: number;
+  detailed_answer_labels: Record<string, string>;
+};
+
+export const DIAGNOSIS_V2_PROGRESS_STATUS_LABELS: Record<DiagnosisV2ProgressStatus, string> = {
+  short_in_progress: "3分診断中",
+  short_completed: "3分診断完了",
+  detailed_in_progress: "詳細診断中",
+  detailed_completed: "詳細診断完了",
+  abandoned: "中断",
+  expired: "期限切れ"
 };
 
 export const DIAGNOSIS_V2_SALES_STATUS_LABELS: Record<DiagnosisV2SalesStatus, string> = {
@@ -181,7 +202,18 @@ export function normalizeConstructionManagementDiagnosis(
     abandoned_stage: diagnosis.abandoned_stage ?? null,
     abandoned_question_id: diagnosis.abandoned_question_id ?? null,
     device_type: diagnosis.device_type ?? null,
-    browser_family: diagnosis.browser_family ?? null
+    browser_family: diagnosis.browser_family ?? null,
+    diagnosis_status: diagnosis.diagnosis_status ?? (diagnosis.detailed_completed_at ? "detailed_completed" : diagnosis.detailed_started_at ? "detailed_in_progress" : diagnosis.quick_completed_at ? "short_completed" : "short_in_progress"),
+    resume_token_hash: diagnosis.resume_token_hash ?? null,
+    resume_token_expires_at: diagnosis.resume_token_expires_at ?? null,
+    resume_token_created_at: diagnosis.resume_token_created_at ?? null,
+    resume_count: Number(diagnosis.resume_count ?? 0),
+    last_saved_at: diagnosis.last_saved_at ?? diagnosis.updated_at ?? null,
+    detailed_total_questions: Number(diagnosis.detailed_total_questions ?? 0),
+    detailed_answered_count: Number(diagnosis.detailed_answered_count ?? 0),
+    detailed_last_question_id: diagnosis.detailed_last_question_id ?? diagnosis.abandoned_question_id ?? null,
+    detailed_current_step: Number(diagnosis.detailed_current_step ?? diagnosis.detailed_last_step ?? 0),
+    detailed_answer_labels: diagnosis.detailed_answer_labels ?? {}
   };
 }
 

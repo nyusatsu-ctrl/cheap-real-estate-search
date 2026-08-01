@@ -34,6 +34,17 @@ export type DiagnosisV22Session = {
   detailed_last_step: number | null;
   detailed_answers: DiagnosisV2AnswerMap;
   detailed_completed_at: string | null;
+  diagnosis_status: "short_in_progress" | "short_completed" | "detailed_in_progress" | "detailed_completed" | "abandoned" | "expired";
+  resume_token_hash: string | null;
+  resume_token_expires_at: string | null;
+  resume_token_created_at: string | null;
+  resume_count: number;
+  last_saved_at: string | null;
+  detailed_total_questions: number;
+  detailed_answered_count: number;
+  detailed_last_question_id: string | null;
+  detailed_current_step: number;
+  detailed_answer_labels: Record<string, string>;
   abandoned_stage: string | null;
   abandoned_question_id: string | null;
   device_type: string;
@@ -90,12 +101,12 @@ export async function markDiagnosisV22DetailedStarted(id: string) {
   const now = new Date().toISOString();
   await supabase
     .from("construction_diagnosis_sessions")
-    .update({ detailed_started_at: now, abandoned_stage: "detailed", abandoned_question_id: null })
+    .update({ detailed_started_at: now, diagnosis_status: "detailed_in_progress", abandoned_stage: "detailed", abandoned_question_id: null, last_saved_at: now })
     .eq("id", id)
     .is("detailed_started_at", null);
   await supabase
     .from("construction_diagnoses")
-    .update({ detailed_started_at: now, abandoned_stage: "detailed", abandoned_question_id: null })
+    .update({ detailed_started_at: now, diagnosis_status: "detailed_in_progress", abandoned_stage: "detailed", abandoned_question_id: null, last_saved_at: now })
     .eq("id", id)
     .is("detailed_started_at", null);
 }
@@ -136,7 +147,18 @@ function normalizeSession(session: DiagnosisV22Session): DiagnosisV22Session {
     short_axis_scores: session.short_axis_scores ?? {},
     short_critical_flags: Array.isArray(session.short_critical_flags) ? session.short_critical_flags : [],
     short_result: session.short_result ?? null,
-    detailed_answers: session.detailed_answers ?? {}
+    detailed_answers: session.detailed_answers ?? {},
+    diagnosis_status: session.diagnosis_status ?? (session.detailed_completed_at ? "detailed_completed" : session.detailed_started_at ? "detailed_in_progress" : session.short_completed_at ? "short_completed" : "short_in_progress"),
+    resume_token_hash: session.resume_token_hash ?? null,
+    resume_token_expires_at: session.resume_token_expires_at ?? null,
+    resume_token_created_at: session.resume_token_created_at ?? null,
+    resume_count: Number(session.resume_count ?? 0),
+    last_saved_at: session.last_saved_at ?? session.updated_at ?? null,
+    detailed_total_questions: Number(session.detailed_total_questions ?? 0),
+    detailed_answered_count: Number(session.detailed_answered_count ?? 0),
+    detailed_last_question_id: session.detailed_last_question_id ?? session.abandoned_question_id ?? null,
+    detailed_current_step: Number(session.detailed_current_step ?? session.detailed_last_step ?? 0),
+    detailed_answer_labels: session.detailed_answer_labels ?? {}
   };
 }
 

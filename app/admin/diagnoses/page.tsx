@@ -16,6 +16,7 @@ import {
 import type { DiagnosisV2Judgment } from "@/lib/construction-diagnosis-v2/questions";
 import {
   DIAGNOSIS_V2_DEAL_STATUS_LABELS,
+  DIAGNOSIS_V2_PROGRESS_STATUS_LABELS,
   DIAGNOSIS_V2_SALES_STATUS_LABELS,
   isConstructionManagementDiagnosis,
   normalizeConstructionManagementDiagnosis
@@ -122,7 +123,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
           <table className="min-w-[2250px] divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
               <tr>
-                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "URL流入元", "主な業態", "公共工事意向", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "結果正確性", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
+                {["診断日時", "会社名", "回答者", "都道府県", "電話番号", "メール", "URL流入元", "主な業態", "公共工事意向", "診断状態", "詳細回答", "最終質問", "最終保存", "簡易診断", "詳細診断", "総合点", "支援判定", "重大フラグ", "相談希望", "結果正確性", "面談予定日", "商談状況", "成約状況", "契約金額", "次回対応日", "詳細"].map((header) => (
                   <th key={header} className="whitespace-nowrap px-3 py-3">{header}</th>
                 ))}
               </tr>
@@ -142,6 +143,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                       <Cell>{getLeadSourceLabel(diagnosis.lead_source)}</Cell>
                       <Cell>{diagnosis.primary_trade ? getPrimaryTradeLabel(diagnosis.primary_trade) : "-"}</Cell>
                       <Cell>{diagnosis.public_work_intent ? getPublicWorkIntentLabel(diagnosis.public_work_intent) : "-"}</Cell>
+                      <Cell>{diagnosis.diagnosis_status ? DIAGNOSIS_V2_PROGRESS_STATUS_LABELS[diagnosis.diagnosis_status] : "-"}</Cell>
+                      <Cell>{diagnosis.detailed_total_questions > 0 ? `${diagnosis.detailed_answered_count}/${diagnosis.detailed_total_questions}` : "-"}</Cell>
+                      <Cell>{diagnosis.detailed_last_question_id ?? "-"}</Cell>
+                      <Cell>{formatNullableDate(diagnosis.last_saved_at)}</Cell>
                       <Cell>{diagnosis.quick_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell>{diagnosis.detailed_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell bold>{diagnosis.total_score === null ? "-" : Number(diagnosis.total_score).toFixed(1)}</Cell>
@@ -171,6 +176,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                     <Cell>-</Cell>
                     <Cell>-</Cell>
                     <Cell>旧診断</Cell>
+                    <Cell>-</Cell>
+                    <Cell>-</Cell>
+                    <Cell>-</Cell>
+                    <Cell>旧診断</Cell>
                     <Cell>旧診断</Cell>
                     <Cell>-</Cell>
                     <Cell>{DIAGNOSIS_TYPES[rawDiagnosis.main_type].name}</Cell>
@@ -187,7 +196,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                 );
               })}
               {diagnoses.length === 0 ? (
-                <tr><td colSpan={22} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">条件に一致する診断データはありません。</td></tr>
+                <tr><td colSpan={26} className="px-3 py-8 text-center text-sm font-semibold text-slate-500">条件に一致する診断データはありません。</td></tr>
               ) : null}
             </tbody>
           </table>

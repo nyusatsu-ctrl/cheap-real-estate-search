@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
 import { getDiagnosisV22Session, type DiagnosisV22Session } from "@/lib/construction-diagnosis-v2/sessions";
 import { getShortAxisLabel } from "@/lib/construction-diagnosis-v2/short-result";
-import { QUICK_CATEGORY_LABELS, type QuickDiagnosisCategory } from "@/lib/construction-diagnosis-v2/questions";
+import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION, QUICK_CATEGORY_LABELS, type QuickDiagnosisCategory } from "@/lib/construction-diagnosis-v2/questions";
 import { getPrimaryTradeLabel, getPublicWorksScoringMode } from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { DiagnosisV22ResultActions } from "@/components/diagnoses/v2/DiagnosisV22ResultActions";
 import { getAdditionalDetailedQuestions } from "@/lib/construction-diagnosis-v2/short-questions";
@@ -15,6 +15,7 @@ export default async function DiagnosisV2QuickResultPage({ params }: { params: P
   if (session?.short_completed_at && session.short_result) return <DiagnosisV22QuickResult session={session} />;
   const diagnosis = await getConstructionManagementDiagnosis(id);
   if (!diagnosis?.quick_completed_at) notFound();
+  if (diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION) notFound();
 
   const scoreEntries = Object.entries(diagnosis.quick_scores) as [QuickDiagnosisCategory, number][];
   const publicScore = diagnosis.quick_scores.public_works ?? 0;

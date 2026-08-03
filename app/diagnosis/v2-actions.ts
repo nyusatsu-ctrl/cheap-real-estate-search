@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
+  PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   SUPPORTED_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSIONS,
   getApplicableDetailedQuestions,
   isSpecialtyConstructionDiagnosisVersion,
@@ -23,6 +24,7 @@ import {
   type DiagnosisV22ResultIntent
 } from "@/lib/construction-diagnosis-v2/result-contact";
 import { buildShortDiagnosisResult } from "@/lib/construction-diagnosis-v2/short-result";
+import { selectGrowthStrategyQuestions } from "@/lib/construction-diagnosis-v2/strategy";
 import {
   getDiagnosisV22Session,
   hasDiagnosisV22Session
@@ -125,6 +127,13 @@ export async function submitDiagnosisV2QuickAction(
 
   const now = new Date().toISOString();
   const shortResult = buildShortDiagnosisResult(quickAnswers, quickResult, primaryTrade!, publicWorkIntent!);
+  const strategySelection = selectGrowthStrategyQuestions({
+    axisScores: quickResult.axisScores,
+    criticalFlags: quickResult.criticalFlags,
+    shortAnswers: quickAnswers,
+    primaryTrade: primaryTrade!,
+    publicWorkIntent: publicWorkIntent!
+  });
   const lastQuestion = getShortDiagnosisQuestions(quickContext).at(-1)?.id ?? null;
   const { error } = await supabase
     .from("construction_diagnosis_sessions")
@@ -140,6 +149,11 @@ export async function submitDiagnosisV2QuickAction(
       short_total_score: quickResult.totalScore,
       short_critical_flags: quickResult.criticalFlags,
       short_result: shortResult,
+      strategy_question_ids: strategySelection.questionIds,
+      strategy_question_reasons: strategySelection.reasons,
+      strategy_low_score_sections: strategySelection.lowScoreSections,
+      strategy_critical_sections: strategySelection.criticalSections,
+      strategy_total_questions: strategySelection.questionIds.length,
       short_last_step: getShortDiagnosisQuestions(quickContext).length,
       short_completed_at: now,
       diagnosis_status: "short_completed",
@@ -390,7 +404,7 @@ export async function submitDiagnosisV2DetailedAction(
     .select("quick_answers")
     .eq("id", id)
     .maybeSingle();
-  const inheritedAnswers = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
+  const inheritedAnswers = diagnosis.diagnosis_version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
     ? getInheritedDetailedAnswers((storedDiagnosis?.quick_answers ?? {}) as DiagnosisV2AnswerMap)
     : {};
   const detailedAnswers: DiagnosisV2AnswerMap = { ...inheritedAnswers };
@@ -470,7 +484,7 @@ export async function submitDiagnosisV2DetailedAction(
     return { ...EMPTY_STATE, formError: "詳細診断を保存できませんでした。時間をおいて再度お試しください。" };
   }
 
-  if (diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION) {
+  if (diagnosis.diagnosis_version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION) {
     const { error: progressError } = await supabase
       .from("construction_diagnosis_sessions")
       .update({

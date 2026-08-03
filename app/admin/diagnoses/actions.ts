@@ -9,12 +9,14 @@ import {
 } from "@/lib/construction-diagnosis-v2/data";
 import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
 import { issueDiagnosisResumeToken } from "@/lib/construction-diagnosis-v2/resume";
+import { issueDiagnosisPrecheckToken } from "@/lib/construction-diagnosis-v2/precheck";
 
 export type DiagnosisResumeAdminState = {
   path?: string;
   expiresAt?: string;
   error?: string;
 };
+export type DiagnosisPrecheckAdminState = DiagnosisResumeAdminState;
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -127,5 +129,20 @@ export async function reissueDiagnosisResumeAction(
     return { path: issued.path, expiresAt: issued.expiresAt };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "再開リンクを発行できませんでした。" };
+  }
+}
+
+export async function issueDiagnosisPrecheckAction(
+  _state: DiagnosisPrecheckAdminState,
+  formData: FormData
+): Promise<DiagnosisPrecheckAdminState> {
+  await requireDiagnosisAdmin();
+  const id = requiredString(formData, "id");
+  try {
+    const issued = await issueDiagnosisPrecheckToken(id);
+    revalidatePath(`/admin/diagnoses/${id}`);
+    return issued;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "事前確認用URLを発行できませんでした。" };
   }
 }

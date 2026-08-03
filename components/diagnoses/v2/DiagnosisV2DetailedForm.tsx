@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { submitDiagnosisV2DetailedAction, type DiagnosisV2FormState } from "@/app/diagnosis/v2-actions";
+import { submitDiagnosisV23PrecheckAction } from "@/app/diagnosis/strategy-actions";
 import {
   DIAGNOSIS_V2_SECTIONS,
   getApplicableDetailedQuestions,
@@ -42,7 +43,8 @@ export function DiagnosisV2DetailedForm({
   trackProgress,
   initialAnsweredCount = 0,
   initialSavedAt = null,
-  resumePath = null
+  resumePath = null,
+  mode = "diagnosis"
 }: {
   diagnosisId: string;
   primaryTrade: PrimaryTrade | null;
@@ -54,9 +56,11 @@ export function DiagnosisV2DetailedForm({
   initialAnsweredCount?: number;
   initialSavedAt?: string | null;
   resumePath?: string | null;
+  mode?: "diagnosis" | "precheck";
 }) {
-  const [state, formAction, isPending] = useActionState(submitDiagnosisV2DetailedAction, INITIAL_STATE);
-  const storageKey = `construction-management-diagnosis-v2-2-details-${diagnosisId}`;
+  const action = mode === "precheck" ? submitDiagnosisV23PrecheckAction : submitDiagnosisV2DetailedAction;
+  const [state, formAction, isPending] = useActionState(action, INITIAL_STATE);
+  const storageKey = `construction-management-diagnosis-${mode}-${diagnosisId}`;
   const sectionStorageKey = `${storageKey}-section`;
   const [sectionIndex, setSectionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({ ...initialAnswers });
@@ -155,7 +159,7 @@ export function DiagnosisV2DetailedForm({
     setProgressSaved(false);
     setProgressError("");
     const operation = saveChainRef.current.then(() =>
-      saveDetailedProgress(diagnosisId, step, nextAnswers, questionId)
+      saveDetailedProgress(diagnosisId, step, nextAnswers, questionId, mode === "precheck" ? "precheck" : "detailed")
     );
     saveChainRef.current = operation.catch(() => undefined);
     return operation.then(() => {
@@ -261,7 +265,7 @@ export function DiagnosisV2DetailedForm({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-black text-brand-700">詳しい診断 8分野＋業態別・追加{displayedQuestions.length}問</p>
+              <p className="text-sm font-black text-brand-700">{mode === "precheck" ? `個別相談前の詳しい事前確認・${displayedQuestions.length}問` : `詳しい診断 8分野＋業態別・追加${displayedQuestions.length}問`}</p>
               <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-black text-amber-800">テスト版</span>
             </div>
             <h1 className="mt-1 text-2xl font-black text-slate-950">{currentStep.label}</h1>
@@ -396,18 +400,18 @@ export function DiagnosisV2DetailedForm({
             <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <DetailedSubmitButton pending={isPending || savingProgress} disabled={Boolean(progressError)} />
+          <DetailedSubmitButton pending={isPending || savingProgress} disabled={Boolean(progressError)} mode={mode} />
         )}
       </div>
     </form>
   );
 }
 
-function DetailedSubmitButton({ pending, disabled }: { pending: boolean; disabled: boolean }) {
+function DetailedSubmitButton({ pending, disabled, mode }: { pending: boolean; disabled: boolean; mode: "diagnosis" | "precheck" }) {
   return (
     <button disabled={pending || disabled} className="inline-flex items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring disabled:cursor-wait disabled:bg-slate-500">
       <Save className="h-4 w-4" />
-      {pending ? "送信中です…" : "詳細診断結果を見る"}
+      {pending ? "送信中です…" : mode === "precheck" ? "事前確認を完了する" : "詳細診断結果を見る"}
     </button>
   );
 }
@@ -450,12 +454,12 @@ function writeSessionStorage(storageKey: string, value: string) {
   }
 }
 
-async function saveDetailedProgress(sessionId: string, step: number, answers: Record<string, string>, questionId?: string) {
+async function saveDetailedProgress(sessionId: string, step: number, answers: Record<string, string>, questionId: string | undefined, stage: "detailed" | "precheck") {
   const response = await fetch("/api/diagnosis/v2-progress", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     keepalive: true,
-    body: JSON.stringify({ action: "progress", stage: "detailed", sessionId, step, answers, questionId })
+    body: JSON.stringify({ action: "progress", stage, sessionId, step, answers, questionId })
   });
   if (response.ok) return;
   const result = await response.json().catch(() => ({})) as { error?: string };

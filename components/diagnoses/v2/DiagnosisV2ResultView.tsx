@@ -4,7 +4,7 @@ import { DiagnosisV21FeedbackForm } from "@/components/diagnoses/v2/DiagnosisV21
 import { DiagnosisPrintLauncher } from "@/components/diagnoses/v2/DiagnosisPrintLauncher";
 import type { ConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
 import {
-  CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
+  PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   DIAGNOSIS_V2_SECTIONS,
   getApplicableDetailedQuestions,
   isSpecialtyConstructionDiagnosisVersion,
@@ -32,7 +32,7 @@ export function DiagnosisV2ResultView({
   printError?: boolean;
 }) {
   const hasSpecialty = isSpecialtyConstructionDiagnosisVersion(diagnosis.diagnosis_version);
-  const isV22 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+  const isV22 = diagnosis.diagnosis_version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
   const context: DiagnosisV2ScoringContext = hasSpecialty
     ? {
         primaryTrade: diagnosis.primary_trade,

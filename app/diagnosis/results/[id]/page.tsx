@@ -11,11 +11,12 @@ import {
   getPublicWorksRoutePlan
 } from "@/lib/construction-diagnosis";
 import { DiagnosisV2ResultView } from "@/components/diagnoses/v2/DiagnosisV2ResultView";
+import { DiagnosisV23StrategyResultView } from "@/components/diagnoses/v2/DiagnosisV23StrategyResultView";
 import {
   isConstructionManagementDiagnosis,
   normalizeConstructionManagementDiagnosis
 } from "@/lib/construction-diagnosis-v2/data";
-import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION } from "@/lib/construction-diagnosis-v2/questions";
+import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION, PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION } from "@/lib/construction-diagnosis-v2/questions";
 import { canAccessDiagnosisV22 } from "@/lib/construction-diagnosis-v2/resume";
 import { ArrowRight, CalendarCheck, ClipboardList, Hammer, PhoneCall, Route } from "lucide-react";
 
@@ -34,8 +35,13 @@ export default async function DiagnosisResultPage({
   const diagnosis = await getConstructionDiagnosis(id) ?? await getCachedDiagnosis(id);
   if (!diagnosis) notFound();
   if (isConstructionManagementDiagnosis(diagnosis)) {
-    if (diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION && !await canAccessDiagnosisV22(id)) notFound();
-    return <DiagnosisV2ResultView diagnosis={normalizeConstructionManagementDiagnosis(diagnosis)} printError={query.print_error === "1"} />;
+    if ([CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION, PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION].includes(diagnosis.diagnosis_version) && !await canAccessDiagnosisV22(id)) notFound();
+    const normalized = normalizeConstructionManagementDiagnosis(diagnosis);
+    if (normalized.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION) {
+      if (!normalized.strategy_result) notFound();
+      return <DiagnosisV23StrategyResultView id={normalized.id} result={normalized.strategy_result} axisScores={normalized.axis_scores} companyName={normalized.company_name} email={normalized.email} saved />;
+    }
+    return <DiagnosisV2ResultView diagnosis={normalized} printError={query.print_error === "1"} />;
   }
 
   const main = DIAGNOSIS_TYPES[diagnosis.main_type];

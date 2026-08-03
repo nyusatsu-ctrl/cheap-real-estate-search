@@ -7,10 +7,12 @@ import {
   DIAGNOSIS_V2_SALES_STATUS_LABELS
 } from "@/lib/construction-diagnosis-v2/data";
 import { DiagnosisResumeAdminAction } from "./DiagnosisResumeAdminAction";
+import { DiagnosisPrecheckAdminAction } from "./DiagnosisPrecheckAdminAction";
 import {
   DIAGNOSIS_V2_QUESTION_BY_ID,
   DIAGNOSIS_V2_SECTIONS,
   QUICK_DIAGNOSIS_QUESTIONS,
+  CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   getApplicableDetailedQuestions,
   getDiagnosisV2OptionLabel,
   getQuickDiagnosisOptionLabel,
@@ -22,6 +24,7 @@ import {
   getShortDiagnosisQuestions,
   hasShortDiagnosisAnswers
 } from "@/lib/construction-diagnosis-v2/short-questions";
+import { getStrategyAnswerLabel, getStrategyQuestions } from "@/lib/construction-diagnosis-v2/strategy";
 import {
   getOrderModelLabel,
   getPrimaryTradeLabel,
@@ -33,6 +36,9 @@ import { formatDiagnosisDate, getLeadSourceLabel } from "@/lib/construction-diag
 
 export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionManagementDiagnosis }) {
   const result = diagnosis.diagnosis_result;
+  const isV23 = diagnosis.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+  const strategyResult = diagnosis.strategy_result;
+  const strategyQuestions = getStrategyQuestions(diagnosis.strategy_question_ids);
   const hasSpecialty = isSpecialtyConstructionDiagnosisVersion(diagnosis.diagnosis_version);
   const applicableQuestions = getApplicableDetailedQuestions(hasSpecialty
     ? { primaryTrade: diagnosis.primary_trade, publicWorkIntent: diagnosis.public_work_intent, includeSpecialty: true }
@@ -91,8 +97,8 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
 
           <AdminSection title="診断の保存・再開状況">
             <Info label="診断状態" value={diagnosis.diagnosis_status ? DIAGNOSIS_V2_PROGRESS_STATUS_LABELS[diagnosis.diagnosis_status] : "不明"} />
-            <Info label="詳細診断の回答数" value={`${diagnosis.detailed_answered_count} / ${diagnosis.detailed_total_questions}問`} />
-            <Info label="最後に回答した質問" value={diagnosis.detailed_last_question_id ?? "-"} />
+            <Info label={isV23 ? "再成長戦略の回答数" : "詳細診断の回答数"} value={isV23 ? `${diagnosis.strategy_answered_count} / ${diagnosis.strategy_total_questions}問` : `${diagnosis.detailed_answered_count} / ${diagnosis.detailed_total_questions}問`} />
+            <Info label="最後に回答した質問" value={isV23 ? diagnosis.strategy_last_question_id ?? "-" : diagnosis.detailed_last_question_id ?? "-"} />
             <Info label="最終保存日時" value={diagnosis.last_saved_at ? formatDiagnosisDate(diagnosis.last_saved_at) : "-"} />
             <Info label="再開リンク" value={diagnosis.resume_token_created_at ? "発行済み" : "未発行"} />
             <Info label="再開期限" value={diagnosis.resume_token_expires_at ? formatDiagnosisDate(diagnosis.resume_token_expires_at) : "-"} />
@@ -128,7 +134,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
           <AdminSection title="診断結果">
             <div className="grid gap-3 sm:grid-cols-3">
               <ScoreBox label="総合点" value={diagnosis.total_score === null ? "-" : `${Number(diagnosis.total_score).toFixed(1)}点`} />
-              <ScoreBox label="支援判定" value={diagnosis.judgment ?? "詳細診断未完了"} />
+              <ScoreBox label="支援判定" value={diagnosis.strategy_result?.supportJudgment ?? diagnosis.judgment ?? "詳細診断未完了"} />
               <ScoreBox label="重大フラグ" value={`${diagnosis.critical_flags.length}件`} />
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -160,6 +166,28 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             </AdminSection>
           ) : null}
 
+          {strategyResult ? (
+            <AdminSection title="御社の再成長戦略">
+              <Info label="追加質問数" value={`${diagnosis.strategy_total_questions}問`} />
+              <Info label="選択された質問ID" value={diagnosis.strategy_question_ids.join(" / ")} />
+              <Info label="対象となった低評価分野" value={diagnosis.strategy_low_score_sections.map((id) => DIAGNOSIS_V2_SECTIONS.find((section) => section.id === id)?.label ?? id).join(" / ") || "-"} />
+              <Info label="重大な注意項目" value={diagnosis.critical_flags.join(" / ") || "なし"} />
+              <ResultBlock title="質問の選択理由" items={Object.entries(diagnosis.strategy_question_reasons).map(([id, reason]) => `${id}: ${reason}`)} />
+              <ResultBlock title="結論" items={[strategyResult.conclusion.firstAction, strategyResult.conclusion.priority, strategyResult.conclusion.potential]} />
+              <ResultBlock title="主な強み" items={strategyResult.strengths} />
+              <ResultBlock title="成長を止めている原因" items={strategyResult.blockers} />
+              <ResultBlock title="増やす仕事" items={strategyResult.workPriorities.growth} />
+              <ResultBlock title="維持する仕事" items={strategyResult.workPriorities.maintain} />
+              <ResultBlock title="見直す仕事" items={strategyResult.workPriorities.review} />
+              <ResultBlock title="30日計画" items={strategyResult.actions30Days} />
+              <ResultBlock title="90日計画" items={[...strategyResult.plan90Days.month1, ...strategyResult.plan90Days.month2, ...strategyResult.plan90Days.month3]} />
+              <ResultBlock title="毎月確認する数字" items={strategyResult.monthlyMetrics} />
+              <Info label="支援判定" value={strategyResult.supportJudgment} />
+              <Info label="格安不動産サーチへの関心" value={diagnosis.property_search_interest ?? "未回答"} />
+              <Info label="案内希望内容" value={diagnosis.property_search_interest_topics.join(" / ") || "-"} />
+            </AdminSection>
+          ) : null}
+
           {hasSpecialty ? (
             <AdminSection title="テストフィードバック">
               <Info label="回答状況" value={diagnosis.feedback_submitted_at ? `回答済み（${formatDiagnosisDate(diagnosis.feedback_submitted_at)}）` : "未回答"} />
@@ -177,6 +205,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             <Info label="相談内容" value={diagnosis.consultation_topic ?? "-"} />
             <Info label="電話連絡可能時間" value={diagnosis.consultation_contact_time ?? "-"} />
             <Info label="備考" value={diagnosis.consultation_notes ?? "-"} />
+            {isV23 ? <DiagnosisPrecheckAdminAction diagnosisId={diagnosis.id} /> : null}
           </AdminSection>
 
           <AdminSection title={usesShortDiagnosis ? "短縮診断回答" : "旧簡易診断回答"}>
@@ -194,7 +223,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
             </div>
           </AdminSection>
 
-          <AdminSection title="詳細診断回答">
+          {isV23 ? <AdminSection title="再成長戦略の追加質問回答"><div className="divide-y divide-slate-200">{strategyQuestions.map((question) => <AnswerRow key={question.id} id={question.id} question={question.question} answer={getStrategyAnswerLabel(question.id, diagnosis.strategy_answers[question.id])} />)}</div></AdminSection> : <AdminSection title="詳細診断回答">
             {DIAGNOSIS_V2_SECTIONS.map((section) => (
               <div key={section.id} className="mt-5 first:mt-0">
                 <h3 className="text-base font-black text-slate-950">{section.label}</h3>
@@ -210,7 +239,9 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
                 </div>
               </div>
             ))}
-          </AdminSection>
+          </AdminSection>}
+
+          {isV23 && Object.keys(diagnosis.precheck_answers).length > 0 ? <AdminSection title="個別相談前の詳しい事前確認"><div className="divide-y divide-slate-200">{applicableQuestions.filter((question) => diagnosis.precheck_answers[question.id] !== undefined).map((question) => <AnswerRow key={question.id} id={question.id} question={question.question} answer={question.options.find((option) => option.value === diagnosis.precheck_answers[question.id])?.label ?? "未回答"} />)}</div></AdminSection> : null}
 
           {hasSpecialty ? (
             <AdminSection title="業態別回答">

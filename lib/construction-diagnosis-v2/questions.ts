@@ -8,19 +8,22 @@ import {
   type PublicWorksScoringMode
 } from "./specialty-questions.ts";
 
-export const CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2_2";
-export const PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2_1";
-export const LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2";
+export const CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2_3";
+export const PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2_2";
+export const LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2_1";
+export const ORIGINAL_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION = "construction_management_diagnosis_v2";
 
 export const SUPPORTED_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSIONS = [
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
-  LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
+  LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
+  ORIGINAL_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
 ] as const;
 
 export function isSpecialtyConstructionDiagnosisVersion(version: string | null | undefined) {
   return version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
-    || version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+    || version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
+    || version === LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
 }
 
 export type DiagnosisV2SectionId =

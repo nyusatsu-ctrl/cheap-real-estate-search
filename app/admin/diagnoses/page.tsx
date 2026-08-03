@@ -28,7 +28,7 @@ import {
   getPublicWorkIntentLabel,
   type PrimaryTrade
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
-import { getDiagnosisV22FunnelSummary, type DiagnosisV22FunnelSummary } from "@/lib/construction-diagnosis-v2/sessions";
+import { getDiagnosisV22FunnelSummary, getPropertySearchWaitlist, type DiagnosisV22FunnelSummary, type PropertySearchWaitlistEntry } from "@/lib/construction-diagnosis-v2/sessions";
 import { Download, Filter, LogOut } from "lucide-react";
 
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -50,9 +50,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
 
   const params = await searchParams;
   const filters = getFilters(params);
-  const [diagnoses, funnel] = await Promise.all([
+  const [diagnoses, funnel, propertyWaitlist] = await Promise.all([
     getConstructionDiagnoses(filters),
-    getDiagnosisV22FunnelSummary()
+    getDiagnosisV22FunnelSummary(),
+    getPropertySearchWaitlist()
   ]);
   const exportHref = `/admin/diagnoses/export${getFilterQuery(filters)}`;
 
@@ -60,6 +61,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
     <div className="mx-auto max-w-[1600px] px-4 py-6">
       <AdminHeader email={admin.email} />
       {funnel ? <DiagnosisFunnel summary={funnel} /> : null}
+      {propertyWaitlist.length > 0 ? <PropertyWaitlist entries={propertyWaitlist} /> : null}
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-950">診断者一覧</h1>
@@ -150,7 +152,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
                       <Cell>{diagnosis.quick_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell>{diagnosis.detailed_completed_at ? "完了" : "未完了"}</Cell>
                       <Cell bold>{diagnosis.total_score === null ? "-" : Number(diagnosis.total_score).toFixed(1)}</Cell>
-                      <Cell bold>{diagnosis.judgment ?? "-"}</Cell>
+                      <Cell bold>{diagnosis.strategy_result?.supportJudgment ?? diagnosis.judgment ?? "-"}</Cell>
                       <Cell>{diagnosis.critical_flags.length}件</Cell>
                       <Cell>{diagnosis.consultation_requested ? "希望あり" : "希望なし"}</Cell>
                       <Cell>{diagnosis.feedback_accuracy === null ? "-" : `${diagnosis.feedback_accuracy}点`}</Cell>
@@ -206,6 +208,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
   );
 }
 
+function PropertyWaitlist({ entries }: { entries: PropertySearchWaitlistEntry[] }) {
+  return <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950">格安不動産サーチ案内希望</h2><p className="mt-1 text-sm text-slate-600">登録{entries.length}件。最新200件を表示しています。</p></div><Link href="/admin/diagnoses/property-waitlist/export" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">待機リストCSV</Link></div><div className="mt-4 overflow-x-auto"><table className="min-w-[900px] text-sm"><thead className="bg-slate-50 text-left text-xs font-bold text-slate-500"><tr>{["会社名", "業種", "メール", "関心度", "知りたい物件", "登録日時", "流入元"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-200">{entries.map((entry) => <tr key={entry.id}><Cell bold>{entry.company_name}</Cell><Cell>{getPrimaryTradeLabel(entry.primary_trade)}</Cell><Cell>{entry.email}</Cell><Cell>{entry.interest_level === "notify" ? "完成時に案内" : "詳しい内容"}</Cell><Cell>{entry.interest_topics.join(" / ")}</Cell><Cell>{formatDiagnosisDate(entry.created_at)}</Cell><Cell>{getLeadSourceLabel(entry.source)}</Cell></tr>)}</tbody></table></div></section>;
+}
+
 function DiagnosisFunnel({ summary }: { summary: DiagnosisV22FunnelSummary }) {
   const cards = [
     ["短縮診断を始めた数", summary.started],
@@ -213,6 +219,11 @@ function DiagnosisFunnel({ summary }: { summary: DiagnosisV22FunnelSummary }) {
     ["短縮診断の完了率", `${summary.shortCompletionRate}%`],
     ["詳細診断へ進んだ数", summary.detailedStarted],
     ["詳細診断を完了した数", summary.detailedCompleted],
+    ["再成長戦略へ進んだ数", summary.strategyStarted],
+    ["再成長戦略を完了した数", summary.strategyCompleted],
+    ["再成長戦略への移行率", `${summary.strategyConversionRate}%`],
+    ["個別相談申込み", summary.consultationRequested],
+    ["格安不動産案内希望", summary.propertyWaitlist],
     ["連絡先未入力の診断", summary.activeAnonymous]
   ];
   return (

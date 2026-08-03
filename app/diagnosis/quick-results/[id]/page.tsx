@@ -6,6 +6,7 @@ import { getShortAxisLabel } from "@/lib/construction-diagnosis-v2/short-result"
 import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION, QUICK_CATEGORY_LABELS, type QuickDiagnosisCategory } from "@/lib/construction-diagnosis-v2/questions";
 import { getPrimaryTradeLabel, getPublicWorksScoringMode } from "@/lib/construction-diagnosis-v2/specialty-questions";
 import { DiagnosisV22ResultActions } from "@/components/diagnoses/v2/DiagnosisV22ResultActions";
+import { PropertySearchInterestForm } from "@/components/diagnoses/v2/PropertySearchInterestForm";
 import { getAdditionalDetailedQuestions } from "@/lib/construction-diagnosis-v2/short-questions";
 import { ArrowRight, CalendarRange, CheckCircle2, CircleAlert, Gauge, ListChecks } from "lucide-react";
 
@@ -91,6 +92,7 @@ function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) 
     publicWorkIntent: session.public_work_intent,
     includeSpecialty: true
   }).length;
+  const isV23 = session.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
   return (
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
@@ -117,11 +119,17 @@ function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) 
         <QuickSection title="この工事業種で毎月見る数字" items={result.monthlyNumbers} icon={<ListChecks className="h-5 w-5 text-brand-700" />} />
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><CircleAlert className="h-5 w-5 text-brand-700" /><h2 className="text-xl font-black text-slate-950">公共工事への現在地</h2></div><p className="mt-3 text-sm font-semibold leading-7 text-slate-700">{result.publicWorksStatus}</p></section>
         <QuickSection title="今後30日間に行うこと" items={result.actions30Days} icon={<CalendarRange className="h-5 w-5 text-brand-700" />} />
-        <DiagnosisV22ResultActions
-          sessionId={session.id}
-          alreadySaved={Boolean(session.diagnosis_id)}
-          additionalQuestionCount={additionalQuestionCount}
-        />
+        {isV23 ? (
+          <section className="rounded-lg border border-brand-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-black text-slate-950">御社に合わせた再成長戦略を作成します</h2>
+            <p className="mt-2 text-sm leading-7 text-slate-700">全社共通6問と、3分診断で確認が必要だった分野の質問だけを表示します。会社名やメールアドレスはまだ入力不要です。</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-black text-brand-900"><span className="rounded bg-brand-50 px-3 py-2">追加{session.strategy_total_questions}問</span><span className="rounded bg-brand-50 px-3 py-2">回答ごとに自動保存</span></div>
+            <Link href={`/diagnosis/details/${session.id}`} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring sm:w-auto">追加質問を始める<ArrowRight className="h-4 w-4" /></Link>
+          </section>
+        ) : (
+          <DiagnosisV22ResultActions sessionId={session.id} alreadySaved={Boolean(session.diagnosis_id)} additionalQuestionCount={additionalQuestionCount} />
+        )}
+        {isV23 ? <PropertySearchInterestForm sessionId={session.id} /> : null}
         <p className="rounded border border-slate-200 bg-white p-4 text-xs font-semibold leading-6 text-slate-600">{result.disclaimer}</p>
       </div>
     </div>

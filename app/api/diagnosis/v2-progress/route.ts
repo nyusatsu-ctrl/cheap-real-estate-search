@@ -5,6 +5,7 @@ import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
 } from "@/lib/construction-diagnosis-v2/questions";
 import { buildDetailedProgress } from "@/lib/construction-diagnosis-v2/progress";
+import { getStrategyQuestions } from "@/lib/construction-diagnosis-v2/strategy";
 import {
   DIAGNOSIS_V22_EMPLOYEE_OPTIONS,
   DIAGNOSIS_V22_SALES_OPTIONS,
@@ -20,6 +21,7 @@ import {
   setDiagnosisV22SessionCookie
 } from "@/lib/construction-diagnosis-v2/sessions";
 import { classifyDiagnosisClient } from "@/lib/construction-diagnosis-v2/client-info";
+import { canAccessDiagnosisPrecheck } from "@/lib/construction-diagnosis-v2/precheck";
 import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
 
 export async function POST(request: NextRequest) {
@@ -100,7 +102,10 @@ export async function POST(request: NextRequest) {
     if (!id || !await hasDiagnosisV22Session(id)) {
       return NextResponse.json({ error: "保存した診断を確認できません。最初の画面からもう一度進んでください。" }, { status: 401 });
     }
-    const stage = body.stage === "detailed" ? "detailed" : "short";
+    const stage = body.stage === "detailed" ? "detailed" : body.stage === "precheck" ? "precheck" : body.stage === "strategy" ? "strategy" : "short";
+    if (stage === "precheck" && !await canAccessDiagnosisPrecheck(id)) {
+      return NextResponse.json({ error: "事前確認用URLの有効性を確認できません。管理者へご連絡ください。" }, { status: 403 });
+    }
     const step = Math.max(0, Math.min(100, Number(body.step) || 0));
     const answers = sanitizeAnswers(body.answers);
     const questionId = stringValue(body.questionId) || null;
@@ -116,6 +121,60 @@ export async function POST(request: NextRequest) {
         abandoned_stage: "short",
         abandoned_question_id: questionId
       };
+    } else if (stage === "strategy") {
+      const { data: storedSession, error: sessionLookupError } = await supabase
+        .from("construction_diagnosis_sessions")
+        .select("strategy_question_ids, strategy_answers, diagnosis_id, primary_trade, public_work_intent")
+        .eq("id", id)
+        .maybeSingle();
+      if (sessionLookupError || !storedSession) {
+        return NextResponse.json({ error: "保存した診断を確認できません。最初から開き直してください。" }, { status: 409 });
+      }
+      const questions = getStrategyQuestions(
+        Array.isArray(storedSession.strategy_question_ids) ? storedSession.strategy_question_ids : [],
+        {
+          primaryTrade: storedSession.primary_trade,
+          publicWorkIntent: storedSession.public_work_intent
+        }
+      );
+      const submitted = sanitizeStrategyAnswers(body.answers, questions);
+      const merged = { ...sanitizeStrategyAnswers(storedSession.strategy_answers, questions), ...submitted };
+      const validAnswers = Object.fromEntries(questions.flatMap((question) => question.options.some((option) => option.value === merged[question.id]) ? [[question.id, merged[question.id]]] : []));
+      const answered = Object.keys(validAnswers).length;
+      update = {
+        strategy_answers: validAnswers,
+        strategy_answered_count: answered,
+        strategy_total_questions: questions.length,
+        strategy_last_question_id: questionId,
+        strategy_last_saved_at: now,
+        diagnosis_status: "strategy_in_progress",
+        last_saved_at: now,
+        abandoned_stage: "strategy",
+        abandoned_question_id: questionId
+      };
+      diagnosisUpdate = storedSession.diagnosis_id ? { ...update, updated_at: now } : null;
+    } else if (stage === "precheck") {
+      const { data: storedSession, error: sessionLookupError } = await supabase
+        .from("construction_diagnosis_sessions")
+        .select("primary_trade, public_work_intent, short_answers, precheck_answers, diagnosis_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (sessionLookupError || !storedSession?.diagnosis_id) return NextResponse.json({ error: "事前確認の対象を確認できません。" }, { status: 409 });
+      const context = { primaryTrade: storedSession.primary_trade, publicWorkIntent: storedSession.public_work_intent, includeSpecialty: true };
+      const mergedAnswers = { ...sanitizeAnswers(storedSession.precheck_answers), ...answers };
+      const progress = buildDetailedProgress(sanitizeAnswers(storedSession.short_answers), mergedAnswers, context, questionId);
+      update = {
+        precheck_answers: progress.validAnswers,
+        detailed_last_step: step,
+        detailed_current_step: step,
+        detailed_total_questions: progress.total,
+        detailed_answered_count: progress.answered,
+        detailed_last_question_id: progress.lastQuestionId,
+        last_saved_at: now,
+        abandoned_stage: "precheck",
+        abandoned_question_id: progress.lastQuestionId
+      };
+      diagnosisUpdate = { ...update, updated_at: now };
     } else {
       const { data: storedSession, error: sessionLookupError } = await supabase
         .from("construction_diagnosis_sessions")
@@ -167,7 +226,7 @@ export async function POST(request: NextRequest) {
     if (!savedSession) {
       return NextResponse.json({ error: "保存した診断を確認できません。最初の画面へ戻り、もう一度進んでください。" }, { status: 409 });
     }
-    if (stage === "detailed") {
+    if (stage !== "short" && diagnosisUpdate) {
       const { error: diagnosisError } = await supabase
         .from("construction_diagnoses")
         .update(diagnosisUpdate ?? {})
@@ -188,6 +247,12 @@ function sanitizeStringRecord(value: unknown) {
 function sanitizeAnswers(value: unknown) {
   const input = sanitizeStringRecord(value);
   return Object.fromEntries(Object.entries(input).filter(([key, answer]) => /^[A-Z]{1,3}\d{2}$/.test(key) && /^[0-4]$/.test(answer)));
+}
+
+function sanitizeStrategyAnswers(value: unknown, questions: ReturnType<typeof getStrategyQuestions>) {
+  const input = sanitizeStringRecord(value);
+  const allowed = new Map(questions.map((question) => [question.id, new Set(question.options.map((option) => option.value))]));
+  return Object.fromEntries(Object.entries(input).filter(([key, answer]) => allowed.get(key)?.has(answer)));
 }
 
 function stringValue(value: unknown) {

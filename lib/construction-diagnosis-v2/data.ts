@@ -3,6 +3,7 @@ import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnos
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
+  ORIGINAL_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   type DiagnosisV2AnswerMap,
   type DiagnosisV2Judgment,
@@ -27,7 +28,7 @@ export type DiagnosisV2SalesStatus =
   | "on_hold";
 
 export type DiagnosisV2DealStatus = "open" | "won" | "lost" | "on_hold";
-export type DiagnosisV2ProgressStatus = "short_in_progress" | "short_completed" | "detailed_in_progress" | "detailed_completed" | "abandoned" | "expired";
+export type DiagnosisV2ProgressStatus = "short_in_progress" | "short_completed" | "strategy_in_progress" | "strategy_completed" | "detailed_in_progress" | "detailed_completed" | "abandoned" | "expired";
 
 export type ConstructionManagementDiagnosis = {
   id: string;
@@ -112,11 +113,37 @@ export type ConstructionManagementDiagnosis = {
   detailed_last_question_id: string | null;
   detailed_current_step: number;
   detailed_answer_labels: Record<string, string>;
+  strategy_question_ids: string[];
+  strategy_question_reasons: Record<string, string>;
+  strategy_low_score_sections: DiagnosisV2SectionId[];
+  strategy_critical_sections: DiagnosisV2SectionId[];
+  strategy_answers: DiagnosisV2AnswerMap;
+  strategy_total_questions: number;
+  strategy_answered_count: number;
+  strategy_started_at: string | null;
+  strategy_last_question_id: string | null;
+  strategy_last_saved_at: string | null;
+  strategy_completed_at: string | null;
+  strategy_result: import("@/lib/construction-diagnosis-v2/strategy").GrowthStrategyResult | null;
+  strategy_growth_work: string[];
+  strategy_maintain_work: string[];
+  strategy_review_work: string[];
+  strategy_monthly_metrics: string[];
+  property_search_interest: string | null;
+  property_search_interest_topics: string[];
+  property_search_interest_submitted_at: string | null;
+  precheck_started_at: string | null;
+  precheck_answers: DiagnosisV2AnswerMap;
+  precheck_completed_at: string | null;
+  precheck_token_hash: string | null;
+  precheck_token_expires_at: string | null;
 };
 
 export const DIAGNOSIS_V2_PROGRESS_STATUS_LABELS: Record<DiagnosisV2ProgressStatus, string> = {
   short_in_progress: "3分診断中",
   short_completed: "3分診断完了",
+  strategy_in_progress: "再成長戦略中",
+  strategy_completed: "再成長戦略完了",
   detailed_in_progress: "詳細診断中",
   detailed_completed: "詳細診断完了",
   abandoned: "中断",
@@ -146,7 +173,8 @@ export function isConstructionManagementDiagnosis(value: unknown): value is Cons
   const version = (value as { diagnosis_version?: unknown }).diagnosis_version;
   return version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
     || version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
-    || version === LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+    || version === LEGACY_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
+    || version === ORIGINAL_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
 }
 
 export async function getConstructionManagementDiagnosis(id: string) {
@@ -213,7 +241,31 @@ export function normalizeConstructionManagementDiagnosis(
     detailed_answered_count: Number(diagnosis.detailed_answered_count ?? 0),
     detailed_last_question_id: diagnosis.detailed_last_question_id ?? diagnosis.abandoned_question_id ?? null,
     detailed_current_step: Number(diagnosis.detailed_current_step ?? diagnosis.detailed_last_step ?? 0),
-    detailed_answer_labels: diagnosis.detailed_answer_labels ?? {}
+    detailed_answer_labels: diagnosis.detailed_answer_labels ?? {},
+    strategy_question_ids: Array.isArray(diagnosis.strategy_question_ids) ? diagnosis.strategy_question_ids : [],
+    strategy_question_reasons: diagnosis.strategy_question_reasons ?? {},
+    strategy_low_score_sections: Array.isArray(diagnosis.strategy_low_score_sections) ? diagnosis.strategy_low_score_sections : [],
+    strategy_critical_sections: Array.isArray(diagnosis.strategy_critical_sections) ? diagnosis.strategy_critical_sections : [],
+    strategy_answers: diagnosis.strategy_answers ?? {},
+    strategy_total_questions: Number(diagnosis.strategy_total_questions ?? 0),
+    strategy_answered_count: Number(diagnosis.strategy_answered_count ?? 0),
+    strategy_started_at: diagnosis.strategy_started_at ?? null,
+    strategy_last_question_id: diagnosis.strategy_last_question_id ?? null,
+    strategy_last_saved_at: diagnosis.strategy_last_saved_at ?? null,
+    strategy_completed_at: diagnosis.strategy_completed_at ?? null,
+    strategy_result: diagnosis.strategy_result ?? null,
+    strategy_growth_work: Array.isArray(diagnosis.strategy_growth_work) ? diagnosis.strategy_growth_work : [],
+    strategy_maintain_work: Array.isArray(diagnosis.strategy_maintain_work) ? diagnosis.strategy_maintain_work : [],
+    strategy_review_work: Array.isArray(diagnosis.strategy_review_work) ? diagnosis.strategy_review_work : [],
+    strategy_monthly_metrics: Array.isArray(diagnosis.strategy_monthly_metrics) ? diagnosis.strategy_monthly_metrics : [],
+    property_search_interest: diagnosis.property_search_interest ?? null,
+    property_search_interest_topics: Array.isArray(diagnosis.property_search_interest_topics) ? diagnosis.property_search_interest_topics : [],
+    property_search_interest_submitted_at: diagnosis.property_search_interest_submitted_at ?? null,
+    precheck_started_at: diagnosis.precheck_started_at ?? null,
+    precheck_answers: diagnosis.precheck_answers ?? {},
+    precheck_completed_at: diagnosis.precheck_completed_at ?? null,
+    precheck_token_hash: diagnosis.precheck_token_hash ?? null,
+    precheck_token_expires_at: diagnosis.precheck_token_expires_at ?? null
   };
 }
 

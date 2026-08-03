@@ -97,3 +97,15 @@ test("property waitlist filters are applied to the list and CSV export", () => {
   assert.match(adminPage, /表示条件でCSV/);
   assert.match(csvRoute, /getPropertySearchWaitlist\(\{/);
 });
+
+test("property interest copy mentions low-cost and zero-yen listings on both result views", () => {
+  const form = readFileSync(new URL("../components/diagnoses/v2/PropertySearchInterestForm.tsx", import.meta.url), "utf8");
+  const quickResult = readFileSync(new URL("../app/diagnosis/quick-results/[id]/page.tsx", import.meta.url), "utf8");
+  const strategyResult = readFileSync(new URL("../components/diagnoses/v2/DiagnosisV23StrategyResultView.tsx", import.meta.url), "utf8");
+  assert.match(form, /建設会社にも活用できる格安・ゼロ円物件情報サービスを開発中です/);
+  assert.match(form, /全国の格安物件や、条件によってはゼロ円に近い物件・ゼロ円物件情報も探せるサービスを開発しています。/);
+  assert.match(form, /格安物件やゼロ円物件情報の案内を希望しますか。/);
+  assert.doesNotMatch(form, /建設会社にも活用できる格安不動産情報サービスを開発中です/);
+  assert.match(quickResult, /<PropertySearchInterestForm/);
+  assert.match(strategyResult, /<PropertySearchInterestForm/);
+});

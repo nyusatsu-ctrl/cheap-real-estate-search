@@ -80,3 +80,10 @@ test("the 27-question precheck requires its dedicated access guard", () => {
   assert.match(page, /getInheritedDetailedQuestionIds\(diagnosis\.quick_answers\)/);
   assert.match(action, /getAdditionalDetailedQuestions\(session\.short_answers/);
 });
+
+test("v2.3 quick result shows the dynamic question count and expected time", () => {
+  const page = readFileSync(new URL("../app/diagnosis/quick-results/[id]/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /追加6～10問です/);
+  assert.match(page, /目安時間：約\{strategyEstimatedMinutes\}分/);
+  assert.match(page, /あと3～5分で、会社に合わせた再成長戦略を見る/);
+});

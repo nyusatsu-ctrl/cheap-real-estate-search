@@ -93,6 +93,7 @@ function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) 
     includeSpecialty: true
   }).length;
   const isV23 = session.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
+  const strategyEstimatedMinutes = Math.min(5, Math.max(3, Math.ceil(session.strategy_total_questions / 2)));
   return (
     <div className="bg-slate-50">
       <section className="border-b border-slate-200 bg-white">
@@ -122,9 +123,14 @@ function DiagnosisV22QuickResult({ session }: { session: DiagnosisV22Session }) 
         {isV23 ? (
           <section className="rounded-lg border border-brand-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-black text-slate-950">御社に合わせた再成長戦略を作成します</h2>
-            <p className="mt-2 text-sm leading-7 text-slate-700">全社共通6問と、3分診断で確認が必要だった分野の質問だけを表示します。会社名やメールアドレスはまだ入力不要です。</p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-black text-brand-900"><span className="rounded bg-brand-50 px-3 py-2">追加{session.strategy_total_questions}問</span><span className="rounded bg-brand-50 px-3 py-2">回答ごとに自動保存</span></div>
-            <Link href={`/diagnosis/details/${session.id}`} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring sm:w-auto">追加質問を始める<ArrowRight className="h-4 w-4" /></Link>
+            <p className="mt-2 text-sm leading-7 text-slate-700">追加6～10問です。3分診断で回答した内容は引き継がれるため、同じ質問への再回答はありません。</p>
+            <p className="mt-1 text-sm leading-7 text-slate-700">回答内容によって質問数が変わります。会社名やメールアドレスはまだ入力不要です。</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-black text-brand-900">
+              <span className="rounded bg-brand-50 px-3 py-2">追加{session.strategy_total_questions}問</span>
+              <span className="rounded bg-brand-50 px-3 py-2">目安時間：約{strategyEstimatedMinutes}分</span>
+              <span className="rounded bg-brand-50 px-3 py-2">回答ごとに自動保存</span>
+            </div>
+            <Link href={`/diagnosis/details/${session.id}`} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded bg-brand-700 px-5 py-3 font-black text-white focus-ring sm:w-auto">あと3～5分で、会社に合わせた再成長戦略を見る<ArrowRight className="h-4 w-4" /></Link>
           </section>
         ) : (
           <DiagnosisV22ResultActions sessionId={session.id} alreadySaved={Boolean(session.diagnosis_id)} additionalQuestionCount={additionalQuestionCount} />

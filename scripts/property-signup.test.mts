@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getMemberAuthErrorMessage,
+  getMemberAuthErrorCode,
+  getMemberAuthPageMessage,
   getPropertyAuthCallbackUrl,
+  getPropertyPasswordResetCallbackUrl,
   getPropertySignupError,
   getPropertySignupPageError,
   PROPERTY_APP_ORIGIN,
@@ -50,4 +53,15 @@ test("production confirmation links always return to the property app callback",
     getPropertyAuthCallbackUrl("http://localhost:3000/api/auth/signup", "development"),
     "http://localhost:3000/auth/callback"
   );
+  assert.equal(
+    getPropertyPasswordResetCallbackUrl("https://preview.example/forgot-password", "production"),
+    `${PROPERTY_APP_ORIGIN}/auth/callback?next=/reset-password`
+  );
+});
+
+test("member auth query codes only expose allowlisted Japanese messages", () => {
+  assert.equal(getMemberAuthErrorCode({ message: "Invalid login credentials" }), "invalid_credentials");
+  assert.equal(getMemberAuthPageMessage("reset_email_sent").includes("送信しました"), true);
+  assert.equal(getMemberAuthPageMessage("password_updated").includes("変更しました"), true);
+  assert.equal(getMemberAuthPageMessage("Unexpected English auth failure"), "");
 });

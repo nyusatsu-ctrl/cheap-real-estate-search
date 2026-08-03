@@ -2,6 +2,20 @@ export const PROPERTY_APP_ORIGIN = "https://cheap-real-estate-search.vercel.app"
 export const PROPERTY_AUTH_CALLBACK_PATH = "/auth/callback";
 export const PROPERTY_SIGNUP_COMPLETE_PATH = "/signup/complete";
 
+export type PropertyMemberAuthMessageCode =
+  | "already_registered"
+  | "auth_link_invalid"
+  | "email_not_confirmed"
+  | "invalid_credentials"
+  | "invalid_email"
+  | "password_mismatch"
+  | "password_updated"
+  | "rate_limited"
+  | "reset_email_sent"
+  | "reset_link_required"
+  | "temporarily_unavailable"
+  | "weak_password";
+
 export type PropertySignupInput = {
   email: string;
   password: string;
@@ -96,29 +110,65 @@ export function getPropertySignupPageError(code?: string) {
 }
 
 export function getMemberAuthErrorMessage(message: string) {
-  const normalized = message.toLowerCase();
+  return getMemberAuthPageMessage(getMemberAuthErrorCode(message));
+}
+
+export function getMemberAuthErrorCode(error: unknown): PropertyMemberAuthMessageCode {
+  const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const normalized = `${String(record.code ?? "")} ${String(record.message ?? error ?? "")}`.toLowerCase();
 
   if (normalized.includes("email rate limit") || normalized.includes("over_email_send_rate_limit")) {
-    return "確認メールの送信回数が上限に達しました。しばらく時間を置いてから再度お試しください。";
+    return "rate_limited";
   }
 
   if (normalized.includes("email not confirmed")) {
-    return "メール確認が完了していません。確認メール内のボタンを押してからログインしてください。";
+    return "email_not_confirmed";
   }
 
   if (normalized.includes("invalid login credentials")) {
-    return "メールアドレスまたはパスワードが違います。";
+    return "invalid_credentials";
   }
 
   if (normalized.includes("already registered") || normalized.includes("already exists")) {
-    return "このメールアドレスはすでに登録されています。会員ログインをお試しください。";
+    return "already_registered";
   }
 
   if (normalized.includes("password")) {
-    return "パスワードは8文字以上で入力してください。";
+    return "weak_password";
   }
 
-  return "処理を完了できませんでした。一定時間後に再度お試しください。";
+  return "temporarily_unavailable";
+}
+
+export function getMemberAuthPageMessage(code?: string) {
+  switch (code as PropertyMemberAuthMessageCode | undefined) {
+    case "already_registered":
+      return "このメールアドレスはすでに登録されています。会員ログインをお試しください。";
+    case "auth_link_invalid":
+      return "リンクが無効か、有効期限が切れています。パスワードを忘れた方から再度お申し込みください。";
+    case "email_not_confirmed":
+      return "メール確認が完了していません。確認メール内のボタンを押してからログインしてください。";
+    case "invalid_credentials":
+      return "メールアドレスまたはパスワードが違います。";
+    case "invalid_email":
+      return "メールアドレスの形式を確認してください。";
+    case "password_mismatch":
+      return "確認用パスワードが一致しません。";
+    case "password_updated":
+      return "パスワードを変更しました。新しいパスワードでログインしてください。";
+    case "rate_limited":
+      return "メールの送信回数が上限に達しました。しばらく時間を置いてから再度お試しください。";
+    case "reset_email_sent":
+      return "パスワード再設定メールを送信しました。メール内のボタンから新しいパスワードを設定してください。";
+    case "reset_link_required":
+      return "パスワード再設定メール内のボタンから、この画面を開いてください。リンクが無効な場合は再申請してください。";
+    case "weak_password":
+      return "パスワードは8文字以上で入力してください。";
+    case "temporarily_unavailable":
+      return "処理を完了できませんでした。一定時間後に再度お試しください。";
+    default:
+      return "";
+  }
 }
 
 export function getPropertyAuthCallbackUrl(requestUrl: string, vercelEnvironment?: string) {
@@ -126,4 +176,8 @@ export function getPropertyAuthCallbackUrl(requestUrl: string, vercelEnvironment
     ? PROPERTY_APP_ORIGIN
     : new URL(requestUrl).origin;
   return `${origin}${PROPERTY_AUTH_CALLBACK_PATH}`;
+}
+
+export function getPropertyPasswordResetCallbackUrl(requestUrl: string, vercelEnvironment?: string) {
+  return `${getPropertyAuthCallbackUrl(requestUrl, vercelEnvironment)}?next=/reset-password`;
 }

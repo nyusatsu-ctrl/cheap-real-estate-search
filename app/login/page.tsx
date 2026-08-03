@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { signInMemberAction } from "@/app/auth/actions";
 import { propertyMetadata } from "@/lib/property-metadata";
+import { getMemberAuthPageMessage } from "@/lib/property-signup";
 
 export const metadata: Metadata = propertyMetadata(
   "会員ログイン｜格安不動産サーチ",
@@ -10,17 +11,19 @@ export const metadata: Metadata = propertyMetadata(
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string; next?: string }> }) {
   const params = await searchParams;
+  const successMessage = getMemberAuthPageMessage(params.message);
+  const errorMessage = getMemberAuthPageMessage(params.error);
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-2xl font-black text-slate-950">会員ログイン</h1>
         <p className="mt-2 text-sm text-slate-600">物件一覧、無料期間、契約状態を確認できます。</p>
-        {params.message ? (
-          <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{params.message}</p>
+        {successMessage ? (
+          <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{successMessage}</p>
         ) : null}
-        {params.error ? (
-          <p className="mt-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{params.error}</p>
+        {errorMessage ? (
+          <p className="mt-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage}</p>
         ) : null}
         <form action={signInMemberAction} className="mt-5 grid gap-4">
           <input type="hidden" name="next" value={safeNextPath(params.next)} />

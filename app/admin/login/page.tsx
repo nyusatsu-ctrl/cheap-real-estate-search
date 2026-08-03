@@ -6,8 +6,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "管理者ログイン｜建設業売上アップ診断｜株式会社エコループ",
-  description: "建設業売上アップ診断の診断者一覧、リード対応状況、診断詳細を管理するためのログイン画面です。"
+  title: "管理者ログイン｜エコループ 建設会社向け経営診断",
+  description: "建設会社向け経営診断の診断者一覧、リード対応状況、診断詳細を管理するためのログイン画面です。"
 };
 
 type AdminLoginSearchParams = {
@@ -46,7 +46,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
           textClassName="text-base"
           priority
         />
-        <p className="mt-4 text-sm font-bold text-brand-700">建設業売上アップ診断</p>
+        <p className="mt-4 text-sm font-bold text-brand-700">エコループ 建設会社向け経営診断</p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
         <p className="mt-2 text-sm text-slate-600">診断者一覧、リード対応状況、診断詳細を管理するアカウントでログインしてください。</p>
         {!hasRequiredSupabaseEnv(redirectTo) ? (

@@ -28,7 +28,7 @@ import {
   getPublicWorkIntentLabel,
   type PrimaryTrade
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
-import { getDiagnosisV22FunnelSummary, getPropertySearchWaitlist, type DiagnosisV22FunnelSummary, type PropertySearchWaitlistEntry } from "@/lib/construction-diagnosis-v2/sessions";
+import { getDiagnosisV22FunnelSummary, getPropertySearchWaitlist, type DiagnosisV22FunnelSummary, type PropertySearchWaitlistEntry, type PropertySearchWaitlistFilters } from "@/lib/construction-diagnosis-v2/sessions";
 import { Download, Filter, LogOut } from "lucide-react";
 
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -50,10 +50,11 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
 
   const params = await searchParams;
   const filters = getFilters(params);
+  const waitlistFilters = getPropertyWaitlistFilters(params);
   const [diagnoses, funnel, propertyWaitlist] = await Promise.all([
     getConstructionDiagnoses(filters),
     getDiagnosisV22FunnelSummary(),
-    getPropertySearchWaitlist()
+    getPropertySearchWaitlist(waitlistFilters)
   ]);
   const exportHref = `/admin/diagnoses/export${getFilterQuery(filters)}`;
 
@@ -61,7 +62,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
     <div className="mx-auto max-w-[1600px] px-4 py-6">
       <AdminHeader email={admin.email} />
       {funnel ? <DiagnosisFunnel summary={funnel} /> : null}
-      {propertyWaitlist.length > 0 ? <PropertyWaitlist entries={propertyWaitlist} /> : null}
+      <PropertyWaitlist entries={propertyWaitlist} filters={waitlistFilters} />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-950">診断者一覧</h1>
@@ -208,8 +209,24 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
   );
 }
 
-function PropertyWaitlist({ entries }: { entries: PropertySearchWaitlistEntry[] }) {
-  return <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950">格安不動産サーチ案内希望</h2><p className="mt-1 text-sm text-slate-600">登録{entries.length}件。最新200件を表示しています。</p></div><Link href="/admin/diagnoses/property-waitlist/export" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">待機リストCSV</Link></div><div className="mt-4 overflow-x-auto"><table className="min-w-[900px] text-sm"><thead className="bg-slate-50 text-left text-xs font-bold text-slate-500"><tr>{["会社名", "業種", "メール", "関心度", "知りたい物件", "登録日時", "流入元"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-200">{entries.map((entry) => <tr key={entry.id}><Cell bold>{entry.company_name}</Cell><Cell>{getPrimaryTradeLabel(entry.primary_trade)}</Cell><Cell>{entry.email}</Cell><Cell>{entry.interest_level === "notify" ? "完成時に案内" : "詳しい内容"}</Cell><Cell>{entry.interest_topics.join(" / ")}</Cell><Cell>{formatDiagnosisDate(entry.created_at)}</Cell><Cell>{getLeadSourceLabel(entry.source)}</Cell></tr>)}</tbody></table></div></section>;
+function PropertyWaitlist({ entries, filters }: { entries: PropertySearchWaitlistEntry[]; filters: PropertySearchWaitlistFilters }) {
+  const exportParams = new URLSearchParams();
+  if (filters.interestLevel) exportParams.set("waitlist_interest", filters.interestLevel);
+  if (filters.primaryTrade) exportParams.set("waitlist_trade", filters.primaryTrade);
+  if (filters.source) exportParams.set("waitlist_source", filters.source);
+  const exportHref = `/admin/diagnoses/property-waitlist/export${exportParams.size > 0 ? `?${exportParams.toString()}` : ""}`;
+  return <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950">格安不動産サーチ案内希望</h2><p className="mt-1 text-sm text-slate-600">条件一致{entries.length}件。最新200件を表示しています。</p></div><Link href={exportHref} className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">表示条件でCSV</Link></div><form method="get" className="mt-4 grid gap-3 rounded border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4"><SelectFilter name="waitlist_interest" label="関心度" defaultValue={filters.interestLevel ?? ""}><option value="notify">完成時に案内</option><option value="details">詳しい内容</option></SelectFilter><SelectFilter name="waitlist_trade" label="業種" defaultValue={filters.primaryTrade ?? ""}>{PRIMARY_TRADE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</SelectFilter><SelectFilter name="waitlist_source" label="流入元" defaultValue={filters.source ?? ""}>{LEAD_SOURCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</SelectFilter><div className="flex items-end gap-2"><button className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white">絞り込む</button><Link href="/admin/diagnoses" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">解除</Link></div></form><div className="mt-4 overflow-x-auto"><table className="min-w-[900px] text-sm"><thead className="bg-slate-50 text-left text-xs font-bold text-slate-500"><tr>{["会社名", "業種", "メール", "関心度", "知りたい物件", "登録日時", "流入元"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-200">{entries.map((entry) => <tr key={entry.id}><Cell bold>{entry.company_name}</Cell><Cell>{getPrimaryTradeLabel(entry.primary_trade)}</Cell><Cell>{entry.email}</Cell><Cell>{entry.interest_level === "notify" ? "完成時に案内" : "詳しい内容"}</Cell><Cell>{entry.interest_topics.join(" / ")}</Cell><Cell>{formatDiagnosisDate(entry.created_at)}</Cell><Cell>{getLeadSourceLabel(entry.source)}</Cell></tr>)}{entries.length === 0 ? <tr><td colSpan={7} className="px-3 py-6 text-center text-sm font-semibold text-slate-500">条件に一致する案内希望はありません。</td></tr> : null}</tbody></table></div></section>;
+}
+
+function getPropertyWaitlistFilters(params: Record<string, string | string[] | undefined>): PropertySearchWaitlistFilters {
+  const interestLevel = firstParam(params.waitlist_interest);
+  const primaryTrade = firstParam(params.waitlist_trade);
+  const source = firstParam(params.waitlist_source);
+  return {
+    interestLevel: interestLevel === "notify" || interestLevel === "details" ? interestLevel : undefined,
+    primaryTrade: PRIMARY_TRADE_OPTIONS.some((option) => option.value === primaryTrade) ? primaryTrade as PrimaryTrade : undefined,
+    source: LEAD_SOURCES.some(([value]) => value === source) ? source : undefined
+  };
 }
 
 function DiagnosisFunnel({ summary }: { summary: DiagnosisV22FunnelSummary }) {

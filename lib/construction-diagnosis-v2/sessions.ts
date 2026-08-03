@@ -94,6 +94,12 @@ export type PropertySearchWaitlistEntry = {
   created_at: string;
 };
 
+export type PropertySearchWaitlistFilters = {
+  interestLevel?: "notify" | "details";
+  primaryTrade?: PrimaryTrade;
+  source?: string;
+};
+
 export async function setDiagnosisV22SessionCookie(id: string) {
   const cookieStore = await cookies();
   cookieStore.set(DIAGNOSIS_V22_SESSION_COOKIE, id, {
@@ -201,10 +207,18 @@ export async function getDiagnosisV22FunnelSummary(): Promise<DiagnosisV22Funnel
   };
 }
 
-export async function getPropertySearchWaitlist(): Promise<PropertySearchWaitlistEntry[]> {
+export async function getPropertySearchWaitlist(filters: PropertySearchWaitlistFilters = {}): Promise<PropertySearchWaitlistEntry[]> {
   const supabase = createDiagnosisSupabaseServiceRoleClient();
   if (!supabase) return [];
-  const { data, error } = await supabase.from("property_search_waitlist").select("id, company_name, email, primary_trade, interest_level, interest_topics, source, created_at").order("created_at", { ascending: false }).limit(200);
+  let query = supabase
+    .from("property_search_waitlist")
+    .select("id, company_name, email, primary_trade, interest_level, interest_topics, source, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (filters.interestLevel) query = query.eq("interest_level", filters.interestLevel);
+  if (filters.primaryTrade) query = query.eq("primary_trade", filters.primaryTrade);
+  if (filters.source) query = query.eq("source", filters.source);
+  const { data, error } = await query;
   if (error || !data) return [];
   return data.map((row) => ({
     ...row,

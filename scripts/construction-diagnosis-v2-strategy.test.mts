@@ -87,3 +87,13 @@ test("v2.3 quick result shows the dynamic question count and expected time", () 
   assert.match(page, /目安時間：約\{strategyEstimatedMinutes\}分/);
   assert.match(page, /あと3～5分で、会社に合わせた再成長戦略を見る/);
 });
+
+test("property waitlist filters are applied to the list and CSV export", () => {
+  const sessions = readFileSync(new URL("../lib/construction-diagnosis-v2/sessions.ts", import.meta.url), "utf8");
+  const adminPage = readFileSync(new URL("../app/admin/diagnoses/page.tsx", import.meta.url), "utf8");
+  const csvRoute = readFileSync(new URL("../app/admin/diagnoses/property-waitlist/export/route.ts", import.meta.url), "utf8");
+  assert.match(sessions, /filters\.interestLevel[\s\S]*interest_level/);
+  assert.match(adminPage, /waitlist_interest/);
+  assert.match(adminPage, /表示条件でCSV/);
+  assert.match(csvRoute, /getPropertySearchWaitlist\(\{/);
+});

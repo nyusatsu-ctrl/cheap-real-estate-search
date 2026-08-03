@@ -2,38 +2,18 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import {
+  getMemberAuthErrorMessage,
+  getPropertyAuthCallbackUrl,
+  getPropertySignupError,
+  PROPERTY_SIGNUP_COMPLETE_PATH
+} from "@/lib/property-signup";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   if (!value) throw new Error(`${key} is required`);
   return value;
-}
-
-function getAuthErrorMessage(message: string) {
-  const normalized = message.toLowerCase();
-
-  if (normalized.includes("email rate limit")) {
-    return "確認メールの送信上限に達しました。Supabaseのメール確認を一時的にOFFにするか、しばらく時間を置いてから再度お試しください。";
-  }
-
-  if (normalized.includes("email not confirmed")) {
-    return "メール確認が完了していません。Supabaseでこのユーザーを確認済みにするか、メール確認をOFFにしてから再登録してください。";
-  }
-
-  if (normalized.includes("invalid login credentials")) {
-    return "メールアドレスまたはパスワードが違います。";
-  }
-
-  if (normalized.includes("already registered") || normalized.includes("already exists")) {
-    return "このメールアドレスはすでに登録されています。ログインをお試しください。";
-  }
-
-  if (normalized.includes("password")) {
-    return "パスワードは8文字以上で入力してください。";
-  }
-
-  return message;
 }
 
 async function getAppOrigin() {
@@ -47,21 +27,42 @@ async function getAppOrigin() {
   return host ? `${protocol}://${host}` : "http://localhost:3000";
 }
 
+function redirectWithMessage(path: string, key: "error" | "message", message: string): never {
+  const params = new URLSearchParams({ [key]: message });
+  redirect(`${path}?${params.toString()}`);
+}
+
+// Compatibility path for registration pages loaded before the JSON API form rollout.
 export async function signUpMemberAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/dashboard?demo=1");
+  if (!supabase) {
+    redirect("/signup?error=temporarily_unavailable");
+  }
 
   const email = normalizeEmail(requiredString(formData, "email"));
   const password = requiredString(formData, "password");
+  const origin = await getAppOrigin();
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) redirect(`/signup?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: getPropertyAuthCallbackUrl(`${origin}/signup`, process.env.VERCEL_ENV)
+      }
+    });
 
-  if (!data.user || data.user.identities?.length === 0) {
-    redirect("/signup?error=このメールアドレスはすでに登録されています。ログインをお試しください。");
+    if (error) {
+      redirect(`/signup?error=${getPropertySignupError(error).code}`);
+    }
+
+    redirect(data.session ? "/dashboard" : PROPERTY_SIGNUP_COMPLETE_PATH);
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT")) {
+      throw error;
+    }
+    redirect("/signup?error=temporarily_unavailable");
   }
-
-  redirect(data.session ? "/dashboard" : "/login?message=確認メールを送信しました。メール内のリンクから登録を完了してください。");
 }
 
 export async function signInMemberAction(formData: FormData) {
@@ -73,14 +74,14 @@ export async function signInMemberAction(formData: FormData) {
   const next = safeMemberNextPath(String(formData.get("next") ?? ""));
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+  if (error) redirect(`/login?error=${encodeURIComponent(getMemberAuthErrorMessage(error.message))}`);
 
   redirect(next);
 }
 
 export async function sendPasswordResetAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/forgot-password?error=Supabase 環境変数が未設定です。");
+  if (!supabase) redirectWithMessage("/forgot-password", "error", "現在、パスワード再設定を受け付けられません。一定時間後に再度お試しください。");
 
   const email = requiredString(formData, "email");
   const origin = await getAppOrigin();
@@ -88,30 +89,30 @@ export async function sendPasswordResetAction(formData: FormData) {
     redirectTo: `${origin}/auth/callback?next=/reset-password`
   });
 
-  if (error) redirect(`/forgot-password?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+  if (error) redirect(`/forgot-password?error=${encodeURIComponent(getMemberAuthErrorMessage(error.message))}`);
 
-  redirect("/forgot-password?message=パスワード再設定メールを送信しました。メール内のリンクを開いてください。");
+  redirectWithMessage("/forgot-password", "message", "パスワード再設定メールを送信しました。メール内のリンクを開いてください。");
 }
 
 export async function updatePasswordAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/reset-password?error=Supabase 環境変数が未設定です。");
+  if (!supabase) redirectWithMessage("/reset-password", "error", "現在、パスワードを変更できません。一定時間後に再度お試しください。");
 
   const password = requiredString(formData, "password");
   const passwordConfirmation = requiredString(formData, "password_confirmation");
 
   if (password.length < 8) {
-    redirect("/reset-password?error=パスワードは8文字以上で入力してください。");
+    redirectWithMessage("/reset-password", "error", "パスワードは8文字以上で入力してください。");
   }
 
   if (password !== passwordConfirmation) {
-    redirect("/reset-password?error=確認用パスワードが一致しません。");
+    redirectWithMessage("/reset-password", "error", "確認用パスワードが一致しません。");
   }
 
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) redirect(`/reset-password?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+  if (error) redirect(`/reset-password?error=${encodeURIComponent(getMemberAuthErrorMessage(error.message))}`);
 
-  redirect("/admin/login?message=パスワードを変更しました。新しいパスワードでログインしてください。");
+  redirectWithMessage("/admin/login", "message", "パスワードを変更しました。新しいパスワードでログインしてください。");
 }
 
 export async function signOutMemberAction() {

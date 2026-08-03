@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { signUpMemberAction } from "@/app/auth/actions";
+import { SignupForm } from "@/app/signup/SignupForm";
 import { propertyMetadata } from "@/lib/property-metadata";
+import { getPropertySignupPageError } from "@/lib/property-signup";
 
 export const metadata: Metadata = propertyMetadata(
   "無料登録｜格安不動産サーチ",
@@ -21,20 +22,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           <p>継続する場合は月額4,980円（税込）の有料プランへお申し込みください。申込み時に4,980円が即時決済され、以後毎月自動更新されます。</p>
           <p>有料プランはStripeの契約管理画面から解約でき、解約後も支払済み期間の終了日まで利用できます。</p>
         </div>
-        {params.error ? (
-          <p className="mt-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{params.error}</p>
-        ) : null}
-        <form action={signUpMemberAction} className="mt-5 grid gap-4">
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            メールアドレス
-            <input name="email" type="email" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
-          </label>
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            パスワード
-            <input name="password" type="password" minLength={8} required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
-          </label>
-          <button className="rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">14日間無料で始める</button>
-        </form>
+        <SignupForm initialError={getPropertySignupPageError(params.error)} />
         <p className="mt-4 text-sm text-slate-600">
           登録済みの方は{" "}
           <Link href="/login" className="font-bold text-brand-700">

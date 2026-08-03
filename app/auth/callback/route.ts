@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getMemberAuthErrorMessage } from "@/lib/property-signup";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getSafeNextUrl(origin: string, next: string | null) {
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const next = requestUrl.searchParams.get("next");
 
   if (errorDescription) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorDescription)}`, requestUrl.origin));
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(getMemberAuthErrorMessage(errorDescription))}`, requestUrl.origin));
   }
 
   if (code) {
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     const { error } = supabase ? await supabase.auth.exchangeCodeForSession(code) : { error: new Error("Supabase is not configured.") };
 
     if (error) {
-      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, requestUrl.origin));
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(getMemberAuthErrorMessage(error.message))}`, requestUrl.origin));
     }
   }
 

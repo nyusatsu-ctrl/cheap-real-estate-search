@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
+import {
+  getPropertyAuthCallbackDestination,
+  getPropertyAuthCallbackFlow,
+  type PropertyAuthCallbackOutcome
+} from "@/lib/property-signup";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-function getSafeNextUrl(origin: string, next: string | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/admin")) {
-    return new URL("/dashboard", origin);
+function getCallbackUrl(origin: string, next: string | null, outcome: PropertyAuthCallbackOutcome) {
+  const destination = getPropertyAuthCallbackDestination(next, outcome);
+  const url = new URL(destination.path, origin);
+  if (destination.key && destination.code) {
+    url.searchParams.set(destination.key, destination.code);
   }
-  return new URL(next, origin);
-}
-
-function getInvalidLinkUrl(origin: string, next: string | null) {
-  const path = next === "/reset-password" ? "/forgot-password" : "/login";
-  return new URL(`${path}?error=auth_link_invalid`, origin);
+  return url;
 }
 
 export async function GET(request: Request) {
@@ -18,19 +20,30 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const errorDescription = requestUrl.searchParams.get("error_description");
   const next = requestUrl.searchParams.get("next");
+  const flow = getPropertyAuthCallbackFlow(next);
 
   if (errorDescription) {
-    return NextResponse.redirect(getInvalidLinkUrl(requestUrl.origin, next));
+    console.warn("[property-auth] callback provider error", { flow });
+    return NextResponse.redirect(getCallbackUrl(requestUrl.origin, next, "failure"));
   }
 
-  if (code) {
-    const supabase = await createSupabaseServerClient();
-    const { error } = supabase ? await supabase.auth.exchangeCodeForSession(code) : { error: new Error("Supabase is not configured.") };
-
-    if (error) {
-      return NextResponse.redirect(getInvalidLinkUrl(requestUrl.origin, next));
-    }
+  if (!code) {
+    console.warn("[property-auth] callback missing code", { flow });
+    return NextResponse.redirect(getCallbackUrl(requestUrl.origin, next, "failure"));
   }
 
-  return NextResponse.redirect(getSafeNextUrl(requestUrl.origin, next));
+  const supabase = await createSupabaseServerClient();
+  const { error } = supabase
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : { error: new Error("Supabase is not configured.") };
+
+  if (error) {
+    console.warn("[property-auth] callback exchange failed", {
+      flow,
+      errorCode: "code" in error ? String(error.code ?? "unknown") : "unknown"
+    });
+    return NextResponse.redirect(getCallbackUrl(requestUrl.origin, next, "failure"));
+  }
+
+  return NextResponse.redirect(getCallbackUrl(requestUrl.origin, next, "success"));
 }

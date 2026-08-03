@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { PREFECTURES, PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_SORT_OPTIONS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { getCityOptions, getRegionPrefectures } from "@/lib/property-filters";
@@ -47,6 +47,35 @@ export function SearchFilters({
   const [selectedPrefecture, setSelectedPrefecture] = useState(prefecture ?? "");
   const [selectedCity, setSelectedCity] = useState(city ?? "");
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRange ?? "");
+  const [selectedPropertyType, setSelectedPropertyType] = useState(propertyType ?? "");
+  const [selectedSort, setSelectedSort] = useState<PropertySort>(sort);
+  const [selectedKeyword, setSelectedKeyword] = useState(keyword ?? "");
+  const [, forceFilterRestore] = useState(0);
+
+  useEffect(() => {
+    function restoreFiltersFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedRegion(params.get("region") ?? "");
+      setSelectedPrefecture(params.get("prefecture") ?? "");
+      setSelectedCity(params.get("city") ?? "");
+      setSelectedPriceRange(params.get("priceRange") ?? "");
+      setSelectedPropertyType(params.get("propertyType") ?? "");
+      setSelectedSort(normalizeSort(params.get("sort")));
+      setSelectedKeyword(params.get("keyword") ?? "");
+      forceFilterRestore((version) => version + 1);
+    }
+
+    function scheduleFilterRestore() {
+      window.setTimeout(restoreFiltersFromUrl, 0);
+    }
+
+    window.addEventListener("popstate", scheduleFilterRestore);
+    window.addEventListener("pageshow", scheduleFilterRestore);
+    return () => {
+      window.removeEventListener("popstate", scheduleFilterRestore);
+      window.removeEventListener("pageshow", scheduleFilterRestore);
+    };
+  }, []);
 
   const showDetailedLocation = locationMode === "detailed";
   const showRegionLocation = locationMode === "detailed" || locationMode === "region-only";
@@ -56,7 +85,7 @@ export function SearchFilters({
 
   return (
     <section className="rounded-lg border border-emerald-100 bg-white/95 p-3 shadow-lg shadow-emerald-900/5 backdrop-blur sm:p-5">
-      <form action={action}>
+      <form action={action} autoComplete="off">
         <div className={showDetailedLocation ? "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
           {showRegionLocation ? (
             <label className={labelClass}>
@@ -124,7 +153,7 @@ export function SearchFilters({
 
           <label className={labelClass}>
             物件種別
-            <select name="propertyType" defaultValue={propertyType ?? ""} className={controlClass}>
+            <select name="propertyType" value={selectedPropertyType} onChange={(event) => setSelectedPropertyType(event.target.value)} className={controlClass}>
               <option value="">すべて</option>
               {Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -153,7 +182,7 @@ export function SearchFilters({
 
           <label className={labelClass}>
             並び順
-            <select name="sort" defaultValue={sort} className={controlClass}>
+            <select name="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as PropertySort)} className={controlClass}>
               {PROPERTY_SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -166,7 +195,8 @@ export function SearchFilters({
             キーワード
             <input
               name="keyword"
-              defaultValue={keyword ?? ""}
+              value={selectedKeyword}
+              onChange={(event) => setSelectedKeyword(event.target.value)}
               placeholder="空き家、山林、地域名など"
               className={controlClass}
             />
@@ -180,4 +210,9 @@ export function SearchFilters({
       </form>
     </section>
   );
+}
+
+function normalizeSort(value: string | null): PropertySort {
+  if (value === "source-newest" || value === "price-asc" || value === "price-desc") return value;
+  return "newest";
 }

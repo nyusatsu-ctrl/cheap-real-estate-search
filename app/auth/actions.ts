@@ -75,8 +75,19 @@ export async function signInMemberAction(formData: FormData) {
   const next = safeMemberNextPath(String(formData.get("next") ?? ""));
   if (!email || !password) redirect("/login?error=invalid_credentials");
 
+  const startedAt = Date.now();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${getMemberAuthErrorCode(error)}`);
+  console.info("[property-auth] sign in completed", {
+    durationMs: Date.now() - startedAt,
+    outcome: error ? "error" : "success"
+  });
+  if (error) {
+    const params = new URLSearchParams({
+      error: getMemberAuthErrorCode(error),
+      next
+    });
+    redirect(`/login?${params.toString()}`);
+  }
 
   redirect(next);
 }

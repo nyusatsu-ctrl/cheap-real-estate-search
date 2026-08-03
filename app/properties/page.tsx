@@ -11,13 +11,12 @@ import {
   getPropertyAccessPageState,
   type PropertyAccessPageState
 } from "@/lib/property-access";
-import { firstString, normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
+import { buildPropertySearchPath, firstString, normalizePropertyFilters, type PropertySearchParams } from "@/lib/property-filters";
 import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedPropertiesResult } from "@/lib/properties";
 import { getCurrentMember, type CurrentMember } from "@/lib/user";
 
 const PUBLIC_PROPERTIES_PAGE_SIZE = 100;
-const PRESERVED_PAGE_PARAM_KEYS = ["prefecture", "propertyType", "priceRange", "sort", "keyword"] as const;
 
 export const metadata: Metadata = propertyMetadata(
   "物件一覧｜格安不動産サーチ",
@@ -47,6 +46,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
   const propertiesResult = await getPublishedPropertiesResult(filters, { page: requestedPage, pageSize: PUBLIC_PROPERTIES_PAGE_SIZE });
   const { properties, totalCount, page, pageSize, errorMessage } = propertiesResult;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentSearchPath = buildPropertySearchPath(resolvedSearchParams, { page });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
@@ -75,6 +75,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         </div>
         <MemberAccessSummary member={member} accessState={accessState} />
         <SearchFilters
+          key={currentSearchPath}
           locations={[]}
           prefecture={filters.prefecture}
           priceRange={filters.priceRange}
@@ -94,7 +95,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         ) : null}
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {properties.map((property) => (
-            <PropertyCard key={property.id} property={property} />
+            <PropertyCard key={property.id} property={property} returnPath={currentSearchPath} />
           ))}
         </div>
         {properties.length === 0 && !errorMessage ? (
@@ -368,16 +369,7 @@ function getPaginationItems(currentPage: number, totalPages: number): Array<numb
 }
 
 function buildPageHref(params: PropertySearchParams, page: number) {
-  const query = new URLSearchParams();
-
-  PRESERVED_PAGE_PARAM_KEYS.forEach((key) => {
-    const value = firstString(params[key]);
-    if (value) query.set(key, value);
-  });
-
-  if (page > 1) query.set("page", String(page));
-  const queryString = query.toString();
-  return queryString ? `/properties?${queryString}` : "/properties";
+  return buildPropertySearchPath(params, { page });
 }
 
 const paginationLinkClass = "inline-flex min-h-10 min-w-10 items-center justify-center rounded border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm hover:border-emerald-600 hover:text-emerald-700 focus-ring";

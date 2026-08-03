@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { signInMemberAction } from "@/app/auth/actions";
+import { LoginForm } from "@/app/login/LoginForm";
 import { propertyMetadata } from "@/lib/property-metadata";
 import { getMemberAuthPageMessage } from "@/lib/property-signup";
 
@@ -9,9 +10,10 @@ export const metadata: Metadata = propertyMetadata(
   "格安不動産サーチの会員ログイン画面です。"
 );
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string; next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string; notice?: string; next?: string }> }) {
   const params = await searchParams;
   const successMessage = getMemberAuthPageMessage(params.message);
+  const noticeMessage = getMemberAuthPageMessage(params.notice);
   const errorMessage = getMemberAuthPageMessage(params.error);
 
   return (
@@ -22,21 +24,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {successMessage ? (
           <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{successMessage}</p>
         ) : null}
+        {noticeMessage ? (
+          <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{noticeMessage}</p>
+        ) : null}
         {errorMessage ? (
           <p className="mt-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage}</p>
         ) : null}
-        <form action={signInMemberAction} className="mt-5 grid gap-4">
-          <input type="hidden" name="next" value={safeNextPath(params.next)} />
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            メールアドレス
-            <input name="email" type="email" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
-          </label>
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            パスワード
-            <input name="password" type="password" required className="rounded border border-slate-300 px-3 py-2 font-normal focus-ring" />
-          </label>
-          <button className="rounded bg-brand-700 px-4 py-3 font-bold text-white focus-ring">ログイン</button>
-        </form>
+        <LoginForm action={signInMemberAction} next={safeNextPath(params.next)} />
         <p className="mt-4 text-sm text-slate-600">
           <Link href="/forgot-password" className="font-bold text-brand-700">
             パスワードを忘れた方

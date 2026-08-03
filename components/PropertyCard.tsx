@@ -11,7 +11,7 @@ const VIEWED_PROPERTIES_KEY = "cheap-real-estate:viewed-properties";
 const NEW_DAYS = 7;
 const badgeBaseClass = "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold leading-none";
 
-export function PropertyCard({ property }: { property: Property }) {
+export function PropertyCard({ property, returnPath = "/properties" }: { property: Property; returnPath?: string }) {
   const [isViewed, setIsViewed] = useState(true);
   const isTodayAdded = isTodayInTokyo(property.first_detected_at ?? property.scraped_at ?? null);
   const isNew = isWithinDays(property.first_detected_at, NEW_DAYS);
@@ -35,7 +35,7 @@ export function PropertyCard({ property }: { property: Property }) {
 
   return (
     <article className="overflow-hidden rounded-lg border border-slate-200/90 bg-white shadow-lg shadow-slate-900/5 transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-900/10">
-      <Link href={`/properties/${property.id}`} onClick={markViewed} className="block p-4 focus-ring sm:p-5">
+      <Link href={getPropertyDetailHref(property.id, returnPath)} onClick={markViewed} className="block p-4 focus-ring sm:p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -94,6 +94,11 @@ export function PropertyCard({ property }: { property: Property }) {
       </Link>
     </article>
   );
+}
+
+function getPropertyDetailHref(propertyId: string, returnPath: string) {
+  const query = new URLSearchParams({ returnTo: returnPath });
+  return `/properties/${propertyId}?${query.toString()}`;
 }
 
 function getViewedPropertyIds() {

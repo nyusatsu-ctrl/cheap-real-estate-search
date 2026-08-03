@@ -5,6 +5,7 @@ import { ArrowLeft, Calculator, ExternalLink, MapPin } from "lucide-react";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { formatArea, formatDate, formatPrice } from "@/lib/format";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
+import { getSafePropertyReturnPath } from "@/lib/property-filters";
 import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedProperty } from "@/lib/properties";
 import { requireActiveMember } from "@/lib/user";
@@ -15,9 +16,17 @@ export const metadata: Metadata = propertyMetadata(
   "格安不動産サーチに掲載されている物件の所在地、価格、面積、掲載元情報を確認できます。"
 );
 
-export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PropertyDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+}) {
   await requireActiveMember();
   const { id } = await params;
+  const { returnTo } = await searchParams;
+  const returnPath = getSafePropertyReturnPath(returnTo);
   const property = await getPublishedProperty(id);
   if (!property) notFound();
   const propertyCategory = property.property_category ?? property.property_type;
@@ -25,7 +34,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <ViewedPropertyTracker propertyId={property.id} />
-      <Link href="/properties" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-brand-700">
+      <Link href={returnPath} className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-brand-700">
         <ArrowLeft className="h-4 w-4" />
         一覧に戻る
       </Link>
@@ -77,7 +86,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           <a
             href={property.source_url}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="mt-2 inline-flex items-center gap-2 rounded bg-brand-700 px-4 py-3 text-sm font-bold text-white focus-ring"
           >
             掲載元で確認

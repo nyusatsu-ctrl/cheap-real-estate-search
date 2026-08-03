@@ -5,6 +5,8 @@ export const PROPERTY_SIGNUP_COMPLETE_PATH = "/signup/complete";
 export type PropertyMemberAuthMessageCode =
   | "already_registered"
   | "auth_link_invalid"
+  | "email_confirmation_unavailable"
+  | "email_confirmed"
   | "email_not_confirmed"
   | "invalid_credentials"
   | "invalid_email"
@@ -12,6 +14,7 @@ export type PropertyMemberAuthMessageCode =
   | "password_updated"
   | "rate_limited"
   | "reset_email_sent"
+  | "reset_link_invalid"
   | "reset_link_required"
   | "temporarily_unavailable"
   | "weak_password";
@@ -25,6 +28,15 @@ export type PropertySignupError = {
   code: "invalid_email" | "invalid_password" | "already_registered" | "rate_limited" | "temporarily_unavailable";
   message: string;
   status: number;
+};
+
+export type PropertyAuthCallbackFlow = "signup_confirmation" | "password_reset";
+export type PropertyAuthCallbackOutcome = "success" | "failure";
+
+export type PropertyAuthCallbackDestination = {
+  path: "/login" | "/forgot-password" | "/reset-password";
+  key?: "error" | "message" | "notice";
+  code?: PropertyMemberAuthMessageCode;
 };
 
 export function validatePropertySignupInput(value: unknown):
@@ -146,6 +158,10 @@ export function getMemberAuthPageMessage(code?: string) {
       return "このメールアドレスはすでに登録されています。会員ログインをお試しください。";
     case "auth_link_invalid":
       return "リンクが無効か、有効期限が切れています。パスワードを忘れた方から再度お申し込みください。";
+    case "email_confirmation_unavailable":
+      return "メール確認の処理を完了できませんでした。すでに確認済みの可能性があります。会員ログインをお試しください。";
+    case "email_confirmed":
+      return "メールアドレスの確認が完了しました。ログインしてください。";
     case "email_not_confirmed":
       return "メール確認が完了していません。確認メール内のボタンを押してからログインしてください。";
     case "invalid_credentials":
@@ -160,6 +176,8 @@ export function getMemberAuthPageMessage(code?: string) {
       return "メールの送信回数が上限に達しました。しばらく時間を置いてから再度お試しください。";
     case "reset_email_sent":
       return "パスワード再設定メールを送信しました。メール内のボタンから新しいパスワードを設定してください。";
+    case "reset_link_invalid":
+      return "パスワード再設定リンクが無効か、有効期限が切れています。パスワードを忘れた方から再度お申し込みください。";
     case "reset_link_required":
       return "パスワード再設定メール内のボタンから、この画面を開いてください。リンクが無効な場合は再申請してください。";
     case "weak_password":
@@ -169,6 +187,25 @@ export function getMemberAuthPageMessage(code?: string) {
     default:
       return "";
   }
+}
+
+export function getPropertyAuthCallbackFlow(next?: string | null): PropertyAuthCallbackFlow {
+  return next === "/reset-password" ? "password_reset" : "signup_confirmation";
+}
+
+export function getPropertyAuthCallbackDestination(
+  next: string | null,
+  outcome: PropertyAuthCallbackOutcome
+): PropertyAuthCallbackDestination {
+  if (getPropertyAuthCallbackFlow(next) === "password_reset") {
+    return outcome === "success"
+      ? { path: "/reset-password" }
+      : { path: "/forgot-password", key: "error", code: "reset_link_invalid" };
+  }
+
+  return outcome === "success"
+    ? { path: "/login", key: "message", code: "email_confirmed" }
+    : { path: "/login", key: "notice", code: "email_confirmation_unavailable" };
 }
 
 export function getPropertyAuthCallbackUrl(requestUrl: string, vercelEnvironment?: string) {

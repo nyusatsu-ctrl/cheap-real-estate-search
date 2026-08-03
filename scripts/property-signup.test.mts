@@ -4,6 +4,7 @@ import {
   getMemberAuthErrorMessage,
   getMemberAuthErrorCode,
   getMemberAuthPageMessage,
+  getPropertyAuthCallbackDestination,
   getPropertyAuthCallbackUrl,
   getPropertyPasswordResetCallbackUrl,
   getPropertySignupError,
@@ -64,4 +65,26 @@ test("member auth query codes only expose allowlisted Japanese messages", () => 
   assert.equal(getMemberAuthPageMessage("reset_email_sent").includes("送信しました"), true);
   assert.equal(getMemberAuthPageMessage("password_updated").includes("変更しました"), true);
   assert.equal(getMemberAuthPageMessage("Unexpected English auth failure"), "");
+});
+
+test("signup confirmation and password reset callbacks use separate outcomes", () => {
+  assert.deepEqual(getPropertyAuthCallbackDestination(null, "success"), {
+    path: "/login",
+    key: "message",
+    code: "email_confirmed"
+  });
+  assert.deepEqual(getPropertyAuthCallbackDestination(null, "failure"), {
+    path: "/login",
+    key: "notice",
+    code: "email_confirmation_unavailable"
+  });
+  assert.deepEqual(getPropertyAuthCallbackDestination("/reset-password", "success"), {
+    path: "/reset-password"
+  });
+  assert.deepEqual(getPropertyAuthCallbackDestination("/reset-password", "failure"), {
+    path: "/forgot-password",
+    key: "error",
+    code: "reset_link_invalid"
+  });
+  assert.doesNotMatch(getMemberAuthPageMessage("email_confirmation_unavailable"), /パスワードを忘れた方/);
 });

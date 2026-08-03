@@ -1,7 +1,12 @@
 import { PREFECTURES, PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS } from "@/lib/constants";
+import {
+  buildPropertySearchPath,
+  firstString,
+  getSafePropertyReturnPath,
+  type PropertyNavigationSearchParams
+} from "@/lib/property-navigation";
 import type { PropertyCategory, PropertyFilters, PropertyLocationOption, PropertySort } from "@/lib/types";
 
-type SearchParamValue = string | string[] | undefined;
 type PriceRangeOption = {
   value: string;
   minPrice?: number;
@@ -9,18 +14,8 @@ type PriceRangeOption = {
 };
 type LocationFilterMode = "detailed" | "region-only" | "prefecture-only";
 
-export type PropertySearchParams = {
-  region?: SearchParamValue;
-  prefecture?: SearchParamValue;
-  city?: SearchParamValue;
-  propertyType?: SearchParamValue;
-  priceRange?: SearchParamValue;
-  sort?: SearchParamValue;
-  keyword?: SearchParamValue;
-  page?: SearchParamValue;
-  minPrice?: SearchParamValue;
-  maxPrice?: SearchParamValue;
-};
+export type PropertySearchParams = PropertyNavigationSearchParams;
+export { buildPropertySearchPath, firstString, getSafePropertyReturnPath };
 
 export function normalizePropertyFilters(
   params: PropertySearchParams,
@@ -80,12 +75,6 @@ export function getCityOptions(locations: PropertyLocationOption[], region?: str
         .filter(Boolean)
     )
   ].sort((a, b) => a.localeCompare(b, "ja"));
-}
-
-export function firstString(value: SearchParamValue) {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  const trimmed = typeof candidate === "string" ? candidate.trim() : "";
-  return trimmed || undefined;
 }
 
 function parseOptionalNumber(value?: string) {

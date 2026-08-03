@@ -1,22 +1,18 @@
 "use client";
 
-import { signOutMemberAction } from "@/app/auth/actions";
 import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
+import { PropertyLogoutForm } from "@/components/PropertyLogoutForm";
+import {
+  getBridgedPropertyMemberState,
+  subscribeToPropertyMemberState,
+  type PropertyMemberState
+} from "@/components/PropertyMemberStateBridge";
 import type { PropertyAccessPageState } from "@/lib/property-access";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DIAGNOSIS_APP_NAME } from "@/lib/diagnosis-brand";
-
-type PropertyMemberState =
-  | { authenticated: false }
-  | {
-      authenticated: true;
-      email: string;
-      role: string;
-      accessState: PropertyAccessPageState;
-    };
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -229,11 +225,7 @@ function RealEstateHeader({ showMemberState }: { showMemberState: boolean }) {
               >
                 {member.role === "admin" ? "管理画面" : "会員ページ"}
               </Link>
-              <form action={signOutMemberAction}>
-                <button type="submit" className="rounded-full bg-white/85 px-2.5 py-1.5 shadow-sm ring-1 ring-emerald-100 hover:text-emerald-700 sm:px-3 sm:py-2">
-                  ログアウト
-                </button>
-              </form>
+              <PropertyLogoutForm compact />
             </>
           ) : null}
           {!member?.authenticated ? (
@@ -254,17 +246,39 @@ function usePropertyMember(enabled: boolean) {
     if (!enabled) return;
 
     let ignore = false;
-    fetch("/api/property-member", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() as Promise<PropertyMemberState> : null)
-      .then((data) => {
-        if (!ignore && data) setMember(data);
-      })
-      .catch(() => {
-        if (!ignore) setMember(null);
-      });
+    const unsubscribe = subscribeToPropertyMemberState((nextMember) => {
+      if (!ignore) setMember(nextMember);
+    });
+    const bridgedMember = getBridgedPropertyMemberState();
+    if (bridgedMember) {
+      const syncTimeoutId = window.setTimeout(() => {
+        if (!ignore) setMember(bridgedMember);
+      }, 0);
+      return () => {
+        ignore = true;
+        window.clearTimeout(syncTimeoutId);
+        unsubscribe();
+      };
+    }
+
+    // Property pages publish their server-known member state during hydration.
+    // Delay the fallback request briefly so those pages do not query Auth/Profile twice.
+    const timeoutId = window.setTimeout(() => {
+      if (getBridgedPropertyMemberState()) return;
+      fetch("/api/property-member", { cache: "no-store" })
+        .then((response) => response.ok ? response.json() as Promise<PropertyMemberState> : null)
+        .then((data) => {
+          if (!ignore && data) setMember(data);
+        })
+        .catch(() => {
+          if (!ignore) setMember(null);
+        });
+    }, 250);
 
     return () => {
       ignore = true;
+      window.clearTimeout(timeoutId);
+      unsubscribe();
     };
   }, [enabled]);
 

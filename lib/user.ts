@@ -22,6 +22,7 @@ export type CurrentMember = {
 };
 
 export async function getCurrentMember(): Promise<CurrentMember | null> {
+  const startedAt = Date.now();
   if (!hasSupabaseEnv()) {
     return getDemoMember();
   }
@@ -29,12 +30,18 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
+  const authStartedAt = Date.now();
   const {
     data: { user }
   } = await supabase.auth.getUser();
+  const authDurationMs = Date.now() - authStartedAt;
 
-  if (!user) return null;
+  if (!user) {
+    logMemberPerformance(startedAt, authDurationMs, 0, 1, "anonymous");
+    return null;
+  }
 
+  const profileStartedAt = Date.now();
   const { data: profile } = await supabase
     .from("profiles")
     .select(
@@ -42,6 +49,7 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
     )
     .eq("id", user.id)
     .single();
+  const profileDurationMs = Date.now() - profileStartedAt;
 
   const subscriptionStatus = profile?.subscription_status ?? "unknown";
   const trialStartedAt = profile?.trial_started_at ?? null;
@@ -57,7 +65,7 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
     cancelAtPeriodEnd
   });
 
-  return {
+  const member = {
     id: user.id,
     email: profile?.email ?? user.email ?? "",
     role: profile?.role ?? "viewer",
@@ -71,6 +79,8 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
     isTrialExpired: access.reason === "trial_expired",
     access
   };
+  logMemberPerformance(startedAt, authDurationMs, profileDurationMs, 2, "authenticated");
+  return member;
 }
 
 export async function requireMember() {
@@ -135,4 +145,20 @@ function getDemoMember(): CurrentMember | null {
     isTrialExpired: access.reason === "trial_expired",
     access
   };
+}
+
+function logMemberPerformance(
+  startedAt: number,
+  authDurationMs: number,
+  profileDurationMs: number,
+  queryCount: number,
+  outcome: "anonymous" | "authenticated"
+) {
+  console.info("[property-performance] member lookup completed", {
+    durationMs: Date.now() - startedAt,
+    authDurationMs,
+    profileDurationMs,
+    queryCount,
+    outcome
+  });
 }

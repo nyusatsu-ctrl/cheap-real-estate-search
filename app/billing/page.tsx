@@ -2,8 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { CreditCard, ShieldCheck } from "lucide-react";
 import { openCustomerPortalAction, startCheckoutAction } from "@/app/billing/actions";
+import { PropertyMemberStateBridge } from "@/components/PropertyMemberStateBridge";
 import { hasStripeEnv, MONTHLY_PRICE_YEN, TRIAL_DAYS } from "@/lib/billing/stripe";
-import { formatPropertyDateJst } from "@/lib/property-access";
+import { formatPropertyDateJst, getPropertyAccessPageState } from "@/lib/property-access";
 import { propertyMetadata } from "@/lib/property-metadata";
 import { requireMember } from "@/lib/user";
 
@@ -22,7 +23,16 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const accessEnded = ["trial_expired", "period_ended", "inactive"].includes(params.access ?? "");
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <>
+      <PropertyMemberStateBridge
+        member={{
+          authenticated: true,
+          email: member.email,
+          role: member.role,
+          accessState: getPropertyAccessPageState(member.access)
+        }}
+      />
+      <div className="mx-auto max-w-3xl px-4 py-8">
       <Link href="/dashboard" className="mb-4 inline-block text-sm font-bold text-brand-700">
         ダッシュボードへ戻る
       </Link>
@@ -112,7 +122,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           無料登録だけでは自動課金されません。有料申込み時に4,980円（税込）が即時決済され、以後毎月4,980円で自動更新されます。解約はStripeの契約管理画面から行え、支払済み期間の終了日まで利用できます。
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

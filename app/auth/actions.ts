@@ -131,12 +131,6 @@ export async function updatePasswordAction(formData: FormData) {
   redirectWithCode("/login", "message", "password_updated");
 }
 
-export async function signOutMemberAction() {
-  const supabase = await createSupabaseServerClient();
-  if (supabase) await supabase.auth.signOut();
-  redirect("/");
-}
-
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }

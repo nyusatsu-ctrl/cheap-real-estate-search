@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { CalendarDays, CircleCheck, LockKeyhole, ShieldCheck } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
+import { PropertyMemberStateBridge } from "@/components/PropertyMemberStateBridge";
+import { PropertyScrollRestorer } from "@/components/PropertyScrollRestorer";
 import { SearchFilters } from "@/components/SearchFilters";
 import { PROPERTY_PUBLIC_PRICE_RANGE_OPTIONS } from "@/lib/constants";
 import { PROPERTY_INFORMATION_NOTICE } from "@/lib/legal";
@@ -23,18 +25,31 @@ export const metadata: Metadata = propertyMetadata(
   "全国の0円物件、空き家、古家付き土地、山林、300万円以下の格安不動産を検索できます。"
 );
 
-export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertySearchParams> }) {
+type PropertiesPageSearchParams = PropertySearchParams & {
+  message?: string | string[];
+  notice?: string | string[];
+};
+
+export default async function PropertiesPage({ searchParams }: { searchParams: Promise<PropertiesPageSearchParams> }) {
   const resolvedSearchParams = await searchParams;
   const member = await getCurrentMember();
   const access = member?.access ?? evaluatePropertyAccess(null);
   const accessState = getPropertyAccessPageState(access);
+  const pageNotice = getPropertyPageNotice(resolvedSearchParams);
+  const memberState = member
+    ? { authenticated: true as const, email: member.email, role: member.role, accessState }
+    : { authenticated: false as const };
   if (!member || !access.allowed) {
     return (
-      <RestrictedProperties
-        accessState={accessState}
-        memberEmail={member?.email ?? null}
-        memberStatus={member?.subscriptionStatus ?? null}
-      />
+      <>
+        <PropertyMemberStateBridge member={memberState} />
+        <RestrictedProperties
+          accessState={accessState}
+          memberEmail={member?.email ?? null}
+          memberStatus={member?.subscriptionStatus ?? null}
+          pageNotice={pageNotice}
+        />
+      </>
     );
   }
 
@@ -49,8 +64,12 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
   const currentSearchPath = buildPropertySearchPath(resolvedSearchParams, { page });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
-      <div className="mx-auto max-w-6xl px-4 py-3 sm:py-8">
+    <>
+      <PropertyMemberStateBridge member={memberState} />
+      <PropertyScrollRestorer searchPath={currentSearchPath} />
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:py-8">
+          <PropertyPageNotice notice={pageNotice} />
         <section className="mb-3 rounded-lg border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/80 to-sky-50 p-4 shadow-lg shadow-emerald-900/5 sm:mb-5 sm:p-7">
           <div className="max-w-3xl">
             <p className="inline-flex rounded-full bg-emerald-700 px-2.5 py-0.5 text-xs font-black text-white shadow-sm sm:px-3 sm:py-1">
@@ -106,8 +125,9 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
         {!errorMessage && totalPages > 1 ? (
           <Pagination searchParams={resolvedSearchParams} currentPage={page} totalPages={totalPages} />
         ) : null}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -166,16 +186,19 @@ function MemberAccessSummary({
 function RestrictedProperties({
   accessState,
   memberEmail,
-  memberStatus
+  memberStatus,
+  pageNotice
 }: {
   accessState: PropertyAccessPageState;
   memberEmail: string | null;
   memberStatus: string | null;
+  pageNotice: PropertyPageNoticeState | null;
 }) {
   const content = restrictedContent(accessState, memberStatus);
   return (
     <div className="min-h-[70vh] bg-gradient-to-b from-emerald-50 via-sky-50/60 to-white">
       <div className="mx-auto max-w-5xl px-4 py-10">
+        <PropertyPageNotice notice={pageNotice} />
         <section className="grid gap-6 rounded-lg border border-emerald-100 bg-white p-6 shadow-lg shadow-emerald-900/5 md:grid-cols-[1fr_20rem] md:items-center">
           <div>
             <LockKeyhole className="h-8 w-8 text-emerald-700" />
@@ -209,6 +232,29 @@ function RestrictedProperties({
       </div>
     </div>
   );
+}
+
+type PropertyPageNoticeState = { tone: "success" | "error"; message: string };
+
+function getPropertyPageNotice(params: PropertiesPageSearchParams): PropertyPageNoticeState | null {
+  if (firstString(params.message) === "logged_out") {
+    return { tone: "success", message: "ログアウトしました。" };
+  }
+  if (firstString(params.notice) === "logout_failed") {
+    return {
+      tone: "error",
+      message: "ログアウトを完了できませんでした。通信状況を確認し、もう一度お試しください。"
+    };
+  }
+  return null;
+}
+
+function PropertyPageNotice({ notice }: { notice: PropertyPageNoticeState | null }) {
+  if (!notice) return null;
+  const classes = notice.tone === "success"
+    ? "mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900"
+    : "mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800";
+  return <div className={classes} role={notice.tone === "error" ? "alert" : "status"}>{notice.message}</div>;
 }
 
 function restrictedContent(accessState: PropertyAccessPageState, memberStatus: string | null) {

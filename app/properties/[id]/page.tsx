@@ -10,6 +10,8 @@ import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedProperty } from "@/lib/properties";
 import { requireActiveMember } from "@/lib/user";
 import { ViewedPropertyTracker } from "@/components/ViewedPropertyTracker";
+import { PropertyMemberStateBridge } from "@/components/PropertyMemberStateBridge";
+import { getPropertyAccessPageState } from "@/lib/property-access";
 
 export const metadata: Metadata = propertyMetadata(
   "物件詳細｜格安不動産サーチ",
@@ -23,7 +25,7 @@ export default async function PropertyDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
-  await requireActiveMember();
+  const member = await requireActiveMember();
   const { id } = await params;
   const { returnTo } = await searchParams;
   const returnPath = getSafePropertyReturnPath(returnTo);
@@ -32,8 +34,17 @@ export default async function PropertyDetailPage({
   const propertyCategory = property.property_category ?? property.property_type;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
-      <ViewedPropertyTracker propertyId={property.id} />
+    <>
+      <PropertyMemberStateBridge
+        member={{
+          authenticated: true,
+          email: member.email,
+          role: member.role,
+          accessState: getPropertyAccessPageState(member.access)
+        }}
+      />
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        <ViewedPropertyTracker propertyId={property.id} />
       <Link href={returnPath} className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-brand-700">
         <ArrowLeft className="h-4 w-4" />
         一覧に戻る
@@ -108,6 +119,7 @@ export default async function PropertyDetailPage({
           </Link>
         </div>
       </article>
-    </div>
+      </div>
+    </>
   );
 }

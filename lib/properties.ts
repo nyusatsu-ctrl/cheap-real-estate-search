@@ -3,6 +3,9 @@ import { sampleProperties } from "@/lib/sample-data";
 import { getRegionPrefectures } from "@/lib/property-filters";
 import type { Property, PropertyFilters, PropertyLocationOption, PropertySort } from "@/lib/types";
 
+const PUBLIC_PROPERTY_LIST_SELECT = "id,title,property_type,property_category,price_yen,prefecture,city,address_display,land_area_m2,building_area_m2,construction_year,latitude,longitude,transaction_type,listed_at,source_published_at,source_updated_at,scraped_at,first_detected_at,last_checked_at,last_changed_at,has_updates,price_band,publication_permission,status,published_at,created_at,updated_at" as const;
+const PUBLIC_PROPERTY_DETAIL_SELECT = `${PUBLIC_PROPERTY_LIST_SELECT},source_url` as const;
+
 type PropertyQuery<T> = {
   eq: (column: string, value: string | number) => T;
   gte: (column: string, value: number) => T;
@@ -26,6 +29,7 @@ export async function getPublishedProperties(filters: PropertyFilters = {}) {
 }
 
 export async function getPublishedPropertiesResult(filters: PropertyFilters = {}, pagination: { page?: number; pageSize?: number } = {}): Promise<PublishedPropertiesResult> {
+  const startedAt = Date.now();
   const page = normalizePage(pagination.page);
   const pageSize = normalizePageSize(pagination.pageSize);
   const supabase = await createPropertyMemberReadClient();
@@ -39,7 +43,7 @@ export async function getPublishedPropertiesResult(filters: PropertyFilters = {}
 
   let query = supabase
     .from("properties")
-    .select("*", { count: "exact" })
+    .select(PUBLIC_PROPERTY_LIST_SELECT, { count: "exact" })
     .eq("status", "published");
 
   query = applyServerFilters(query, filters);
@@ -48,6 +52,7 @@ export async function getPublishedPropertiesResult(filters: PropertyFilters = {}
 
   const { data, error, count } = await query;
   if (error) {
+    logPropertyPerformance("list", startedAt, 1, 0, "error");
     logPropertyQueryError("published properties", error);
     if (shouldUseSampleFallback()) {
       return getFallbackPublishedPropertiesResult(filters, page, pageSize);
@@ -55,8 +60,10 @@ export async function getPublishedPropertiesResult(filters: PropertyFilters = {}
     return getFailedPublishedPropertiesResult(page, pageSize);
   }
 
+  logPropertyPerformance("list", startedAt, 1, data?.length ?? 0, "success");
+
   return {
-    properties: sanitizePublicListProperties(sortProperties(filterProperties((data ?? []) as Property[], filters), filters.sort)),
+    properties: sanitizePublicListProperties(sortProperties(filterProperties((data ?? []) as unknown as Property[], filters), filters.sort)),
     totalCount: count ?? 0,
     page,
     pageSize,
@@ -132,6 +139,7 @@ function applyServerFilters<T extends PropertyQuery<T>>(query: T, filters: Prope
 }
 
 export async function getPublishedProperty(id: string) {
+  const startedAt = Date.now();
   const supabase = await createPropertyMemberReadClient();
 
   if (!supabase) {
@@ -142,13 +150,17 @@ export async function getPublishedProperty(id: string) {
 
   const { data, error } = await supabase
     .from("properties")
-    .select("*, property_images(*)")
+    .select(PUBLIC_PROPERTY_DETAIL_SELECT)
     .eq("id", id)
     .eq("status", "published")
     .single();
 
-  if (error) return null;
-  return sanitizePublicDetailProperty(data as Property);
+  if (error) {
+    logPropertyPerformance("detail", startedAt, 1, 0, "not_found_or_error");
+    return null;
+  }
+  logPropertyPerformance("detail", startedAt, 1, 1, "success");
+  return sanitizePublicDetailProperty(data as unknown as Property);
 }
 
 export async function getAdminProperties(filters: PropertyFilters = {}) {
@@ -261,6 +273,22 @@ function getFallbackPropertyLocations(publishedOnly: boolean) {
 
 function logPropertyQueryError(scope: string, error: { message?: string }) {
   console.error(`[properties] Failed to load ${scope}: ${error.message ?? "unknown error"}`);
+}
+
+function logPropertyPerformance(
+  scope: "list" | "detail",
+  startedAt: number,
+  queryCount: number,
+  rowCount: number,
+  outcome: string
+) {
+  console.info("[property-performance] property query completed", {
+    scope,
+    durationMs: Date.now() - startedAt,
+    queryCount,
+    rowCount,
+    outcome
+  });
 }
 
 function shouldUseSampleFallback() {

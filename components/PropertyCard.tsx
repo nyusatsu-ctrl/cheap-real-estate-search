@@ -3,13 +3,22 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CalendarDays, MapPin, Ruler } from "lucide-react";
+import { PROPERTY_SCROLL_KEY_PREFIX } from "@/components/PropertyScrollRestorer";
 import { PROPERTY_TYPE_LABELS } from "@/lib/constants";
-import { formatArea, formatDate, formatPrice } from "@/lib/format";
+import { formatArea, formatPrice } from "@/lib/format";
 import type { Property } from "@/lib/types";
 
 const VIEWED_PROPERTIES_KEY = "cheap-real-estate:viewed-properties";
 const NEW_DAYS = 7;
 const badgeBaseClass = "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold leading-none";
+const propertyCardDateFormatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
+const tokyoDateKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Tokyo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+let viewedPropertyIdsCache: Set<string> | null = null;
 
 export function PropertyCard({ property, returnPath = "/properties" }: { property: Property; returnPath?: string }) {
   const [isViewed, setIsViewed] = useState(true);
@@ -30,6 +39,11 @@ export function PropertyCard({ property, returnPath = "/properties" }: { propert
     const viewedIds = getViewedPropertyIds();
     viewedIds.add(property.id);
     window.localStorage.setItem(VIEWED_PROPERTIES_KEY, JSON.stringify([...viewedIds]));
+    try {
+      window.sessionStorage.setItem(`${PROPERTY_SCROLL_KEY_PREFIX}${returnPath}`, String(window.scrollY));
+    } catch {
+      // The detail link remains usable when browser storage is unavailable.
+    }
     setIsViewed(true);
   }
 
@@ -82,12 +96,12 @@ export function PropertyCard({ property, returnPath = "/properties" }: { propert
           </p>
           <p className="flex items-start gap-2">
             <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            検知日 {formatDate(property.first_detected_at ?? null)}
+            検知日 {formatPropertyCardDate(property.first_detected_at ?? null)}
           </p>
           {property.source_published_at || property.listed_at ? (
             <p className="flex items-start gap-2">
               <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-              元サイト掲載日 {formatDate(property.source_published_at ?? property.listed_at ?? null)}
+              元サイト掲載日 {formatPropertyCardDate(property.source_published_at ?? property.listed_at ?? null)}
             </p>
           ) : null}
         </div>
@@ -103,14 +117,16 @@ function getPropertyDetailHref(propertyId: string, returnPath: string) {
 
 function getViewedPropertyIds() {
   if (typeof window === "undefined") return new Set<string>();
+  if (viewedPropertyIdsCache) return viewedPropertyIdsCache;
 
   try {
     const savedValue = window.localStorage.getItem(VIEWED_PROPERTIES_KEY);
     const savedIds = savedValue ? JSON.parse(savedValue) : [];
-    return new Set<string>(Array.isArray(savedIds) ? savedIds.filter((id) => typeof id === "string") : []);
+    viewedPropertyIdsCache = new Set<string>(Array.isArray(savedIds) ? savedIds.filter((id) => typeof id === "string") : []);
   } catch {
-    return new Set<string>();
+    viewedPropertyIdsCache = new Set<string>();
   }
+  return viewedPropertyIdsCache;
 }
 
 function isWithinDays(value: string | null | undefined, days: number) {
@@ -133,10 +149,10 @@ function isTodayInTokyo(value: string | null | undefined) {
 }
 
 function toTokyoDateKey(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
+  return tokyoDateKeyFormatter.format(date);
+}
+
+function formatPropertyCardDate(value: string | null) {
+  if (!value) return "-";
+  return propertyCardDateFormatter.format(new Date(value));
 }

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CreditCard, FileSearch, LogOut, MapPinned } from "lucide-react";
-import { signOutMemberAction } from "@/app/auth/actions";
+import { CreditCard, FileSearch, MapPinned } from "lucide-react";
+import { PropertyLogoutForm } from "@/components/PropertyLogoutForm";
+import { PropertyMemberStateBridge } from "@/components/PropertyMemberStateBridge";
 import { MONTHLY_PRICE_YEN } from "@/lib/billing/stripe";
-import { formatPropertyDateJst } from "@/lib/property-access";
+import { formatPropertyDateJst, getPropertyAccessPageState } from "@/lib/property-access";
 import { propertyMetadata } from "@/lib/property-metadata";
 import { getPublishedProperties } from "@/lib/properties";
 import { requireActiveMember } from "@/lib/user";
@@ -23,18 +24,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const isPaid = member.access.reason === "active";
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <>
+      <PropertyMemberStateBridge
+        member={{
+          authenticated: true,
+          email: member.email,
+          role: member.role,
+          accessState: getPropertyAccessPageState(member.access)
+        }}
+      />
+      <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-500">会員ダッシュボード</p>
           <h1 className="text-2xl font-black text-slate-950">{member.email}</h1>
         </div>
-        <form action={signOutMemberAction}>
-          <button className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
-            <LogOut className="h-4 w-4" />
-            ログアウト
-          </button>
-        </form>
+        <PropertyLogoutForm />
       </div>
 
       {params.checkout === "success" ? (
@@ -107,6 +112,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         ))}
       </section>
-    </div>
+      </div>
+    </>
   );
 }

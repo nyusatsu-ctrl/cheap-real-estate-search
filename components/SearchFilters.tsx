@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { LoaderCircle, Search } from "lucide-react";
 import { PREFECTURES, PROPERTY_PRICE_RANGE_OPTIONS, PROPERTY_REGION_OPTIONS, PROPERTY_SORT_OPTIONS, PROPERTY_TYPE_LABELS } from "@/lib/constants";
 import { getCityOptions, getRegionPrefectures } from "@/lib/property-filters";
 import type { PropertyLocationOption, PropertySort } from "@/lib/types";
@@ -50,6 +50,7 @@ export function SearchFilters({
   const [selectedPropertyType, setSelectedPropertyType] = useState(propertyType ?? "");
   const [selectedSort, setSelectedSort] = useState<PropertySort>(sort);
   const [selectedKeyword, setSelectedKeyword] = useState(keyword ?? "");
+  const [isSearching, setIsSearching] = useState(false);
   const [, forceFilterRestore] = useState(0);
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function SearchFilters({
       setSelectedPropertyType(params.get("propertyType") ?? "");
       setSelectedSort(normalizeSort(params.get("sort")));
       setSelectedKeyword(params.get("keyword") ?? "");
+      setIsSearching(false);
       forceFilterRestore((version) => version + 1);
     }
 
@@ -85,7 +87,7 @@ export function SearchFilters({
 
   return (
     <section className="rounded-lg border border-emerald-100 bg-white/95 p-3 shadow-lg shadow-emerald-900/5 backdrop-blur sm:p-5">
-      <form action={action} autoComplete="off">
+      <form action={action} autoComplete="off" aria-busy={isSearching} onSubmit={() => setIsSearching(true)}>
         <div className={showDetailedLocation ? "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"}>
           {showRegionLocation ? (
             <label className={labelClass}>
@@ -202,11 +204,22 @@ export function SearchFilters({
             />
           </label>
 
-          <button className="mt-0.5 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-700 to-brand-700 px-5 py-2.5 font-black text-white shadow-lg shadow-emerald-900/20 hover:from-emerald-800 hover:to-brand-800 focus-ring sm:min-h-12 sm:py-3 lg:mt-6">
-            <Search className="h-4 w-4" />
-            検索
+          <button
+            type="submit"
+            disabled={isSearching}
+            className="mt-0.5 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-700 to-brand-700 px-5 py-2.5 font-black text-white shadow-lg shadow-emerald-900/20 hover:from-emerald-800 hover:to-brand-800 disabled:cursor-wait disabled:opacity-70 focus-ring sm:min-h-12 sm:py-3 lg:mt-6"
+          >
+            {isSearching ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Search className="h-4 w-4" aria-hidden="true" />
+            )}
+            {isSearching ? "検索中…" : "検索"}
           </button>
         </div>
+        <span className="sr-only" aria-live="polite">
+          {isSearching ? "検索条件を適用しています" : ""}
+        </span>
       </form>
     </section>
   );

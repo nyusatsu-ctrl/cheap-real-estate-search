@@ -5,12 +5,15 @@ import {
   validateDiagnosisResumeToken
 } from "@/lib/construction-diagnosis-v2/resume";
 import { DIAGNOSIS_V22_SESSION_COOKIE } from "@/lib/construction-diagnosis-v2/sessions";
+import { after } from "next/server";
+import { recordDiagnosisEvent } from "@/lib/construction-diagnosis-v2/monitoring";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const result = await validateDiagnosisResumeToken(token);
   const redirectUrl = (path: string) => new URL(path, getRequestOrigin(request));
   if (result.ok) {
+    after(() => recordDiagnosisEvent({ eventName: "resume_opened", sessionId: result.sessionId, diagnosisId: result.diagnosisId }));
     const view = request.nextUrl.searchParams.get("view");
     const path = view === "quick" || !result.detailedStarted
       ? `/diagnosis/quick-results/${result.sessionId}`

@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { DIAGNOSIS_APP_NAME } from "@/lib/diagnosis-brand";
 
 type PropertyMemberState =
   | { authenticated: false }
@@ -88,10 +89,10 @@ function DiagnosisHeader({ priority = false }: { priority?: boolean }) {
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link href="/construction-sales-diagnosis" className="min-w-0">
+        <Link href="/diagnosis" className="min-w-0">
           <EcoloopAdminBrand
             showSystemName
-            systemName="建設会社向け 経営診断・再成長戦略"
+            systemName={DIAGNOSIS_APP_NAME}
             className="gap-2 sm:gap-3"
             textClassName="text-xs sm:text-sm"
             priority={priority}

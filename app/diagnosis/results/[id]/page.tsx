@@ -39,7 +39,7 @@ export default async function DiagnosisResultPage({
     const normalized = normalizeConstructionManagementDiagnosis(diagnosis);
     if (normalized.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION) {
       if (!normalized.strategy_result) notFound();
-      return <DiagnosisV23StrategyResultView id={normalized.id} result={normalized.strategy_result} axisScores={normalized.axis_scores} companyName={normalized.company_name} email={normalized.email} saved />;
+      return <DiagnosisV23StrategyResultView id={normalized.id} result={normalized.strategy_result} axisScores={normalized.axis_scores} companyName={normalized.company_name} email={normalized.email} saved feedbackSubmitted={Boolean(normalized.feedback_submitted_at)} />;
     }
     return <DiagnosisV2ResultView diagnosis={normalized} printError={query.print_error === "1"} />;
   }
@@ -97,7 +97,7 @@ export default async function DiagnosisResultPage({
             診断結果をもとに、少額案件を簡単な手続きで申し込める方法から始めるか、建設業の許可、公共工事に必要な会社の審査、国の機関への登録まで進めるかを整理できます。
           </p>
           <a
-            href={`mailto:${diagnosis.email}?subject=${encodeURIComponent("建設業売上アップ診断の個別相談")}`}
+            href={`mailto:${diagnosis.email}?subject=${encodeURIComponent("エコループ 建設会社向け経営診断の個別相談")}`}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded bg-brand-700 px-4 py-3 text-sm font-black text-white focus-ring"
           >
             メールで相談する

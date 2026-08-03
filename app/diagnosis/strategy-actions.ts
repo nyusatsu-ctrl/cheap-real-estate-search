@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
 import { canAccessDiagnosisPrecheck } from "@/lib/construction-diagnosis-v2/precheck";
 import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION, type DiagnosisV2AnswerMap } from "@/lib/construction-diagnosis-v2/questions";
@@ -9,6 +10,7 @@ import { getAdditionalDetailedQuestions } from "@/lib/construction-diagnosis-v2/
 import { getDiagnosisV22Session, hasDiagnosisV22Session } from "@/lib/construction-diagnosis-v2/sessions";
 import { buildGrowthStrategyResult, getStrategyQuestions } from "@/lib/construction-diagnosis-v2/strategy";
 import { getPrimaryTradeLabel } from "@/lib/construction-diagnosis-v2/specialty-questions";
+import { recordDiagnosisEvent } from "@/lib/construction-diagnosis-v2/monitoring";
 
 export type StrategyActionState = {
   formError?: string;
@@ -76,6 +78,14 @@ export async function submitGrowthStrategyAction(
     console.error("[diagnosis-v2.3] strategy_submit_failed", safeError(error));
     return { ...EMPTY, formError: "再成長戦略を保存できませんでした。入力内容はこの画面に残っています。もう一度押してください。" };
   }
+  after(() => recordDiagnosisEvent({
+    eventName: "detailed_diagnosis_completed",
+    sessionId: id,
+    source: session.lead_source,
+    stepNumber: questions.length,
+    totalSteps: questions.length,
+    notify: true
+  }));
   redirect(`/diagnosis/strategy-results/${id}`);
 }
 
@@ -215,6 +225,10 @@ export async function saveGrowthStrategyResultAction(
     return { ...EMPTY, formError: "保存できませんでした。入力内容は消えていません。もう一度押してください。" };
   }
   await supabase.from("construction_diagnosis_sessions").update({ diagnosis_id: session.id, last_saved_at: now, updated_at: now }).eq("id", session.id);
+  after(() => recordDiagnosisEvent({ eventName: "company_info_submitted", sessionId: session.id, diagnosisId: session.id, source: session.lead_source, notify: true }));
+  if (consultationRequested) {
+    after(() => recordDiagnosisEvent({ eventName: "consultation_requested", sessionId: session.id, diagnosisId: session.id, source: session.lead_source, notify: true }));
+  }
   revalidatePath("/admin/diagnoses");
   revalidatePath(`/diagnosis/strategy-results/${session.id}`);
   if (consultationRequested) redirect(`/diagnosis/strategy-results/${session.id}?consultation=complete`);

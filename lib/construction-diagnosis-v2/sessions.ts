@@ -83,6 +83,15 @@ export type DiagnosisV22FunnelSummary = {
   deviceStats: Array<{ label: string; started: number; completed: number; rate: number }>;
 };
 
+export type DiagnosisMonitorSummary = {
+  available: boolean;
+  eventCounts: Record<string, number>;
+  sourceStats: Array<{ source: string; started: number; shortCompleted: number; detailedStarted: number; detailedCompleted: number; companyInfo: number; printed: number; consultation: number; feedback: number }>;
+  averageFeedback: number | null;
+  questionStats: Array<{ questionCode: string; reached: number; dropoffCandidates: number }>;
+  notificationStats: { pending: number; sent: number; failed: number };
+};
+
 export type PropertySearchWaitlistEntry = {
   id: string;
   company_name: string;
@@ -207,6 +216,62 @@ export async function getDiagnosisV22FunnelSummary(): Promise<DiagnosisV22Funnel
   };
 }
 
+export async function getDiagnosisMonitorSummary(): Promise<DiagnosisMonitorSummary> {
+  const empty: DiagnosisMonitorSummary = {
+    available: false,
+    eventCounts: {},
+    sourceStats: [],
+    averageFeedback: null,
+    questionStats: [],
+    notificationStats: { pending: 0, sent: 0, failed: 0 }
+  };
+  const supabase = createDiagnosisSupabaseServiceRoleClient();
+  if (!supabase) return empty;
+  const [eventsResult, sessionsResult, feedbackResult, notificationsResult] = await Promise.all([
+    supabase.from("diagnosis_usage_events").select("event_name, source, question_code").order("created_at", { ascending: false }).limit(10000),
+    supabase.from("construction_diagnosis_sessions").select("abandoned_question_id, strategy_completed_at, detailed_completed_at"),
+    supabase.from("construction_diagnoses").select("feedback_accuracy").not("feedback_accuracy", "is", null),
+    supabase.from("diagnosis_notification_events").select("status").limit(10000)
+  ]);
+  if (eventsResult.error || !eventsResult.data) return empty;
+  const eventCounts = countStrings(eventsResult.data.map((row) => String(row.event_name)));
+  const sources = Array.from(new Set(eventsResult.data.map((row) => String(row.source || "direct"))));
+  const sourceStats = sources.map((source) => {
+    const rows = eventsResult.data!.filter((row) => String(row.source || "direct") === source);
+    const count = (name: string) => rows.filter((row) => row.event_name === name).length;
+    return {
+      source,
+      started: count("diagnosis_started"),
+      shortCompleted: count("short_diagnosis_completed"),
+      detailedStarted: count("detailed_diagnosis_started"),
+      detailedCompleted: count("detailed_diagnosis_completed"),
+      companyInfo: count("company_info_submitted"),
+      printed: count("print_opened"),
+      consultation: count("consultation_requested"),
+      feedback: count("feedback_submitted")
+    };
+  }).sort((a, b) => b.started - a.started);
+  const reached = countStrings(eventsResult.data.flatMap((row) => row.question_code ? [String(row.question_code)] : []));
+  const dropoffs = countStrings((sessionsResult.data ?? []).flatMap((row) => {
+    if (row.strategy_completed_at || row.detailed_completed_at || !row.abandoned_question_id) return [];
+    return [String(row.abandoned_question_id)];
+  }));
+  const feedback = (feedbackResult.data ?? []).map((row) => Number(row.feedback_accuracy)).filter((value) => Number.isFinite(value));
+  const notificationCounts = countStrings((notificationsResult.data ?? []).map((row) => String(row.status)));
+  return {
+    available: true,
+    eventCounts,
+    sourceStats,
+    averageFeedback: feedback.length > 0 ? Math.round((feedback.reduce((sum, value) => sum + value, 0) / feedback.length) * 10) / 10 : null,
+    questionStats: Array.from(new Set([...Object.keys(reached), ...Object.keys(dropoffs)])).map((questionCode) => ({
+      questionCode,
+      reached: reached[questionCode] ?? 0,
+      dropoffCandidates: dropoffs[questionCode] ?? 0
+    })).sort((a, b) => b.reached - a.reached || b.dropoffCandidates - a.dropoffCandidates),
+    notificationStats: { pending: notificationCounts.pending ?? 0, sent: notificationCounts.sent ?? 0, failed: notificationCounts.failed ?? 0 }
+  };
+}
+
 export async function getPropertySearchWaitlist(filters: PropertySearchWaitlistFilters = {}): Promise<PropertySearchWaitlistEntry[]> {
   const supabase = createDiagnosisSupabaseServiceRoleClient();
   if (!supabase) return [];
@@ -261,6 +326,13 @@ function normalizeSession(session: DiagnosisV22Session): DiagnosisV22Session {
     strategy_completed_at: session.strategy_completed_at ?? null,
     strategy_result: session.strategy_result ?? null
   };
+}
+
+function countStrings(values: string[]) {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 function percentage(value: number, total: number) {

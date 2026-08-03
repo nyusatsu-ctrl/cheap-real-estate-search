@@ -81,7 +81,7 @@ export function DiagnosisV2ResultView({
               />
               <div>
                 <p className="text-sm font-black text-slate-950">株式会社エコループ</p>
-                <p className="mt-1 text-xs font-bold text-slate-600">建設会社向け 経営診断・再成長戦略</p>
+                <p className="mt-1 text-xs font-bold text-slate-600">エコループ 建設会社向け経営診断</p>
               </div>
             </div>
           ) : null}
@@ -234,7 +234,7 @@ export function DiagnosisV2ResultView({
           <section className="print:hidden">
             <div className="rounded-lg border border-brand-200 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-black text-slate-950">{result.consultation?.heading ?? "診断結果について詳しく確認したい会社様へ"}</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-700">{result.consultation?.body ?? "診断結果は入力内容に基づく簡易判定です。個別要件を確認することで、より具体的な優先順位を整理できます。"}</p>
+              <p className="mt-3 text-sm leading-7 text-slate-700">診断結果を基に、現在の課題、公共工事参入の可能性、必要な準備、今後90日間の進め方を代表が確認します。</p>
               {diagnosis.consultation_requested ? (
                 <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">個別相談を申込み済みです。日程確認のご連絡をお待ちください。</p>
               ) : shouldRecommendConsultation ? (

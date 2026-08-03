@@ -1,10 +1,11 @@
-export type LeadSource = "aidma" | "meta" | "lp" | "referral" | "direct" | "other";
+export type LeadSource = "aidma" | "meta" | "lp" | "referral" | "monitor2026aug" | "direct" | "other";
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   aidma: "アイドマHD",
   meta: "Meta広告",
   lp: "自社LP",
   referral: "紹介",
+  monitor2026aug: "10社限定モニター",
   direct: "直接",
   other: "その他"
 };

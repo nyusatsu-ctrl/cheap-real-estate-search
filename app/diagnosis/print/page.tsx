@@ -5,9 +5,10 @@ import { DiagnosisV2ResultView } from "@/components/diagnoses/v2/DiagnosisV2Resu
 import { DiagnosisV23StrategyResultView } from "@/components/diagnoses/v2/DiagnosisV23StrategyResultView";
 import { getDiagnosisForPrint } from "@/lib/construction-diagnosis-v2/print";
 import { CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION } from "@/lib/construction-diagnosis-v2/questions";
+import { DIAGNOSIS_APP_NAME } from "@/lib/diagnosis-brand";
 
 export const metadata: Metadata = {
-  title: "診断結果 印刷・PDF保存｜株式会社エコループ",
+  title: `診断結果 印刷・PDF保存｜${DIAGNOSIS_APP_NAME}`,
   robots: { index: false, follow: false }
 };
 

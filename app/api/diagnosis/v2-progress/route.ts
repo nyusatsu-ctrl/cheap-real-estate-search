@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { normalizeLeadSource } from "@/lib/construction-diagnosis";
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION
@@ -23,6 +24,7 @@ import {
 import { classifyDiagnosisClient } from "@/lib/construction-diagnosis-v2/client-info";
 import { canAccessDiagnosisPrecheck } from "@/lib/construction-diagnosis-v2/precheck";
 import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
+import { recordDiagnosisEvent } from "@/lib/construction-diagnosis-v2/monitoring";
 
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown>;
@@ -94,6 +96,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "通信できませんでした。入力内容は消えていません。もう一度押してください。" }, { status: 500 });
     }
     await setDiagnosisV22SessionCookie(id);
+    after(async () => {
+      await recordDiagnosisEvent({ eventName: "diagnosis_started", sessionId: id, source: payload.lead_source, deviceType: client.deviceType, browserType: client.browserFamily });
+      await recordDiagnosisEvent({ eventName: "basic_info_completed", sessionId: id, source: payload.lead_source, deviceType: client.deviceType, browserType: client.browserFamily });
+    });
     return NextResponse.json({ id });
   }
 
@@ -232,6 +238,18 @@ export async function POST(request: NextRequest) {
         .update(diagnosisUpdate ?? {})
         .eq("id", id);
       if (diagnosisError) console.error("[diagnosis-v2.2] diagnosis_progress_save_failed", safeSupabaseError(diagnosisError));
+    }
+    if (questionId) {
+      const eventName = stage === "short" ? "short_question_answered" : "detailed_question_answered";
+      const totalSteps = Number(update.strategy_total_questions ?? update.detailed_total_questions ?? 0) || null;
+      after(() => recordDiagnosisEvent({
+        eventName,
+        sessionId: id,
+        diagnosisId: diagnosisUpdate ? id : null,
+        questionCode: questionId,
+        stepNumber: step,
+        totalSteps
+      }));
     }
     return NextResponse.json({ saved: true });
   }

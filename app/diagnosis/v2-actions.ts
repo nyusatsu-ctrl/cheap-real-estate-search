@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import {
   CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
   PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION,
@@ -47,6 +48,7 @@ import {
   DIAGNOSIS_V22_SALES_OPTIONS
 } from "@/lib/construction-diagnosis-v2/start-form";
 import { createDiagnosisSupabaseServiceRoleClient } from "@/lib/supabase/diagnosis-server";
+import { recordDiagnosisEvent } from "@/lib/construction-diagnosis-v2/monitoring";
 
 const DIAGNOSIS_V2_SESSION_COOKIE = "construction_management_diagnosis_v2_session";
 
@@ -172,6 +174,14 @@ export async function submitDiagnosisV2QuickAction(
     });
     return { ...EMPTY_STATE, formError: "診断を保存できませんでした。入力内容は消えていません。時間をおいて、もう一度押してください。" };
   }
+
+  after(() => recordDiagnosisEvent({
+    eventName: "short_diagnosis_completed",
+    sessionId,
+    stepNumber: getShortDiagnosisQuestions(quickContext).length,
+    totalSteps: getShortDiagnosisQuestions(quickContext).length,
+    notify: true
+  }));
 
   redirect(`/diagnosis/quick-results/${sessionId}`);
 }
@@ -343,6 +353,11 @@ export async function submitDiagnosisV22ResultAction(
   if (sessionError) console.error("[diagnosis-v2.2] session_promote_update_failed", safeError(sessionError));
   if (sessionError) return { ...EMPTY_STATE, formError: "途中保存の準備ができませんでした。入力内容は保存されています。もう一度押してください。" };
 
+  after(() => recordDiagnosisEvent({ eventName: "company_info_submitted", sessionId: session.id, diagnosisId: session.id, source: session.lead_source, notify: true }));
+  if (consultationRequested) {
+    after(() => recordDiagnosisEvent({ eventName: "consultation_requested", sessionId: session.id, diagnosisId: session.id, source: session.lead_source, notify: true }));
+  }
+
   try {
     await issueDiagnosisResumeToken(session.id);
   } catch (error) {
@@ -507,6 +522,15 @@ export async function submitDiagnosisV2DetailedAction(
     if (progressError) console.error("[diagnosis-v2.2] detailed_progress_complete_failed", safeError(progressError));
   }
 
+  after(() => recordDiagnosisEvent({
+    eventName: "detailed_diagnosis_completed",
+    sessionId: id,
+    diagnosisId: id,
+    stepNumber: applicableQuestions.length,
+    totalSteps: applicableQuestions.length,
+    notify: true
+  }));
+
   redirect(`/diagnosis/results/${id}`);
 }
 
@@ -562,6 +586,8 @@ export async function submitDiagnosisV2ConsultationAction(
     return { ...EMPTY_STATE, formError: "相談申込みを保存できませんでした。時間をおいて再度お試しください。" };
   }
 
+  after(() => recordDiagnosisEvent({ eventName: "consultation_requested", sessionId: id, diagnosisId: id, notify: true }));
+
   revalidatePath(`/diagnosis/results/${id}`);
   revalidatePath(`/admin/diagnoses/${id}`);
   return { fieldErrors: {}, success: true };
@@ -577,13 +603,7 @@ export async function submitDiagnosisV2FeedbackAction(
   }
 
   const fieldErrors: Record<string, string> = {};
-  const clarity = requiredRating(formData, "feedback_clarity", fieldErrors);
   const accuracy = requiredRating(formData, "feedback_accuracy", fieldErrors);
-  const usefulness = requiredRating(formData, "feedback_usefulness", fieldErrors);
-  const interest = getString(formData, "feedback_consultation_interest");
-  if (!["yes", "neutral", "no"].includes(interest)) {
-    fieldErrors.feedback_consultation_interest = "回答を選択してください";
-  }
   if (Object.keys(fieldErrors).length > 0) {
     return { formError: "フィードバックの入力内容を確認してください。", fieldErrors };
   }
@@ -598,17 +618,13 @@ export async function submitDiagnosisV2FeedbackAction(
   const { data, error } = await supabase
     .from("construction_diagnoses")
     .update({
-      feedback_clarity: clarity,
       feedback_accuracy: accuracy,
-      feedback_usefulness: usefulness,
-      feedback_consultation_interest: interest,
       feedback_comment: nullableString(formData, "feedback_comment"),
       feedback_submitted_at: now,
       updated_at: now
     })
     .eq("id", id)
     .in("diagnosis_version", [...SUPPORTED_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSIONS])
-    .is("feedback_submitted_at", null)
     .select("id")
     .maybeSingle();
 
@@ -621,9 +637,9 @@ export async function submitDiagnosisV2FeedbackAction(
     });
     return { ...EMPTY_STATE, formError: "フィードバックを保存できませんでした。時間をおいて再度お試しください。" };
   }
-  if (!data) {
-    return { ...EMPTY_STATE, formError: "フィードバックはすでに送信済みです。" };
-  }
+  if (!data) return { ...EMPTY_STATE, formError: "診断データを確認できませんでした。" };
+
+  after(() => recordDiagnosisEvent({ eventName: "feedback_submitted", diagnosisId: id, notify: true }));
 
   revalidatePath(`/diagnosis/results/${id}`);
   revalidatePath(`/admin/diagnoses/${id}`);

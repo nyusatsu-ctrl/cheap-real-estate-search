@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Building2, CheckCircle2, ClipboardCheck, Route, ShieldCheck, TrendingUp } from "lucide-react";
+import { DIAGNOSIS_APP_NAME, DIAGNOSIS_DESCRIPTION, DIAGNOSIS_OPERATOR } from "@/lib/diagnosis-brand";
 
 export const metadata: Metadata = {
-  title: "建設会社向け 経営診断・再成長戦略｜株式会社エコループ",
-  description: "経営課題、利益管理、組織体制、公共工事への参入余地を無料で診断します。",
+  title: DIAGNOSIS_APP_NAME,
+  description: DIAGNOSIS_DESCRIPTION,
   robots: { index: false, follow: false }
 };
 
@@ -37,8 +38,8 @@ export default function ConstructionSalesDiagnosisPage() {
               <span className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800">テスト版</span>
             </div>
             <h1 className="mt-5 text-4xl font-black leading-tight text-slate-950 md:text-6xl">
-              建設会社向け
-              <span className="mt-2 block text-brand-800">経営診断・再成長戦略</span>
+              エコループ
+              <span className="mt-2 block text-brand-800">建設会社向け経営診断</span>
             </h1>
             <p className="mt-6 max-w-3xl text-base leading-8 text-slate-700 md:text-lg">
               売上、利益、原価管理、人材、組織、公共工事への参加体制などを診断し、御社の強み、優先課題、今後90日間の行動方針を整理します。
@@ -82,6 +83,11 @@ export default function ConstructionSalesDiagnosisPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-10">
+        <div className="mb-5 rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-black text-slate-950">建設現場と会社経営の実務を踏まえた診断です</h2>
+          <p className="mt-2 text-sm leading-7 text-slate-700">運営は{DIAGNOSIS_OPERATOR.companyName}です。代表は建設現場・施工管理・建設会社経営の経験を持ち、1級土木施工管理技士等の資格を保有しています。</p>
+          <p className="mt-3 text-xs font-semibold leading-6 text-slate-600">全国約2,000か所以上は、株式会社エコループが自社の建設会社運営において入札参加資格の取得・管理体制を構築してきた発注機関数の目安です。すべての会社が同じ発注機関へ参加できることや、案件の受注・落札を保証するものではありません。</p>
+        </div>
         <p className="rounded border border-slate-200 bg-white px-5 py-4 text-xs font-semibold leading-6 text-slate-600">
           本診断は、入力内容に基づく経営状況の整理を目的としたものです。売上増加、利益改善、入札参加、落札等を保証するものではありません。
         </p>

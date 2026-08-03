@@ -183,7 +183,7 @@ export function DiagnosisV2AdminDetail({ diagnosis }: { diagnosis: ConstructionM
               <ResultBlock title="90日計画" items={[...strategyResult.plan90Days.month1, ...strategyResult.plan90Days.month2, ...strategyResult.plan90Days.month3]} />
               <ResultBlock title="毎月確認する数字" items={strategyResult.monthlyMetrics} />
               <Info label="支援判定" value={strategyResult.supportJudgment} />
-              <Info label="格安不動産サーチへの関心" value={diagnosis.property_search_interest ?? "未回答"} />
+              <Info label="格安・ゼロ円物件情報への関心" value={diagnosis.property_search_interest ?? "未回答"} />
               <Info label="案内希望内容" value={diagnosis.property_search_interest_topics.join(" / ") || "-"} />
             </AdminSection>
           ) : null}

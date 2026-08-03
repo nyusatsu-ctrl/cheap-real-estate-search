@@ -131,12 +131,7 @@ export function DiagnosisV22ResultActions({
           <label className={`mt-4 flex items-start gap-3 rounded border bg-white p-4 text-sm font-semibold leading-6 ${state.fieldErrors?.privacy_consent ? "border-red-500" : "border-slate-200"}`}>
             <input type="checkbox" name="privacy_consent" value="agreed" checked={draft.privacy_consent} onChange={(event) => setDraftValue("privacy_consent", event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-brand-700" />
             <span>
-              個人情報の取り扱いに同意します（必須）。
-              <span className="block text-xs font-normal text-slate-600">
-                <Link href="/diagnosis/terms" target="_blank" className="font-bold text-brand-800 underline">利用規約</Link>
-                <span className="mx-1">・</span>
-                <Link href="/diagnosis/privacy" target="_blank" className="font-bold text-brand-800 underline">プライバシーポリシー</Link>
-              </span>
+              <Link href="/diagnosis/terms" target="_blank" className="font-bold text-brand-800 underline">利用規約</Link>と<Link href="/diagnosis/privacy" target="_blank" className="font-bold text-brand-800 underline">プライバシーポリシー</Link>を確認し、同意します（必須）。
               {state.fieldErrors?.privacy_consent ? <span className="block text-xs font-bold text-red-700">{state.fieldErrors.privacy_consent}</span> : null}
             </span>
           </label>

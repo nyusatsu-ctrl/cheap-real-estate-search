@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { DiagnosisV2DetailedForm } from "@/components/diagnoses/v2/DiagnosisV2DetailedForm";
 import { DiagnosisV23StrategyForm } from "@/components/diagnoses/v2/DiagnosisV23StrategyForm";
 import { getConstructionManagementDiagnosis } from "@/lib/construction-diagnosis-v2/data";
@@ -7,6 +8,7 @@ import { getAdditionalDetailedQuestions, getInheritedDetailedAnswers, getInherit
 import { getDiagnosisV22Session, markDiagnosisV22DetailedStarted, markGrowthStrategyStarted } from "@/lib/construction-diagnosis-v2/sessions";
 import { getStrategyQuestions } from "@/lib/construction-diagnosis-v2/strategy";
 import { canAccessDiagnosisV22, getCurrentDiagnosisResumePath } from "@/lib/construction-diagnosis-v2/resume";
+import { recordDiagnosisEvent } from "@/lib/construction-diagnosis-v2/monitoring";
 
 export default async function DiagnosisV2DetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,6 +16,7 @@ export default async function DiagnosisV2DetailsPage({ params }: { params: Promi
   if (currentSession?.diagnosis_version === CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION) {
     if (!currentSession.short_completed_at || currentSession.strategy_completed_at) notFound();
     await markGrowthStrategyStarted(id);
+    after(() => recordDiagnosisEvent({ eventName: "detailed_diagnosis_started", sessionId: id, source: currentSession.lead_source, notify: true }));
     const questions = getStrategyQuestions(currentSession.strategy_question_ids, {
       primaryTrade: currentSession.primary_trade,
       publicWorkIntent: currentSession.public_work_intent
@@ -26,6 +29,7 @@ export default async function DiagnosisV2DetailsPage({ params }: { params: Promi
   const isV22 = diagnosis.diagnosis_version === PREVIOUS_CONSTRUCTION_MANAGEMENT_DIAGNOSIS_VERSION;
   if (isV22 && !await canAccessDiagnosisV22(id)) notFound();
   if (isV22) await markDiagnosisV22DetailedStarted(id);
+  if (isV22) after(() => recordDiagnosisEvent({ eventName: "detailed_diagnosis_started", sessionId: id, diagnosisId: id, notify: true }));
   const session = isV22 ? currentSession : null;
   if (isV22 && !session) notFound();
   const inheritedAnswers = getInheritedDetailedAnswers(diagnosis.quick_answers);

@@ -21,6 +21,7 @@ export default async function DiagnosisV2ConsultationPage({ params }: { params: 
             <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-black text-amber-800">テスト版</span>
           </div>
           <h1 className="mt-1 text-2xl font-black text-slate-950">個別相談申込み</h1>
+          <p className="mt-3 text-sm leading-7 text-slate-700">診断結果を基に、現在の課題、公共工事参入の可能性、必要な準備、今後90日間の進め方を代表が確認します。</p>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <Info label="会社名" value={diagnosis.company_name} />
             <Info label="回答者" value={diagnosis.respondent_name} />

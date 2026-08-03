@@ -55,9 +55,11 @@ test("case 1b: detailed diagnosis has the specified 8 sections and 34-question d
   assert.equal(new Set(DETAILED_DIAGNOSIS_QUESTIONS.map((question) => question.id)).size, 34);
 });
 
-test("referral, aidma, and missing diagnosis sources are normalized without overlap", () => {
+test("referral, monitor, aidma, and missing diagnosis sources are normalized without overlap", () => {
   assert.equal(normalizeLeadSource("referral"), "referral");
   assert.equal(getLeadSourceLabel("referral"), "紹介");
+  assert.equal(normalizeLeadSource("monitor2026aug"), "monitor2026aug");
+  assert.equal(getLeadSourceLabel("monitor2026aug"), "10社限定モニター");
   assert.equal(normalizeLeadSource("aidma"), "aidma");
   assert.equal(getLeadSourceLabel("aidma"), "アイドマHD");
   assert.equal(normalizeLeadSource(""), "direct");

@@ -28,7 +28,7 @@ import {
   getPublicWorkIntentLabel,
   type PrimaryTrade
 } from "@/lib/construction-diagnosis-v2/specialty-questions";
-import { getDiagnosisV22FunnelSummary, getPropertySearchWaitlist, type DiagnosisV22FunnelSummary, type PropertySearchWaitlistEntry, type PropertySearchWaitlistFilters } from "@/lib/construction-diagnosis-v2/sessions";
+import { getDiagnosisMonitorSummary, getDiagnosisV22FunnelSummary, getPropertySearchWaitlist, type DiagnosisMonitorSummary, type DiagnosisV22FunnelSummary, type PropertySearchWaitlistEntry, type PropertySearchWaitlistFilters } from "@/lib/construction-diagnosis-v2/sessions";
 import { Download, Filter, LogOut } from "lucide-react";
 
 type AdminDiagnosesSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -51,9 +51,10 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
   const params = await searchParams;
   const filters = getFilters(params);
   const waitlistFilters = getPropertyWaitlistFilters(params);
-  const [diagnoses, funnel, propertyWaitlist] = await Promise.all([
+  const [diagnoses, funnel, monitor, propertyWaitlist] = await Promise.all([
     getConstructionDiagnoses(filters),
     getDiagnosisV22FunnelSummary(),
+    getDiagnosisMonitorSummary(),
     getPropertySearchWaitlist(waitlistFilters)
   ]);
   const exportHref = `/admin/diagnoses/export${getFilterQuery(filters)}`;
@@ -61,6 +62,7 @@ export default async function AdminDiagnosesPage({ searchParams }: { searchParam
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6">
       <AdminHeader email={admin.email} />
+      <DiagnosisMonitorMetrics summary={monitor} />
       {funnel ? <DiagnosisFunnel summary={funnel} /> : null}
       <PropertyWaitlist entries={propertyWaitlist} filters={waitlistFilters} />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -258,6 +260,22 @@ function DiagnosisFunnel({ summary }: { summary: DiagnosisV22FunnelSummary }) {
   );
 }
 
+function DiagnosisMonitorMetrics({ summary }: { summary: DiagnosisMonitorSummary }) {
+  if (!summary.available) return <section className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-7 text-amber-900">利用イベント集計は、診断モニタリング用マイグレーション適用後に表示されます。</section>;
+  const eventCards = [
+    ["診断開始", summary.eventCounts.diagnosis_started ?? 0],
+    ["3分診断完了", summary.eventCounts.short_diagnosis_completed ?? 0],
+    ["追加診断開始", summary.eventCounts.detailed_diagnosis_started ?? 0],
+    ["追加診断完了", summary.eventCounts.detailed_diagnosis_completed ?? 0],
+    ["会社情報入力", summary.eventCounts.company_info_submitted ?? 0],
+    ["印刷・保存", summary.eventCounts.print_opened ?? 0],
+    ["相談申込み", summary.eventCounts.consultation_requested ?? 0],
+    ["フィードバック", summary.eventCounts.feedback_submitted ?? 0],
+    ["平均評価", summary.averageFeedback === null ? "-" : `${summary.averageFeedback} / 5`]
+  ];
+  return <section className="mb-5 rounded-lg border border-brand-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950">モニターテスト利用状況</h2><p className="mt-1 text-xs text-slate-500">会社名や回答本文を含まない匿名イベントの集計です。</p></div><p className="text-xs font-bold text-slate-600">通知: 送信済み {summary.notificationStats.sent} / 保留 {summary.notificationStats.pending} / 失敗 {summary.notificationStats.failed}</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">{eventCards.map(([label, value]) => <div key={String(label)} className="rounded border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div>)}</div><div className="mt-4 grid gap-4 lg:grid-cols-2"><div className="overflow-x-auto rounded border border-slate-200"><table className="min-w-[760px] text-xs"><thead className="bg-slate-50 text-left text-slate-500"><tr>{["source", "開始", "3分完了", "追加開始", "追加完了", "会社情報", "印刷", "相談", "評価"].map((label) => <th key={label} className="px-2 py-2">{label}</th>)}</tr></thead><tbody>{summary.sourceStats.map((row) => <tr key={row.source} className="border-t border-slate-200"><td className="px-2 py-2 font-black">{getLeadSourceLabel(row.source)}</td>{[row.started, row.shortCompleted, row.detailedStarted, row.detailedCompleted, row.companyInfo, row.printed, row.consultation, row.feedback].map((value, index) => <td key={index} className="px-2 py-2">{value}</td>)}</tr>)}</tbody></table></div><FunnelList title="質問別 到達数 / 離脱候補" items={summary.questionStats.map((item) => `${item.questionCode}: 到達${item.reached}件 / 離脱候補${item.dropoffCandidates}件`)} /></div></section>;
+}
+
 function FunnelList({ title, items }: { title: string; items: string[] }) {
   return <div className="rounded border border-slate-200 p-3"><h3 className="text-sm font-black text-slate-900">{title}</h3>{items.length > 0 ? <ul className="mt-2 grid gap-1 text-xs font-semibold leading-5 text-slate-600">{items.slice(0, 8).map((item) => <li key={item}>・{item}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500">該当なし</p>}</div>;
 }
@@ -356,7 +374,7 @@ function AdminHeader({ email }: { email: string }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-slate-500">建設会社向け 経営診断・再成長戦略</p>
+        <p className="text-sm font-semibold text-slate-500">エコループ 建設会社向け経営診断</p>
         <p className="mt-1 text-xs text-slate-500">{email}</p>
       </div>
       <div className="flex items-center gap-2">

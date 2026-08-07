@@ -8,8 +8,11 @@ export default async function GpsCustomersPage() {
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <h2 className="text-lg font-black text-slate-950">GPS顧客一覧</h2>
+        <Link href="/admin/gps/customers/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+          顧客を新規登録
+        </Link>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -17,8 +20,8 @@ export default async function GpsCustomersPage() {
             <tr>
               <th className="px-3 py-3">氏名</th>
               <th className="px-3 py-3">電話</th>
-              <th className="px-3 py-3">物件</th>
-              <th className="px-3 py-3">管理対象</th>
+              <th className="px-3 py-3">車両</th>
+              <th className="px-3 py-3">GPS端末</th>
               <th className="px-3 py-3">最新位置</th>
               <th className="px-3 py-3">契約種別</th>
               <th className="px-3 py-3">ステータス</th>

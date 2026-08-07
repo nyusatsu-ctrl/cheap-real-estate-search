@@ -13,6 +13,7 @@
     "test:property-navigation": "node --no-warnings --test --experimental-strip-types scripts/property-navigation.test.mts",
     "test:diagnosis-v2": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2.test.mts scripts/construction-diagnosis-v2-specialty.test.mts scripts/construction-diagnosis-v2-start-form.test.mts scripts/construction-diagnosis-v2-short.test.mts scripts/construction-diagnosis-v2-resume.test.mts scripts/construction-diagnosis-v2-print.test.mts scripts/construction-diagnosis-v2-strategy.test.mts",
     "test:diagnosis-v2-specialty": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2-specialty.test.mts",
+    "test:gps": "node --test scripts/gps-foundation.test.mts scripts/mv930g-protocol.test.mts",
     "crawl:properties": "node scripts/crawlers/run.mjs",
     "import:properties": "node scripts/import-properties.mjs",
     "import:nationwide": "node scripts/import-properties.mjs --source=all",

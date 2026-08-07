@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isGpsAdminPath } from "@/lib/gps/routing";
 import { BUSINESS_INFO } from "@/lib/legal";
 
 const footerLinks = [
@@ -27,6 +28,7 @@ const diagnosisFooterLinks = [
 
 export function AppFooter() {
   const pathname = usePathname();
+  if (isGpsAdminPath(pathname)) return null;
   if (pathname.startsWith("/diagnosis/print")) return null;
   if (pathname.startsWith("/income-potential")) return <IncomePotentialFooter />;
 

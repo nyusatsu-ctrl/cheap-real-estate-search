@@ -1,5 +1,4 @@
 import {
-  sampleDeviceCommandQueue,
   sampleGpsCustomers,
   sampleGpsDevices,
   sampleGpsPositions,
@@ -7,6 +6,11 @@ import {
   sampleOperationLogs,
   sampleRawDeviceLogs
 } from "@/lib/gps/sample-data";
+import {
+  validateGpsCustomerInput,
+  validateGpsDeviceInput,
+  validateGpsVehicleInput
+} from "@/lib/gps/validation";
 
 export type GpsResourceName =
   | "gps_customers"
@@ -14,13 +18,13 @@ export type GpsResourceName =
   | "gps_devices"
   | "gps_positions"
   | "raw_device_logs"
-  | "operation_logs"
-  | "device_command_queue";
+  | "operation_logs";
 
 export type GpsResourceConfig = {
   table: GpsResourceName;
   label: string;
   orderColumn: string;
+  selectColumns: string;
   allowedFields: string[];
   sampleRows: Record<string, unknown>[];
 };
@@ -30,20 +34,41 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
     table: "gps_customers",
     label: "GPS顧客",
     orderColumn: "updated_at",
+    selectColumns: "*",
     allowedFields: ["full_name", "phone", "address", "email", "contract_type", "contract_status", "notes"],
     sampleRows: sampleGpsCustomers as unknown as Record<string, unknown>[]
   },
   gps_vehicles: {
     table: "gps_vehicles",
-    label: "GPS物件",
+    label: "GPS車両",
     orderColumn: "updated_at",
+    selectColumns: "*",
     allowedFields: ["customer_id", "vehicle_type", "maker", "model_name", "model_year", "vin", "license_plate", "status"],
     sampleRows: sampleGpsVehicles as unknown as Record<string, unknown>[]
   },
   gps_devices: {
     table: "gps_devices",
-    label: "GPS管理対象",
+    label: "GPS端末",
     orderColumn: "updated_at",
+    selectColumns: [
+      "id",
+      "vehicle_id",
+      "device_name",
+      "imei",
+      "device_identifier",
+      "protocol_terminal_id",
+      "is_active",
+      "sim_phone_number",
+      "iccid",
+      "connection_status",
+      "last_seen_at",
+      "jt808_auth_issued_at",
+      "jt808_registered_at",
+      "last_authenticated_at",
+      "last_raw_log_id",
+      "created_at",
+      "updated_at"
+    ].join(","),
     allowedFields: [
       "vehicle_id",
       "device_name",
@@ -61,6 +86,7 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
     table: "gps_positions",
     label: "GPS位置",
     orderColumn: "received_at",
+    selectColumns: "*",
     allowedFields: [
       "device_id",
       "vehicle_id",
@@ -81,6 +107,7 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
     table: "raw_device_logs",
     label: "raw受信ログ",
     orderColumn: "received_at",
+    selectColumns: "*",
     allowedFields: [
       "transport",
       "remote_address",
@@ -101,6 +128,7 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
     table: "operation_logs",
     label: "操作ログ",
     orderColumn: "created_at",
+    selectColumns: "*",
     allowedFields: [
       "actor_profile_id",
       "device_id",
@@ -114,25 +142,6 @@ export const GPS_RESOURCE_CONFIGS: Record<GpsResourceName, GpsResourceConfig> = 
       "executed_at"
     ],
     sampleRows: sampleOperationLogs as unknown as Record<string, unknown>[]
-  },
-  device_command_queue: {
-    table: "device_command_queue",
-    label: "管理対象コマンドキュー",
-    orderColumn: "queued_at",
-    allowedFields: [
-      "operation_log_id",
-      "device_id",
-      "command_type",
-      "command_payload",
-      "command_hex",
-      "status",
-      "attempts",
-      "last_error_message",
-      "queued_at",
-      "sent_at",
-      "acknowledged_at"
-    ],
-    sampleRows: sampleDeviceCommandQueue as unknown as Record<string, unknown>[]
   }
 };
 
@@ -147,4 +156,19 @@ export function sanitizeGpsPayload(config: GpsResourceConfig, payload: Record<st
     if (Object.prototype.hasOwnProperty.call(payload, field)) sanitized[field] = payload[field];
   }
   return sanitized;
+}
+
+export function validateGpsMutableResourcePayload(config: GpsResourceConfig, payload: Record<string, unknown>) {
+  if (config.table === "gps_customers") return validateGpsCustomerInput(payload);
+  if (config.table === "gps_vehicles") return validateGpsVehicleInput(payload);
+  if (config.table === "gps_devices") return validateGpsDeviceInput(payload);
+  return null;
+}
+
+export function getGpsDeactivationPayload(config: GpsResourceConfig) {
+  const updatedAt = new Date().toISOString();
+  if (config.table === "gps_customers") return { contract_status: "cancelled", updated_at: updatedAt };
+  if (config.table === "gps_vehicles") return { status: "inactive", updated_at: updatedAt };
+  if (config.table === "gps_devices") return { connection_status: "offline", is_active: false, updated_at: updatedAt };
+  return null;
 }

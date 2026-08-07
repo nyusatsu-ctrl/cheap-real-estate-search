@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createDiagnosisSupabaseServerClient } from "@/lib/supabase/diagnosis-server";
 import { requireAdmin } from "@/lib/admin";
+import { sanitizeAdminRedirectPath } from "@/lib/admin-redirect";
 import type { PropertyStatus } from "@/lib/types";
 
 function requiredString(formData: FormData, key: string) {
@@ -18,14 +19,6 @@ function nullableNumber(formData: FormData, key: string) {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function safeAdminRedirectPath(value: FormDataEntryValue | null) {
-  const path = String(value ?? "").trim();
-  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/admin/login")) {
-    return "/admin/sales-contracts";
-  }
-  return path;
 }
 
 function isDiagnosisAdminPath(path: string) {
@@ -51,7 +44,7 @@ async function getSignInClients(redirectTo: string) {
 export async function signInAction(formData: FormData) {
   const email = requiredString(formData, "email");
   const password = requiredString(formData, "password");
-  const redirectTo = safeAdminRedirectPath(formData.get("redirect_to"));
+  const redirectTo = sanitizeAdminRedirectPath(formData.get("redirect_to"));
   const clients = await getSignInClients(redirectTo);
   if (!clients.length) throw new Error("Supabase environment variables are not set.");
 

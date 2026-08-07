@@ -1,12 +1,14 @@
 import { GpsStatusBadge } from "@/components/gps/GpsStatusBadge";
+import { pairGpsProtocolTerminalAction } from "@/app/admin/gps/actions";
 import { GPS_PACKET_TYPE_LABELS, GPS_PARSE_STATUS_LABELS } from "@/lib/gps/labels";
 import { loadGpsAdminData } from "@/lib/gps/data";
+import { maskGpsIdentifier } from "@/lib/gps/sensitive";
 import type { GpsPacketType, GpsParseStatus } from "@/lib/gps/types";
 
 export default async function GpsRawLogsPage({
   searchParams
 }: {
-  searchParams: Promise<{ packetType?: string; parseStatus?: string; deviceIdentifier?: string }>;
+  searchParams: Promise<{ packetType?: string; parseStatus?: string; deviceIdentifier?: string; paired?: string; error?: string }>;
 }) {
   const data = await loadGpsAdminData();
   const filters = await searchParams;
@@ -18,9 +20,55 @@ export default async function GpsRawLogsPage({
     .filter((log) => !parseStatus || log.parse_status === parseStatus)
     .filter((log) => !deviceIdentifier || log.device_identifier?.includes(deviceIdentifier))
     .sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
+  const pairedTerminalIds = new Set(data.devices.map((device) => device.protocol_terminal_id).filter(Boolean));
+  const unpairedByTerminal = new Map<string, (typeof data.rawLogs)[number]>();
+  for (const log of data.rawLogs) {
+    if (
+      log.protocol_terminal_id
+      && !pairedTerminalIds.has(log.protocol_terminal_id)
+      && !unpairedByTerminal.has(log.protocol_terminal_id)
+    ) {
+      unpairedByTerminal.set(log.protocol_terminal_id, log);
+    }
+  }
+  const availableDevices = data.devices.filter((device) => device.is_active && !device.protocol_terminal_id);
 
   return (
     <div className="space-y-4">
+      {filters.paired === "1" && (
+        <p className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
+          プロトコル端末IDを既存GPS端末へ紐付けました。次回の端末登録から新しい認証コードを発行します。
+        </p>
+      )}
+      {filters.error && (
+        <p className="rounded border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-900">
+          紐付けを完了できませんでした。対象が未登録か、既に別のGPS端末へ紐付いていないか確認してください。
+        </p>
+      )}
+      <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <h2 className="text-base font-black text-amber-950">未登録JT/T 808端末の安全な紐付け</h2>
+        <p className="mt-1 text-sm text-amber-900">
+          受信したプロトコル端末IDはマスク表示します。IMEIから推測せず、選択した既存GPS端末へ管理者が明示的に紐付けます。
+        </p>
+        <div className="mt-3 space-y-2">
+          {[...unpairedByTerminal.values()].map((log) => (
+            <form key={log.id} action={pairGpsProtocolTerminalAction} className="flex flex-wrap items-center gap-2 rounded border border-amber-200 bg-white p-3">
+              <input type="hidden" name="raw_log_id" value={log.id} />
+              <span className="font-mono text-sm font-bold text-slate-800">{maskGpsIdentifier(log.protocol_terminal_id)}</span>
+              <select name="device_id" required className="min-w-56 rounded border border-slate-300 bg-white px-3 py-2 text-sm">
+                <option value="">紐付け先のGPS端末を選択</option>
+                {availableDevices.map((device) => (
+                  <option key={device.id} value={device.id}>{device.device_name}</option>
+                ))}
+              </select>
+              <button disabled={availableDevices.length === 0} className="rounded bg-brand-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
+                紐付ける
+              </button>
+            </form>
+          ))}
+          {unpairedByTerminal.size === 0 && <p className="text-sm text-amber-900">未登録のプロトコル端末IDはありません。</p>}
+        </div>
+      </section>
       <form className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-4">
           <label className="text-sm font-bold text-slate-700">
@@ -51,7 +99,7 @@ export default async function GpsRawLogsPage({
               name="deviceIdentifier"
               defaultValue={deviceIdentifier ?? ""}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-              placeholder="13912345678"
+              placeholder="端末IDを入力"
             />
           </label>
           <div className="flex items-end gap-2">
@@ -75,7 +123,7 @@ export default async function GpsRawLogsPage({
                 <th className="px-3 py-3">受信日時</th>
                 <th className="px-3 py-3">通信</th>
                 <th className="px-3 py-3">送信元</th>
-                <th className="px-3 py-3">Device ID</th>
+                <th className="px-3 py-3">JT/T 808端末ID</th>
                 <th className="px-3 py-3">packet_type</th>
                 <th className="px-3 py-3">parse_status</th>
                 <th className="px-3 py-3">raw_hex</th>
@@ -87,7 +135,7 @@ export default async function GpsRawLogsPage({
                   <td className="px-3 py-3 text-slate-700">{formatDateTime(log.received_at)}</td>
                   <td className="px-3 py-3 font-bold text-slate-950">{log.transport.toUpperCase()}</td>
                   <td className="px-3 py-3 text-slate-700">{log.remote_address ?? "-"}:{log.remote_port ?? "-"}</td>
-                  <td className="px-3 py-3 font-mono text-xs text-slate-700">{log.device_identifier ?? "-"}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-slate-700">{maskGpsIdentifier(log.protocol_terminal_id)}</td>
                   <td className="px-3 py-3 text-slate-700">{GPS_PACKET_TYPE_LABELS[log.packet_type]}</td>
                   <td className="px-3 py-3">
                     <GpsStatusBadge label={GPS_PARSE_STATUS_LABELS[log.parse_status]} tone={log.parse_status === "parsed" ? "green" : "yellow"} />

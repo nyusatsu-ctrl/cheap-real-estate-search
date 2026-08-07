@@ -1,6 +1,8 @@
 import { GpsMockSeedButton } from "@/components/gps/GpsMockSeedButton";
 import { MV930G_SAMPLE_AUTH_HEX, MV930G_SAMPLE_HEARTBEAT_HEX, MV930G_SAMPLE_LOCATION_HEX } from "@/lib/gps/sample-data";
 import { parseMv930gPacket } from "@/lib/gps/parser";
+import { isGpsMockRouteAvailable } from "@/lib/gps/runtime";
+import { notFound } from "next/navigation";
 
 const samples = [
   { label: "Terminal Authentication 0x0102", hex: MV930G_SAMPLE_AUTH_HEX },
@@ -9,6 +11,7 @@ const samples = [
 ];
 
 export default function GpsMockPage() {
+  if (!isGpsMockRouteAvailable()) notFound();
   return (
     <div className="space-y-5">
       <GpsMockSeedButton />

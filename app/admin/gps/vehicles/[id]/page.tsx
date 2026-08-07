@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { GpsOperationControls } from "@/components/gps/GpsOperationControls";
+import { deactivateGpsVehicleAction } from "@/app/admin/gps/actions";
+import { GpsDeactivateButton } from "@/components/gps/GpsDeactivateButton";
 import { GPS_VEHICLE_STATUS_LABELS, GPS_VEHICLE_TYPE_LABELS } from "@/lib/gps/labels";
 import { findGpsVehicle, loadGpsAdminData } from "@/lib/gps/data";
 
@@ -13,16 +14,24 @@ export default async function GpsVehicleDetailPage({ params }: { params: Promise
   const customer = data.customers.find((item) => item.id === vehicle.customer_id);
   const devices = data.devices.filter((device) => device.vehicle_id === vehicle.id);
   const positions = data.positions.filter((position) => position.vehicle_id === vehicle.id);
-  const primaryDevice = devices[0];
-
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-2xl font-black text-slate-950">
-          {[vehicle.maker, vehicle.model_name].filter(Boolean).join(" ") || "物件詳細"}
-        </h2>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h2 className="text-2xl font-black text-slate-950">
+            {[vehicle.maker, vehicle.model_name].filter(Boolean).join(" ") || "車両詳細"}
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/admin/gps/vehicles/${vehicle.id}/edit`} className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+              編集
+            </Link>
+            {vehicle.status !== "inactive" && (
+              <GpsDeactivateButton id={vehicle.id} label="車両" action={deactivateGpsVehicleAction} />
+            )}
+          </div>
+        </div>
         <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
-          <Info label="物件区分" value={GPS_VEHICLE_TYPE_LABELS[vehicle.vehicle_type]} />
+          <Info label="車両区分" value={GPS_VEHICLE_TYPE_LABELS[vehicle.vehicle_type]} />
           <Info label="年式" value={vehicle.model_year ? String(vehicle.model_year) : null} />
           <Info label="車台番号" value={vehicle.vin} />
           <Info label="ナンバー" value={vehicle.license_plate} />
@@ -31,10 +40,8 @@ export default async function GpsVehicleDetailPage({ params }: { params: Promise
         </dl>
       </section>
 
-      {primaryDevice && <GpsOperationControls deviceId={primaryDevice.id} vehicleId={vehicle.id} />}
-
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-lg font-black text-slate-950">管理対象</h3>
+        <h3 className="text-lg font-black text-slate-950">GPS端末</h3>
         <div className="mt-3 divide-y divide-slate-200">
           {devices.map((device) => (
             <div key={device.id} className="py-3 text-sm">

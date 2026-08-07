@@ -3,6 +3,8 @@ import { GpsMapPanel } from "@/components/gps/GpsMapPanel";
 import { GpsStatusBadge } from "@/components/gps/GpsStatusBadge";
 import { GPS_CONNECTION_STATUS_LABELS, GPS_OPERATION_TYPE_LABELS } from "@/lib/gps/labels";
 import { loadGpsAdminData } from "@/lib/gps/data";
+import { GpsDataUsagePanel } from "@/components/gps/GpsDataUsagePanel";
+import { isGpsDevelopmentEnvironment } from "@/lib/gps/runtime";
 
 export default async function AdminGpsDashboardPage() {
   const data = await loadGpsAdminData();
@@ -18,14 +20,15 @@ export default async function AdminGpsDashboardPage() {
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <MetricCard label="GPS顧客数" value={data.customers.length} href="/admin/gps/customers" />
-        <MetricCard label="物件数" value={data.vehicles.length} href="/admin/gps/vehicles" />
-        <MetricCard label="管理対象数" value={data.devices.length} href="/admin/gps/devices" />
-        <MetricCard label="オンライン管理対象" value={onlineCount} href="/admin/gps/devices" />
-        <MetricCard label="オフライン管理対象" value={offlineCount} href="/admin/gps/devices" />
+        <MetricCard label="車両数" value={data.vehicles.length} href="/admin/gps/vehicles" />
+        <MetricCard label="GPS端末数" value={data.devices.length} href="/admin/gps/devices" />
+        <MetricCard label="オンライン端末" value={onlineCount} href="/admin/gps/devices" />
+        <MetricCard label="オフライン端末" value={offlineCount} href="/admin/gps/devices" />
         <MetricCard label="最新rawログ件数" value={latestRawLogs.length} href="/admin/gps/raw-logs" />
       </div>
 
       <GpsMapPanel positions={data.latestPositions} />
+      <GpsDataUsagePanel compact />
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -37,21 +40,23 @@ export default async function AdminGpsDashboardPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-slate-950">実機テスト</h2>
-            <p className="mt-1 text-sm text-slate-600">MV930G到着後のTCP受信、APN/SERVER設定、rawログ確認手順を確認できます。</p>
+      {isGpsDevelopmentEnvironment() && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">実機テスト</h2>
+              <p className="mt-1 text-sm text-slate-600">開発環境でのみ、TCP受信とrawログ確認手順を表示します。</p>
+            </div>
+            <Link href="/admin/gps/test" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+              実機テスト手順へ
+            </Link>
           </div>
-          <Link href="/admin/gps/test" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
-            実機テスト手順へ
-          </Link>
         </div>
-      </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-black text-slate-950">管理対象状態</h2>
+          <h2 className="text-lg font-black text-slate-950">GPS端末状態</h2>
           <div className="mt-3 divide-y divide-slate-200">
             {data.devices.slice(0, 8).map((device) => (
               <div key={device.id} className="flex items-center justify-between gap-3 py-3 text-sm">

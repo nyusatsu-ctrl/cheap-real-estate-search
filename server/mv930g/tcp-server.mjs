@@ -7,16 +7,20 @@ import { forwardIngest } from "./ingest-client.mjs";
 import { parseJt808Frame } from "./parser.mjs";
 import { PermissionRestrictedSpool } from "./spool.mjs";
 
-const DEFAULT_IDLE_TIMEOUT_MS = 120_000;
-const DEFAULT_MAX_CONNECTIONS = 100;
+const DEFAULT_IDLE_TIMEOUT_MS = 300_000;
+const DEFAULT_MAX_CONNECTIONS = 10;
 const DEFAULT_MAX_CONNECTIONS_PER_IP = 10;
-const DEFAULT_MAX_FRAMES_PER_MINUTE = 120;
+const DEFAULT_MAX_FRAMES_PER_MINUTE = 30;
+const DEFAULT_MAX_FRAMES_PER_IP_PER_MINUTE = 300;
+const DEFAULT_SPOOL_MAXIMUM_BYTES = 64 * 1024 * 1024;
+const DEFAULT_SPOOL_MAXIMUM_FILES = 10_000;
 
 export async function startMv930gReceiver(options = {}) {
   const settings = normalizeOptions(options);
   await settings.spool.initialize();
   const connectionsByIp = new Map();
   const ipRateLimiter = new FixedWindowRateLimiter(settings.maximumFramesPerIpPerMinute);
+  const terminalRateLimiter = new FixedWindowRateLimiter(settings.maximumFramesPerTerminalPerMinute);
   let activeConnections = 0;
 
   const server = net.createServer({ allowHalfOpen: false }, (socket) => {
@@ -63,6 +67,22 @@ export async function startMv930gReceiver(options = {}) {
             // The application endpoint persists and classifies invalid frames.
           }
 
+          const terminalHasActiveLimit = parsedTerminalId
+            ? terminalRateLimiter.hasActiveEntry(parsedTerminalId)
+            : false;
+          if (connectionAuthenticated) {
+            if (!connectionTerminalId || parsedTerminalId !== connectionTerminalId) {
+              settings.logger("connection_rejected", "authenticated_terminal_mismatch");
+              socket.destroy();
+              break;
+            }
+          }
+          if ((connectionAuthenticated || terminalHasActiveLimit) && !terminalRateLimiter.consume(parsedTerminalId)) {
+            settings.logger("connection_rejected", "terminal_frame_rate_limit");
+            socket.destroy();
+            break;
+          }
+
           const payload = {
             version: 1,
             transport: "tcp",
@@ -84,6 +104,18 @@ export async function startMv930gReceiver(options = {}) {
                 break;
               }
               connectionTerminalId = parsedTerminalId;
+            }
+            if (result.connectionAuthenticated && (!connectionTerminalId || !parsedTerminalId)) {
+              settings.logger("connection_rejected", "authenticated_terminal_missing");
+              socket.destroy();
+              break;
+            }
+            if (result.connectionAuthenticated && !connectionAuthenticated && !terminalHasActiveLimit) {
+              if (!terminalRateLimiter.consume(connectionTerminalId)) {
+                settings.logger("connection_rejected", "terminal_frame_rate_limit");
+                socket.destroy();
+                break;
+              }
             }
             connectionAuthenticated = result.connectionAuthenticated;
             if (result.ack && !socket.destroyed) socket.write(result.ack);
@@ -158,8 +190,12 @@ function normalizeOptions(options) {
     maximumConnections: integerSetting(options.maximumConnections ?? process.env.MV930G_MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS, 1, 10_000),
     maximumConnectionsPerIp: integerSetting(options.maximumConnectionsPerIp ?? process.env.MV930G_MAX_CONNECTIONS_PER_IP, DEFAULT_MAX_CONNECTIONS_PER_IP, 1, 1_000),
     maximumFramesPerConnectionPerMinute: integerSetting(options.maximumFramesPerConnectionPerMinute ?? process.env.MV930G_MAX_FRAMES_PER_CONNECTION_PER_MINUTE, DEFAULT_MAX_FRAMES_PER_MINUTE, 1, 10_000),
-    maximumFramesPerIpPerMinute: integerSetting(options.maximumFramesPerIpPerMinute ?? process.env.MV930G_MAX_FRAMES_PER_IP_PER_MINUTE, DEFAULT_MAX_FRAMES_PER_MINUTE * 4, 1, 100_000),
-    spool: options.spool ?? new PermissionRestrictedSpool(spoolDirectory),
+    maximumFramesPerIpPerMinute: integerSetting(options.maximumFramesPerIpPerMinute ?? process.env.MV930G_MAX_FRAMES_PER_IP_PER_MINUTE, DEFAULT_MAX_FRAMES_PER_IP_PER_MINUTE, 1, 100_000),
+    maximumFramesPerTerminalPerMinute: integerSetting(options.maximumFramesPerTerminalPerMinute ?? process.env.MV930G_MAX_FRAMES_PER_TERMINAL_PER_MINUTE, DEFAULT_MAX_FRAMES_PER_MINUTE, 1, 10_000),
+    spool: options.spool ?? new PermissionRestrictedSpool(spoolDirectory, {
+      maximumBytes: integerSetting(options.spoolMaximumBytes ?? process.env.MV930G_SPOOL_MAX_BYTES, DEFAULT_SPOOL_MAXIMUM_BYTES, 1, 10 * 1024 * 1024 * 1024),
+      maximumFiles: integerSetting(options.spoolMaximumFiles ?? process.env.MV930G_SPOOL_MAX_FILES, DEFAULT_SPOOL_MAXIMUM_FILES, 1, 1_000_000)
+    }),
     logger: options.logger ?? safeLogger,
     forward: options.forward ?? ((payload) => forwardIngest(payload, {
       endpoint,
@@ -174,9 +210,12 @@ class FixedWindowRateLimiter {
     this.limit = limit;
     this.windowMs = windowMs;
     this.entries = new Map();
+    this.consumptions = 0;
   }
 
   consume(key, now = Date.now()) {
+    this.consumptions += 1;
+    if (this.consumptions % 1_024 === 0) this.#removeExpired(now);
     const existing = this.entries.get(key);
     if (!existing || now - existing.startedAt >= this.windowMs) {
       this.entries.set(key, { startedAt: now, count: 1 });
@@ -185,6 +224,17 @@ class FixedWindowRateLimiter {
     if (existing.count >= this.limit) return false;
     existing.count += 1;
     return true;
+  }
+
+  hasActiveEntry(key, now = Date.now()) {
+    const existing = this.entries.get(key);
+    return Boolean(existing && now - existing.startedAt < this.windowMs);
+  }
+
+  #removeExpired(now) {
+    for (const [key, value] of this.entries) {
+      if (now - value.startedAt >= this.windowMs) this.entries.delete(key);
+    }
   }
 }
 

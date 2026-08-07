@@ -24,6 +24,7 @@ import {
   unescapeJt808Payload
 } from "../server/mv930g/parser.mjs";
 import { startMv930gReceiver } from "../server/mv930g/tcp-server.mjs";
+import { PermissionRestrictedSpool, SpoolCapacityError } from "../server/mv930g/spool.mjs";
 import {
   reserveGpsIngestNonce,
   verifyGpsIngestSignature
@@ -294,6 +295,15 @@ test("通常TCP receiverはTLSなしで起動し、機密値をlogへ出さず�
       })
     });
     assert.ok(receiver.server instanceof net.Server);
+    const healthAddress = receiver.healthServer.address();
+    assert.ok(healthAddress && typeof healthAddress === "object");
+    const healthResponse = await fetch(`http://127.0.0.1:${healthAddress.port}/healthz`);
+    assert.equal(healthResponse.status, 200);
+    assert.deepEqual(await healthResponse.json(), {
+      status: "ok",
+      transport: "plain-tcp",
+      activeConnections: 0
+    });
     const address = receiver.server.address();
     assert.ok(address && typeof address === "object");
     const frame = buildJt808Frame({ messageId: 0x0002, terminalId: syntheticTerminalId, serialNumber: 20 });
@@ -304,6 +314,104 @@ test("通常TCP receiverはTLSなしで起動し、機密値をlogへ出さず�
     assert.doesNotMatch(output, new RegExp(syntheticTerminalId));
     assert.doesNotMatch(output, new RegExp(frame.toString("hex")));
     assert.doesNotMatch(output, new RegExp(frame.toString("base64")));
+  } finally {
+    if (receiver) await receiver.close();
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("HTTPS転送失敗時はACKせず接続を閉じ、0600 spoolを保持する", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "mv930g-forward-failure-test-"));
+  const logs: string[] = [];
+  let receiver: Awaited<ReturnType<typeof startMv930gReceiver>> | null = null;
+  try {
+    receiver = await startMv930gReceiver({
+      host: "127.0.0.1",
+      port: 0,
+      healthHost: "127.0.0.1",
+      healthPort: 0,
+      spoolDirectory: temporaryDirectory,
+      ingestEndpoint: "https://ingest.example.test/api/gps/ingest",
+      ingestSecret: "s".repeat(32),
+      logger: (event: string, code: string) => logs.push(JSON.stringify({ event, code })),
+      forward: async () => {
+        throw new Error("synthetic_forward_failure");
+      }
+    });
+    const address = receiver.server.address();
+    assert.ok(address && typeof address === "object");
+    const frame = buildJt808Frame({ messageId: 0x0002, terminalId: syntheticTerminalId, serialNumber: 44 });
+    await sendTcpFrame(address.port, frame);
+    const retainedFiles = await readdir(temporaryDirectory);
+    assert.equal(retainedFiles.length, 1);
+    assert.equal((await stat(path.join(temporaryDirectory, retainedFiles[0]))).mode & 0o777, 0o600);
+    const output = logs.join("\n");
+    assert.match(output, /forward_failed/);
+    assert.doesNotMatch(output, new RegExp(syntheticTerminalId));
+    assert.doesNotMatch(output, new RegExp(frame.toString("base64")));
+  } finally {
+    if (receiver) await receiver.close();
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("spoolは0600を維持し、容量またはファイル上限でfail-closedになる", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "mv930g-spool-limit-test-"));
+  try {
+    const spool = new PermissionRestrictedSpool(temporaryDirectory, { maximumBytes: 32, maximumFiles: 1 });
+    await spool.initialize();
+    const file = await spool.write({ value: "synthetic" });
+    assert.equal((await stat(file)).mode & 0o777, 0o600);
+    await assert.rejects(() => spool.write({ value: "second" }), SpoolCapacityError);
+    await spool.remove(file);
+    const replacement = await spool.write({ value: "replacement" });
+    assert.equal((await stat(replacement)).mode & 0o777, 0o600);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("認証済み端末は再接続しても端末ID単位のレート上限で拒否される", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "mv930g-terminal-rate-test-"));
+  const logs: string[] = [];
+  let forwardedFrames = 0;
+  let receiver: Awaited<ReturnType<typeof startMv930gReceiver>> | null = null;
+  try {
+    receiver = await startMv930gReceiver({
+      host: "127.0.0.1",
+      port: 0,
+      healthHost: "127.0.0.1",
+      healthPort: 0,
+      spoolDirectory: temporaryDirectory,
+      ingestEndpoint: "https://ingest.example.test/api/gps/ingest",
+      ingestSecret: "s".repeat(32),
+      maximumFramesPerConnectionPerMinute: 10,
+      maximumFramesPerIpPerMinute: 10,
+      maximumFramesPerTerminalPerMinute: 1,
+      logger: (event: string, code: string) => logs.push(JSON.stringify({ event, code })),
+      forward: async () => {
+        forwardedFrames += 1;
+        return {
+          ack: null,
+          bindConnection: true,
+          connectionAuthenticated: true,
+          closeConnection: forwardedFrames === 1
+        };
+      }
+    });
+    const address = receiver.server.address();
+    assert.ok(address && typeof address === "object");
+    const frames = [40, 41].map((serialNumber) => buildJt808Frame({
+      messageId: 0x0002,
+      terminalId: syntheticTerminalId,
+      serialNumber
+    }));
+    await sendTcpFramesAndWaitForClose(address.port, frames.slice(0, 1));
+    await sendTcpFramesAndWaitForClose(address.port, frames.slice(1));
+    assert.equal(forwardedFrames, 1);
+    assert.match(logs.join("\n"), /terminal_frame_rate_limit/);
+    assert.doesNotMatch(logs.join("\n"), new RegExp(syntheticTerminalId));
+    assert.deepEqual(await readdir(temporaryDirectory), []);
   } finally {
     if (receiver) await receiver.close();
     await rm(temporaryDirectory, { recursive: true, force: true });
@@ -345,6 +453,34 @@ test("raw-first、未登録端末拒否、再送位置重複防止、service-rol
   const one = buildJt808Frame({ messageId: 0x0200, terminalId: syntheticTerminalId, serialNumber: 30, body: createLocationBody() });
   const two = Buffer.from(one);
   assert.equal(frameFingerprint(one), frameFingerprint(two));
+});
+
+test("公開receiverのsystemd・上限・spool・ログ設定を安全値へ固定する", async () => {
+  const environmentExample = await readFile(
+    path.join(repositoryRoot, "deploy/mv930g/mv930g.env.example"),
+    "utf8"
+  );
+  const service = await readFile(
+    path.join(repositoryRoot, "deploy/mv930g/mv930g-tcp.service"),
+    "utf8"
+  );
+  const journal = await readFile(
+    path.join(repositoryRoot, "deploy/mv930g/90-mv930g-journald.conf"),
+    "utf8"
+  );
+  assert.match(environmentExample, /^MV930G_IDLE_TIMEOUT_MS=300000$/m);
+  assert.match(environmentExample, /^MV930G_MAX_CONNECTIONS=10$/m);
+  assert.match(environmentExample, /^MV930G_MAX_FRAMES_PER_TERMINAL_PER_MINUTE=30$/m);
+  assert.match(environmentExample, /^MV930G_SPOOL_MAX_BYTES=67108864$/m);
+  assert.match(environmentExample, /^MV930G_SPOOL_MAX_FILES=10000$/m);
+  assert.doesNotMatch(environmentExample, /SUPABASE|SERVICE_ROLE/);
+  assert.match(service, /^DynamicUser=yes$/m);
+  assert.match(service, /^Restart=on-failure$/m);
+  assert.match(service, /^StateDirectoryMode=0700$/m);
+  assert.match(service, /^RestrictAddressFamilies=AF_INET$/m);
+  assert.doesNotMatch(service, /AF_INET6/);
+  assert.match(journal, /^SystemMaxUse=64M$/m);
+  assert.match(journal, /^MaxRetentionSec=7day$/m);
 });
 
 function createLocationBody() {
@@ -412,6 +548,18 @@ function sendTcpFrame(port: number, frame: Buffer) {
   return new Promise<void>((resolve, reject) => {
     const socket = net.createConnection({ host: "127.0.0.1", port }, () => socket.write(frame));
     const timeout = setTimeout(() => socket.destroy(new Error("TCP test timeout.")), 3_000);
+    socket.on("error", reject);
+    socket.on("close", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+}
+
+function sendTcpFramesAndWaitForClose(port: number, frames: Buffer[]) {
+  return new Promise<void>((resolve, reject) => {
+    const socket = net.createConnection({ host: "127.0.0.1", port }, () => socket.write(Buffer.concat(frames)));
+    const timeout = setTimeout(() => socket.destroy(new Error("TCP rate-limit test timeout.")), 3_000);
     socket.on("error", reject);
     socket.on("close", () => {
       clearTimeout(timeout);

@@ -43,9 +43,13 @@ export const GPS_CONNECTION_STATUS_LABELS: Record<GpsConnectionStatus, string> =
 };
 
 export const GPS_PACKET_TYPE_LABELS: Record<GpsPacketType, string> = {
+  terminal_response: "端末共通応答",
+  terminal_registration: "端末登録",
   terminal_authentication: "Terminal Authentication",
   heartbeat: "Heartbeat",
+  terminal_logout: "端末ログアウト",
   location_report: "Location Information Report",
+  transparent_uplink: "上り透過伝送",
   unknown: "未判定"
 };
 
@@ -72,13 +76,22 @@ export const GPS_OPERATION_TYPE_LABELS: Record<GpsOperationType, string> = {
   safe_cut: "燃料カット",
   restore: "復旧",
   arm: "ARM",
-  disarm: "DISARM"
+  disarm: "DISARM",
+  customer_create: "顧客登録",
+  customer_update: "顧客編集",
+  customer_deactivate: "顧客無効化",
+  vehicle_create: "車両登録",
+  vehicle_update: "車両編集",
+  vehicle_deactivate: "車両無効化",
+  device_create: "GPS端末登録",
+  device_update: "GPS端末編集",
+  device_deactivate: "GPS端末無効化"
 };
 
 export const GPS_OPERATION_STATUS_LABELS: Record<GpsOperationStatus, string> = {
   queued: "待機中",
   sent: "送信済み",
-  acknowledged: "ACK受信",
+  acknowledged: "完了",
   failed: "失敗",
   cancelled: "キャンセル"
 };

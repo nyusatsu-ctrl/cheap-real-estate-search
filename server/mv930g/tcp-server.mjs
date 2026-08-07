@@ -1,157 +1,248 @@
+import http from "node:http";
 import net from "node:net";
-import { createClient } from "@supabase/supabase-js";
-import { loadLocalEnv } from "./env.mjs";
-import { normalizeHex, parseMv930gPacket } from "./parser.mjs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { Jt808FrameStream } from "./frame-stream.mjs";
+import { forwardIngest } from "./ingest-client.mjs";
+import { parseJt808Frame } from "./parser.mjs";
+import { PermissionRestrictedSpool } from "./spool.mjs";
 
-loadLocalEnv();
+const DEFAULT_IDLE_TIMEOUT_MS = 120_000;
+const DEFAULT_MAX_CONNECTIONS = 100;
+const DEFAULT_MAX_CONNECTIONS_PER_IP = 10;
+const DEFAULT_MAX_FRAMES_PER_MINUTE = 120;
 
-const port = Number(process.env.MV930G_TCP_PORT ?? 9300);
-const host = process.env.MV930G_TCP_HOST ?? "0.0.0.0";
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export async function startMv930gReceiver(options = {}) {
+  const settings = normalizeOptions(options);
+  await settings.spool.initialize();
+  const connectionsByIp = new Map();
+  const ipRateLimiter = new FixedWindowRateLimiter(settings.maximumFramesPerIpPerMinute);
+  let activeConnections = 0;
 
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.");
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { persistSession: false }
-});
-
-const server = net.createServer((socket) => {
-  socket.on("data", async (buffer) => {
-    try {
-      const result = await saveRawLogThenParse(buffer, {
-        remoteAddress: socket.remoteAddress ?? null,
-        remotePort: socket.remotePort ?? null,
-        localPort: port
-      });
-      socket.write(Buffer.from("01", "hex"));
-      console.log(`[mv930g] saved raw_log=${result.rawLogId} message_id=${result.messageId} parse=${result.parseStatus}`);
-    } catch (error) {
-      console.error("[mv930g] failed to save raw log", error);
-      socket.write(Buffer.from("00", "hex"));
-      socket.end();
+  const server = net.createServer({ allowHalfOpen: false }, (socket) => {
+    const remoteKey = normalizeRemoteKey(socket.remoteAddress);
+    const ipConnections = connectionsByIp.get(remoteKey) ?? 0;
+    if (activeConnections >= settings.maximumConnections || ipConnections >= settings.maximumConnectionsPerIp) {
+      settings.logger("connection_rejected", "connection_limit");
+      socket.destroy();
+      return;
     }
-  });
-});
 
-server.on("error", (error) => {
-  console.error(`[mv930g] TCP server error: ${error.message}`);
-  process.exit(1);
-});
+    activeConnections += 1;
+    connectionsByIp.set(remoteKey, ipConnections + 1);
+    const stream = new Jt808FrameStream();
+    const connectionRateLimiter = new FixedWindowRateLimiter(settings.maximumFramesPerConnectionPerMinute);
+    let connectionTerminalId = null;
+    let connectionAuthenticated = false;
+    let processing = Promise.resolve();
+    let finalized = false;
 
-server.listen(port, host, () => {
-  console.log(`[mv930g] TCP server listening on ${host}:${port}`);
-});
-
-async function saveRawLogThenParse(buffer, meta) {
-  const rawHex = normalizeHex(buffer);
-  const receivedAt = new Date().toISOString();
-  const { data: rawLog, error: insertError } = await supabase
-    .from("raw_device_logs")
-    .insert({
-      transport: "tcp",
-      remote_address: meta.remoteAddress,
-      remote_port: meta.remotePort,
-      local_port: meta.localPort,
-      raw_hex: rawHex,
-      raw_text: printableText(buffer),
-      packet_type: "unknown",
-      parse_status: "pending",
-      received_at: receivedAt
-    })
-    .select("id")
-    .single();
-
-  if (insertError) throw insertError;
-
-  try {
-    const parsed = parseMv930gPacket(rawHex);
-    const parseStatus = parsed.packetType === "unknown" ? "unsupported" : "parsed";
-    await supabase
-      .from("raw_device_logs")
-      .update({
-        device_identifier: parsed.deviceIdentifier,
-        imei: parsed.imei,
-        packet_type: parsed.packetType,
-        parsed_payload: parsed.payload,
-        parse_status: parseStatus
-      })
-      .eq("id", rawLog.id);
-
-    const device = await findDevice(parsed.deviceIdentifier, parsed.imei);
-    if (device) {
-      await supabase
-        .from("gps_devices")
-        .update({
-          connection_status: "online",
-          last_seen_at: receivedAt,
-          last_raw_log_id: rawLog.id
-        })
-        .eq("id", device.id);
-
-      if (parsed.position) {
-        await supabase.from("gps_positions").insert({
-          device_id: device.id,
-          vehicle_id: device.vehicle_id,
-          raw_log_id: rawLog.id,
-          latitude: parsed.position.latitude,
-          longitude: parsed.position.longitude,
-          speed_kmh: parsed.position.speedKmh,
-          heading_degrees: parsed.position.headingDegrees,
-          acc_status: parsed.position.accStatus,
-          relay_status: parsed.position.relayStatus,
-          vehicle_voltage: parsed.position.vehicleVoltage,
-          located_at: parsed.occurredAt,
-          received_at: receivedAt
-        });
+    socket.setTimeout(settings.idleTimeoutMs);
+    socket.setNoDelay(true);
+    socket.on("data", (chunk) => {
+      const extracted = stream.push(chunk);
+      for (const error of extracted.errors) settings.logger("stream_rejected", error.code);
+      if (extracted.errors.some((error) => error.code === "connection_buffer_overflow" || error.code === "frame_too_large")) {
+        socket.destroy();
+        return;
       }
-    }
 
-    if (parseStatus === "unsupported") {
-      await supabase.from("protocol_parse_errors").insert({
-        raw_log_id: rawLog.id,
-        parser_version: "mv930g-mvp-1",
-        error_type: "unsupported_message_id",
-        error_message: `Unsupported MV930G message_id: ${parsed.messageId}`
+      processing = processing.then(async () => {
+        for (const frame of extracted.frames) {
+          if (socket.destroyed) break;
+          if (!connectionRateLimiter.consume("connection") || !ipRateLimiter.consume(remoteKey)) {
+            settings.logger("connection_rejected", "frame_rate_limit");
+            socket.destroy();
+            break;
+          }
+
+          let parsedTerminalId = null;
+          try {
+            parsedTerminalId = parseJt808Frame(frame).terminalId;
+          } catch {
+            // The application endpoint persists and classifies invalid frames.
+          }
+
+          const payload = {
+            version: 1,
+            transport: "tcp",
+            frameBase64: frame.toString("base64"),
+            remoteAddress: socket.remoteAddress ?? null,
+            remotePort: socket.remotePort ?? null,
+            localPort: socket.localPort ?? settings.port,
+            connectionTerminalId,
+            connectionAuthenticated
+          };
+          const spoolFile = await settings.spool.write(payload);
+          try {
+            const result = await settings.forward(payload);
+            await settings.spool.remove(spoolFile);
+            if (result.bindConnection && parsedTerminalId) {
+              if (connectionTerminalId && connectionTerminalId !== parsedTerminalId) {
+                settings.logger("connection_rejected", "terminal_changed");
+                socket.destroy();
+                break;
+              }
+              connectionTerminalId = parsedTerminalId;
+            }
+            connectionAuthenticated = result.connectionAuthenticated;
+            if (result.ack && !socket.destroyed) socket.write(result.ack);
+            if (result.closeConnection) {
+              socket.end();
+              break;
+            }
+          } catch (error) {
+            settings.logger("forward_failed", safeErrorCode(error));
+            socket.destroy();
+            break;
+          }
+        }
+      }).catch((error) => {
+        settings.logger("receiver_failed", safeErrorCode(error));
+        socket.destroy();
       });
-    }
-
-    return { rawLogId: rawLog.id, messageId: parsed.messageId, parseStatus };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown parse error";
-    await supabase.from("raw_device_logs").update({ parse_status: "failed" }).eq("id", rawLog.id);
-    await supabase.from("protocol_parse_errors").insert({
-      raw_log_id: rawLog.id,
-      parser_version: "mv930g-mvp-1",
-      error_type: "parse_failed",
-      error_message: message
     });
-    return { rawLogId: rawLog.id, messageId: "unknown", parseStatus: "failed" };
+
+    socket.on("timeout", () => {
+      settings.logger("connection_closed", "idle_timeout");
+      socket.destroy();
+    });
+    socket.on("error", (error) => settings.logger("socket_error", safeErrorCode(error)));
+    socket.on("close", () => {
+      if (finalized) return;
+      finalized = true;
+      activeConnections -= 1;
+      const remaining = (connectionsByIp.get(remoteKey) ?? 1) - 1;
+      if (remaining > 0) connectionsByIp.set(remoteKey, remaining);
+      else connectionsByIp.delete(remoteKey);
+      stream.reset();
+    });
+  });
+  server.maxConnections = settings.maximumConnections;
+  server.on("error", (error) => settings.logger("tcp_server_error", safeErrorCode(error)));
+
+  const healthServer = http.createServer((request, response) => {
+    if (request.method !== "GET" || request.url !== "/healthz") {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    response.end(JSON.stringify({ status: "ok", transport: "plain-tcp", activeConnections }));
+  });
+  healthServer.on("error", (error) => settings.logger("health_server_error", safeErrorCode(error)));
+
+  await Promise.all([
+    listen(server, settings.port, settings.host),
+    listen(healthServer, settings.healthPort, settings.healthHost)
+  ]);
+  settings.logger("receiver_started", "plain_tcp");
+  return {
+    server,
+    healthServer,
+    close: async () => Promise.all([closeServer(server), closeServer(healthServer)])
+  };
+}
+
+function normalizeOptions(options) {
+  const endpoint = options.ingestEndpoint ?? process.env.MV930G_INGEST_URL;
+  const secret = options.ingestSecret ?? process.env.MV930G_INGEST_HMAC_SECRET;
+  if (!endpoint || !secret) throw new Error("MV930G ingest endpoint and HMAC secret are required.");
+  const spoolDirectory = options.spoolDirectory ?? process.env.MV930G_SPOOL_DIRECTORY;
+  if (!spoolDirectory || !path.isAbsolute(spoolDirectory)) throw new Error("An absolute MV930G spool path is required.");
+  return {
+    host: options.host ?? process.env.MV930G_TCP_HOST ?? "127.0.0.1",
+    port: integerSetting(options.port ?? process.env.MV930G_TCP_PORT, 9300, 0, 65535),
+    healthHost: options.healthHost ?? process.env.MV930G_HEALTH_HOST ?? "127.0.0.1",
+    healthPort: integerSetting(options.healthPort ?? process.env.MV930G_HEALTH_PORT, 9301, 0, 65535),
+    idleTimeoutMs: integerSetting(options.idleTimeoutMs ?? process.env.MV930G_IDLE_TIMEOUT_MS, DEFAULT_IDLE_TIMEOUT_MS, 1_000, 600_000),
+    maximumConnections: integerSetting(options.maximumConnections ?? process.env.MV930G_MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS, 1, 10_000),
+    maximumConnectionsPerIp: integerSetting(options.maximumConnectionsPerIp ?? process.env.MV930G_MAX_CONNECTIONS_PER_IP, DEFAULT_MAX_CONNECTIONS_PER_IP, 1, 1_000),
+    maximumFramesPerConnectionPerMinute: integerSetting(options.maximumFramesPerConnectionPerMinute ?? process.env.MV930G_MAX_FRAMES_PER_CONNECTION_PER_MINUTE, DEFAULT_MAX_FRAMES_PER_MINUTE, 1, 10_000),
+    maximumFramesPerIpPerMinute: integerSetting(options.maximumFramesPerIpPerMinute ?? process.env.MV930G_MAX_FRAMES_PER_IP_PER_MINUTE, DEFAULT_MAX_FRAMES_PER_MINUTE * 4, 1, 100_000),
+    spool: options.spool ?? new PermissionRestrictedSpool(spoolDirectory),
+    logger: options.logger ?? safeLogger,
+    forward: options.forward ?? ((payload) => forwardIngest(payload, {
+      endpoint,
+      secret,
+      timeoutMs: integerSetting(process.env.MV930G_INGEST_TIMEOUT_MS, 10_000, 1_000, 60_000)
+    }))
+  };
+}
+
+class FixedWindowRateLimiter {
+  constructor(limit, windowMs = 60_000) {
+    this.limit = limit;
+    this.windowMs = windowMs;
+    this.entries = new Map();
+  }
+
+  consume(key, now = Date.now()) {
+    const existing = this.entries.get(key);
+    if (!existing || now - existing.startedAt >= this.windowMs) {
+      this.entries.set(key, { startedAt: now, count: 1 });
+      return true;
+    }
+    if (existing.count >= this.limit) return false;
+    existing.count += 1;
+    return true;
   }
 }
 
-async function findDevice(deviceIdentifier, imei) {
-  if (deviceIdentifier) {
-    const { data } = await supabase
-      .from("gps_devices")
-      .select("id, vehicle_id")
-      .eq("device_identifier", deviceIdentifier)
-      .maybeSingle();
-    if (data) return data;
-  }
-
-  if (imei) {
-    const { data } = await supabase.from("gps_devices").select("id, vehicle_id").eq("imei", imei).maybeSingle();
-    if (data) return data;
-  }
-
-  return null;
+function integerSetting(value, fallback, minimum, maximum) {
+  const parsed = value == null || value === "" ? fallback : Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) throw new Error("Invalid MV930G numeric setting.");
+  return parsed;
 }
 
-function printableText(buffer) {
-  const text = buffer.toString("utf8");
-  return /[\u0000-\u0008\u000e-\u001f]/.test(text) ? null : text;
+function normalizeRemoteKey(value) {
+  return typeof value === "string" && value.length <= 64 ? value : "unknown";
+}
+
+function safeLogger(event, code) {
+  console.log("[mv930g-receiver]", event, { code });
+}
+
+function safeErrorCode(error) {
+  if (!error || typeof error !== "object") return "unknown";
+  if ("code" in error && error.code) return String(error.code);
+  if ("name" in error && error.name) return String(error.name);
+  return "unknown";
+}
+
+function listen(server, port, host) {
+  return new Promise((resolve, reject) => {
+    const onError = (error) => reject(error);
+    server.once("error", onError);
+    server.listen(port, host, () => {
+      server.off("error", onError);
+      resolve();
+    });
+  });
+}
+
+function closeServer(server) {
+  return new Promise((resolve, reject) => {
+    if (!server.listening) return resolve();
+    server.close((error) => error ? reject(error) : resolve());
+  });
+}
+
+async function runFromCommandLine() {
+  if (process.env.MV930G_RECEIVER_ENABLED !== "true") {
+    throw new Error("MV930G receiver is disabled until explicitly enabled.");
+  }
+  const receiver = await startMv930gReceiver();
+  const shutdown = async () => {
+    await receiver.close();
+    process.exit(0);
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runFromCommandLine().catch((error) => {
+    safeLogger("startup_failed", safeErrorCode(error));
+    process.exit(1);
+  });
 }

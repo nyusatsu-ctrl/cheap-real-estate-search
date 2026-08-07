@@ -7,19 +7,22 @@ export default async function GpsVehiclesPage() {
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="text-lg font-black text-slate-950">GPS物件一覧</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <h2 className="text-lg font-black text-slate-950">GPS車両一覧</h2>
+        <Link href="/admin/gps/vehicles/new" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+          車両を新規登録
+        </Link>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
             <tr>
-              <th className="px-3 py-3">物件</th>
+              <th className="px-3 py-3">車両</th>
               <th className="px-3 py-3">区分</th>
               <th className="px-3 py-3">年式</th>
               <th className="px-3 py-3">車台番号</th>
               <th className="px-3 py-3">顧客</th>
-              <th className="px-3 py-3">管理対象</th>
+              <th className="px-3 py-3">GPS端末</th>
               <th className="px-3 py-3">最新位置</th>
               <th className="px-3 py-3">状態</th>
               <th className="px-3 py-3">操作</th>

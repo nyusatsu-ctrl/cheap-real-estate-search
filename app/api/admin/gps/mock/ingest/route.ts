@@ -1,36 +1,37 @@
 import { NextRequest } from "next/server";
-import { getCurrentAdmin } from "@/lib/admin";
-import { createSupabaseServerClient, hasSupabaseEnv } from "@/lib/supabase/server";
-import { ingestRawDeviceLog } from "@/lib/gps/ingest";
+import { authorizeGpsApiRequest } from "@/lib/gps/api-auth";
+import { parseGpsJsonObject, validateGpsApiMutationRequest } from "@/lib/gps/api-security";
 import { parseMv930gPacket } from "@/lib/gps/parser";
 import { MV930G_SAMPLE_LOCATION_HEX } from "@/lib/gps/sample-data";
+import { isGpsMockRouteAvailable } from "@/lib/gps/runtime";
 
 export async function POST(request: NextRequest) {
-  const admin = await getCurrentAdmin();
-  if (!admin && hasSupabaseEnv()) return Response.json({ message: "管理者ログインが必要です。" }, { status: 401 });
+  if (!isGpsMockRouteAvailable()) return Response.json({ message: "Not found" }, { status: 404 });
 
-  const body = (await request.json().catch(() => ({}))) as {
-    rawHex?: string;
-    transport?: "tcp" | "udp";
-  };
-  const rawHex = body.rawHex ?? MV930G_SAMPLE_LOCATION_HEX;
-  const transport = body.transport ?? "tcp";
+  const authorization = await authorizeGpsApiRequest();
+  if (!authorization.ok) return authorization.response;
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
+  const requestError = validateGpsApiMutationRequest(request);
+  if (requestError) {
+    return Response.json({ message: requestError.message }, { status: requestError.status });
+  }
+  const parsedBody = await parseGpsJsonObject(request);
+  if (!parsedBody.ok) {
+    return Response.json({ message: parsedBody.error.message }, { status: parsedBody.error.status });
+  }
+
+  const rawHex =
+    typeof parsedBody.data.rawHex === "string" && parsedBody.data.rawHex.trim()
+      ? parsedBody.data.rawHex
+      : MV930G_SAMPLE_LOCATION_HEX;
+
+  try {
     return Response.json({
-      message: "Supabase未設定のためrawログ保存はしていません。解析結果のみ返します。",
+      message: "デモ受信データを解析しました。rawログ保存や端末通信は行っていません。",
       demo: true,
       parsed: parseMv930gPacket(rawHex)
     });
+  } catch {
+    return Response.json({ message: "MV930Gデモ受信データの形式が不正です。" }, { status: 400 });
   }
-
-  const result = await ingestRawDeviceLog(supabase, {
-    transport,
-    raw: rawHex,
-    remoteAddress: "mock-api",
-    remotePort: null,
-    localPort: 9300
-  });
-  return Response.json({ message: "モック受信データを保存しました。", result });
 }

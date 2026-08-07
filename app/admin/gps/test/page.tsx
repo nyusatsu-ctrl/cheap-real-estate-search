@@ -1,22 +1,25 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { isGpsDevelopmentEnvironment } from "@/lib/gps/runtime";
 
 const checks = [
   "Supabase SQL Editorで supabase/mv930g-schema.sql が適用済み",
   "npm run gps:tcp が常駐サーバーまたはVPSで起動中",
-  "MV930G管理対象のSIMが開通済み",
+  "MV930G端末のSIMが開通済み",
   "APN、ユーザー名、パスワードがSIM事業者の情報と一致",
-  "管理対象のDevice IDまたはIMEIが gps_devices に登録済み",
+  "GPS端末の端末IDまたはIMEIが gps_devices に登録済み",
   "サーバー側のTCPポートがファイアウォールで許可済み",
   "raw_device_logs に受信データが保存されることを確認"
 ];
 
 export default function GpsRealDeviceTestPage() {
+  if (!isGpsDevelopmentEnvironment()) notFound();
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-2xl font-black text-slate-950">MV930G 実機テスト手順</h2>
         <p className="mt-2 text-sm text-slate-600">
-          実機到着後にTCP受信、rawログ保存、管理対象設定を確認するための作業ページです。管理対象へ送るSMS/コマンドはMV930Gの正式マニュアルで確認してから使用します。
+          実機到着後にTCP受信、rawログ保存、GPS端末設定を確認するための開発用ページです。SMSやコマンドの送信機能は実装していません。
         </p>
       </section>
 
@@ -58,14 +61,14 @@ export default function GpsRealDeviceTestPage() {
           <li>1. TCPサーバーのログに `saved raw_log=... message_id=... parse=...` が出ることを確認</li>
           <li>2. rawログ一覧で `packet_type` と `parse_status` を確認</li>
           <li>3. `message_id=0200` の場合は最新位置が更新されることを確認</li>
-          <li>4. 管理対象詳細で最終通信日時と位置履歴を確認</li>
+          <li>4. GPS端末詳細で最終通信日時と位置履歴を確認</li>
         </ol>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/admin/gps/raw-logs" className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
             rawログ確認
           </Link>
           <Link href="/admin/gps/devices" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
-            管理対象一覧
+            GPS端末一覧
           </Link>
           <Link href="/admin/gps/positions" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 focus-ring">
             最新位置

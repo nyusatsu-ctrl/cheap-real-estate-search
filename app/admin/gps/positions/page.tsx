@@ -11,15 +11,15 @@ export default async function GpsPositionsPage() {
       <GpsMapPanel positions={data.latestPositions} />
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-lg font-black text-slate-950">最新位置一覧</h2>
+          <h2 className="text-lg font-black text-slate-950">現在位置・走行履歴</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-3">物件</th>
+                <th className="px-3 py-3">車両</th>
                 <th className="px-3 py-3">顧客</th>
-                <th className="px-3 py-3">管理対象</th>
+                <th className="px-3 py-3">GPS端末</th>
                 <th className="px-3 py-3">位置</th>
                 <th className="px-3 py-3">速度</th>
                 <th className="px-3 py-3">方位</th>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, hasSupabaseEnv } from "@/lib/supabase/server";
+import { getAdminLoginPath } from "@/lib/admin-redirect";
 
 const ADMIN_AUTH_DEBUG = process.env.ADMIN_AUTH_DEBUG === "1" || process.env.NODE_ENV === "development";
 
@@ -8,15 +9,26 @@ function logAdminAuthDebug(message: string, details: Record<string, unknown> = {
   console.info("[admin-auth]", message, details);
 }
 
-export async function getCurrentAdmin() {
+export type AdminIdentity = {
+  id: string;
+  email: string;
+};
+
+export type AdminAuthState =
+  | { status: "authorized"; admin: AdminIdentity }
+  | { status: "unauthenticated" }
+  | { status: "forbidden" }
+  | { status: "unavailable" };
+
+export async function getAdminAuthState(): Promise<AdminAuthState> {
   if (!hasSupabaseEnv()) {
     logAdminAuthDebug("missing_supabase_env");
-    return null;
+    return { status: "unavailable" };
   }
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     logAdminAuthDebug("missing_supabase_client");
-    return null;
+    return { status: "unavailable" };
   }
 
   const {
@@ -25,38 +37,44 @@ export async function getCurrentAdmin() {
   } = await supabase.auth.getUser();
 
   logAdminAuthDebug("get_user", {
-    userId: user?.id ?? null,
-    email: user?.email ?? null,
-    error: userError?.message ?? null
+    authenticated: Boolean(user),
+    errorCode: getSafeErrorCode(userError)
   });
 
-  if (!user) return null;
+  if (!user) return { status: "unauthenticated" };
+  if (userError) return { status: "unavailable" };
 
   const profileClient = createSupabaseServiceRoleClient() ?? supabase;
-  const { data, error: profileError } = await profileClient.from("profiles").select("role, email").eq("id", user.id).single();
+  const { data, error: profileError } = await profileClient.from("profiles").select("role, email").eq("id", user.id).maybeSingle();
   logAdminAuthDebug("profile_lookup", {
-    userId: user.id,
-    profileEmail: data?.email ?? null,
-    role: data?.role ?? null,
-    error: profileError?.message ?? null
+    found: Boolean(data),
+    isAdmin: data?.role === "admin",
+    errorCode: getSafeErrorCode(profileError)
   });
 
-  if (data?.role !== "admin") return null;
+  if (profileError) return { status: "unavailable" };
+  if (data?.role !== "admin") return { status: "forbidden" };
 
-  return { id: user.id, email: data.email ?? user.email ?? "" };
+  return {
+    status: "authorized",
+    admin: { id: user.id, email: data.email ?? user.email ?? "" }
+  };
 }
 
-function getAdminLoginPath(nextPath?: string) {
-  const path = String(nextPath ?? "").trim();
-  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/admin/login")) {
-    return "/admin/login";
-  }
-  const params = new URLSearchParams({ next: path });
-  return `/admin/login?${params.toString()}`;
+export async function getCurrentAdmin() {
+  const state = await getAdminAuthState();
+  return state.status === "authorized" ? state.admin : null;
 }
 
 export async function requireAdmin(nextPath?: string) {
   const admin = await getCurrentAdmin();
   if (!admin) redirect(getAdminLoginPath(nextPath));
   return admin;
+}
+
+function getSafeErrorCode(error: unknown) {
+  if (!error || typeof error !== "object") return undefined;
+  if ("code" in error && error.code) return String(error.code);
+  if ("status" in error && error.status) return String(error.status);
+  return "unknown";
 }

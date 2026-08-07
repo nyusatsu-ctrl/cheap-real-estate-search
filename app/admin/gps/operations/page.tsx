@@ -8,7 +8,8 @@ export default async function GpsOperationsPage() {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="text-lg font-black text-slate-950">操作ログ一覧</h2>
+        <h2 className="text-lg font-black text-slate-950">アラーム・操作履歴</h2>
+        <p className="mt-1 text-sm text-slate-600">現在は履歴の参照専用です。端末へのコマンド送信機能はありません。</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -16,8 +17,8 @@ export default async function GpsOperationsPage() {
             <tr>
               <th className="px-3 py-3">日時</th>
               <th className="px-3 py-3">操作</th>
-              <th className="px-3 py-3">対象管理対象</th>
-              <th className="px-3 py-3">Device ID</th>
+              <th className="px-3 py-3">対象GPS端末</th>
+              <th className="px-3 py-3">端末ID</th>
               <th className="px-3 py-3">理由</th>
               <th className="px-3 py-3">状態</th>
               <th className="px-3 py-3">結果</th>

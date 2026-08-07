@@ -21,9 +21,9 @@ export const GPS_MOCK_IDS = {
 };
 
 export const MV930G_SAMPLE_LOCATION_HEX =
-  "7e0200001c0139123456780001000000000000000102008bb807c5c5a40000003e005a26060912000000";
-export const MV930G_SAMPLE_AUTH_HEX = "7e010200080139123456780001313233343536373800";
-export const MV930G_SAMPLE_HEARTBEAT_HEX = "7e00020000013912345678000200";
+  "7e0200001c0000000000000001000000000000000102008bb807c5c5a40000003e005a26060912000000";
+export const MV930G_SAMPLE_AUTH_HEX = "7e010200080000000000000001313233343536373800";
+export const MV930G_SAMPLE_HEARTBEAT_HEX = "7e00020000000000000000000200";
 
 const now = "2026-06-09T12:00:00.000Z";
 
@@ -62,13 +62,18 @@ export const sampleGpsDevices: GpsDevice[] = [
   {
     id: GPS_MOCK_IDS.device,
     vehicle_id: GPS_MOCK_IDS.vehicle,
-    device_name: "MV930G-デモ管理対象",
-    imei: "359339080000001",
-    device_identifier: "13912345678",
-    sim_phone_number: "080-0000-0001",
-    iccid: "8981100000000000001",
+    device_name: "MV930G-デモ端末",
+    imei: "000000000000000",
+    device_identifier: "000000000000",
+    protocol_terminal_id: "000000000001",
+    is_active: true,
+    sim_phone_number: null,
+    iccid: null,
     connection_status: "online",
     last_seen_at: now,
+    jt808_auth_issued_at: now,
+    jt808_registered_at: now,
+    last_authenticated_at: now,
     last_raw_log_id: GPS_MOCK_IDS.rawLog,
     created_at: now,
     updated_at: now
@@ -88,6 +93,21 @@ export const sampleGpsPositions: GpsPosition[] = [
     acc_status: "on",
     relay_status: "restored",
     vehicle_voltage: 12.6,
+    source_frame_fingerprint: null,
+    alarm_flags: 0,
+    status_flags: 3,
+    altitude_meters: 0,
+    positioning_status: "positioned",
+    terminal_time_raw: "260609200000",
+    mileage_km: null,
+    signal_strength: null,
+    gnss_satellites: null,
+    gps_satellites: null,
+    beidou_satellites: null,
+    glonass_satellites: null,
+    additional_status: null,
+    base_station_info: null,
+    iccid: null,
     located_at: now,
     received_at: now,
     created_at: now
@@ -101,14 +121,22 @@ export const sampleRawDeviceLogs: RawDeviceLog[] = [
     remote_address: "127.0.0.1",
     remote_port: 50102,
     local_port: 9300,
-    device_identifier: "13912345678",
+    device_identifier: "000000000000",
+    protocol_terminal_id: "000000000001",
     imei: null,
+    message_id: "0200",
+    message_serial: 1,
+    frame_fingerprint: null,
+    duplicate_of_raw_log_id: null,
+    checksum_valid: true,
+    encryption_type: 0,
+    is_subpackage: false,
     packet_type: "location_report",
     raw_hex: MV930G_SAMPLE_LOCATION_HEX,
     raw_text: null,
     parsed_payload: {
       message_id: "0200",
-      device_id: "13912345678",
+      device_id: "000000000000",
       protocol_family: "mv930g_minimal_jt808"
     },
     parse_status: "parsed",
@@ -124,14 +152,14 @@ export const sampleOperationLogs: OperationLog[] = [
     device_id: GPS_MOCK_IDS.device,
     vehicle_id: GPS_MOCK_IDS.vehicle,
     operation_type: "safe_cut",
-    confirmation_text: "燃料カットは実機接続前のため送信不可。将来はRELAY,2#相当の安全カットを基本にする。",
+    confirmation_text: "リレー制御とGPS端末へのコマンド送信は無効です。",
     reason: "MVPテスト操作",
     request_payload: {
       mode: "mock",
-      safety_note: "disabled_until_protocol_verified"
+      safety_note: "relay_and_device_commands_disabled"
     },
     result_status: "cancelled",
-    result_message: "実機未接続のため送信していません。",
+    result_message: "安全方針により送信していません。",
     created_at: now,
     executed_at: null
   }
@@ -149,7 +177,7 @@ export const sampleDeviceCommandQueue: DeviceCommand[] = [
     command_hex: null,
     status: "cancelled",
     attempts: 0,
-    last_error_message: "MVPでは遠隔制御送信を無効化しています。",
+    last_error_message: "リレー制御と端末コマンド送信は無効です。",
     queued_at: now,
     sent_at: null,
     acknowledged_at: null,
@@ -160,9 +188,9 @@ export const sampleDeviceCommandQueue: DeviceCommand[] = [
 
 export const sampleGpsLatestPositions: GpsLatestPosition[] = sampleGpsPositions.map((position) => ({
   ...position,
-  device_name: "MV930G-デモ管理対象",
-  imei: "359339080000001",
-  device_identifier: "13912345678",
+  device_name: "MV930G-デモ端末",
+  imei: "000000000000000",
+  device_identifier: "000000000000",
   connection_status: "online",
   last_seen_at: now,
   vehicle_type: "car",
@@ -181,6 +209,7 @@ export const sampleGpsAdminData: GpsAdminData = {
   positions: sampleGpsPositions,
   latestPositions: sampleGpsLatestPositions,
   rawLogs: sampleRawDeviceLogs,
+  parseErrors: [],
   operationLogs: sampleOperationLogs,
   commandQueue: sampleDeviceCommandQueue,
   isDemo: true

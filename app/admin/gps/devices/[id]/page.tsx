@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { GpsOperationControls } from "@/components/gps/GpsOperationControls";
+import { deactivateGpsDeviceAction } from "@/app/admin/gps/actions";
+import { GpsDataUsagePanel } from "@/components/gps/GpsDataUsagePanel";
+import { GpsDeactivateButton } from "@/components/gps/GpsDeactivateButton";
 import { GpsStatusBadge } from "@/components/gps/GpsStatusBadge";
 import {
   GPS_ACC_STATUS_LABELS,
@@ -11,6 +14,7 @@ import {
   GPS_RELAY_STATUS_LABELS
 } from "@/lib/gps/labels";
 import { findGpsDevice, loadGpsAdminData } from "@/lib/gps/data";
+import { maskGpsIdentifier } from "@/lib/gps/sensitive";
 
 export default async function GpsDeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,7 +24,12 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
 
   const vehicle = data.vehicles.find((item) => item.id === device.vehicle_id);
   const customer = data.customers.find((item) => item.id === vehicle?.customer_id);
-  const rawLogs = data.rawLogs.filter((log) => log.device_identifier === device.device_identifier || log.imei === device.imei);
+  const rawLogs = data.rawLogs.filter(
+    (log) =>
+      log.device_identifier === device.device_identifier
+      || log.imei === device.imei
+      || (device.protocol_terminal_id && log.protocol_terminal_id === device.protocol_terminal_id)
+  );
   const positions = data.positions
     .filter((position) => position.device_id === device.id)
     .sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
@@ -35,22 +44,30 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-black text-slate-950">{device.device_name}</h2>
-            <p className="mt-1 text-sm text-slate-600">IMEI: {device.imei} / Device ID: {device.device_identifier}</p>
+            <p className="mt-1 text-sm text-slate-600">IMEI: {device.imei} / 管理用端末ID: {device.device_identifier}</p>
           </div>
-          <GpsStatusBadge
-            label={GPS_CONNECTION_STATUS_LABELS[device.connection_status]}
-            tone={device.connection_status === "online" ? "green" : "slate"}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <GpsStatusBadge
+              label={GPS_CONNECTION_STATUS_LABELS[device.connection_status]}
+              tone={device.connection_status === "online" ? "green" : "slate"}
+            />
+            <Link href={`/admin/gps/devices/${device.id}/edit`} className="rounded bg-brand-700 px-4 py-2 text-sm font-bold text-white focus-ring">
+              編集
+            </Link>
+            <GpsDeactivateButton id={device.id} label="GPS端末" action={deactivateGpsDeviceAction} />
+          </div>
         </div>
         <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
           <Info label="SIM電話番号" value={device.sim_phone_number} />
           <Info label="ICCID" value={device.iccid} />
           <Info label="最終通信" value={formatDateTime(device.last_seen_at)} />
           <Info label="顧客" value={customer?.full_name ?? null} />
-          <Info label="物件" value={[vehicle?.maker, vehicle?.model_name, vehicle?.license_plate].filter(Boolean).join(" / ") || null} />
+          <Info label="車両" value={[vehicle?.maker, vehicle?.model_name, vehicle?.license_plate].filter(Boolean).join(" / ") || null} />
           <Info label="接続状態" value={GPS_CONNECTION_STATUS_LABELS[device.connection_status]} />
           <Info label="Device ID" value={device.device_identifier} />
+          <Info label="JT/T 808端末ID" value={maskGpsIdentifier(device.protocol_terminal_id)} />
           <Info label="IMEI" value={device.imei} />
+          <Info label="受信有効状態" value={device.is_active ? "有効" : "無効"} />
         </dl>
       </section>
 
@@ -58,7 +75,7 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-black text-slate-950">最新位置</h3>
-            <p className="mt-1 text-sm text-slate-600">GPS管理対象から最後に取得した位置です。</p>
+            <p className="mt-1 text-sm text-slate-600">GPS端末から最後に取得した位置です。</p>
           </div>
           {latestPosition && (
             <a
@@ -80,14 +97,14 @@ export default async function GpsDeviceDetailPage({ params }: { params: Promise<
             <Info label="受信日時" value={formatDateTime(latestPosition.received_at)} />
             <Info label="ACC" value={GPS_ACC_STATUS_LABELS[latestPosition.acc_status]} />
             <Info label="リレー" value={GPS_RELAY_STATUS_LABELS[latestPosition.relay_status]} />
-            <Info label="物件電圧" value={latestPosition.vehicle_voltage ? `${latestPosition.vehicle_voltage} V` : null} />
+            <Info label="車両電圧" value={latestPosition.vehicle_voltage ? `${latestPosition.vehicle_voltage} V` : null} />
           </dl>
         ) : (
           <p className="mt-3 text-sm text-slate-500">位置情報はまだありません。</p>
         )}
       </section>
 
-      <GpsOperationControls deviceId={device.id} vehicleId={vehicle?.id ?? null} />
+      <GpsDataUsagePanel compact />
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="text-lg font-black text-slate-950">位置履歴</h3>

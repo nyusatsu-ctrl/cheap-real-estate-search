@@ -1,21 +1,27 @@
-import { getCurrentAdmin } from "@/lib/admin";
-import { createSupabaseServerClient, hasSupabaseEnv } from "@/lib/supabase/server";
-import { seedGpsMockData } from "@/lib/gps/mock-seed";
+import { NextRequest } from "next/server";
+import { authorizeGpsApiRequest } from "@/lib/gps/api-auth";
+import { parseGpsJsonObject, validateGpsApiMutationRequest } from "@/lib/gps/api-security";
 import { sampleGpsAdminData } from "@/lib/gps/sample-data";
+import { isGpsMockRouteAvailable } from "@/lib/gps/runtime";
 
-export async function POST() {
-  const admin = await getCurrentAdmin();
-  if (!admin && hasSupabaseEnv()) return Response.json({ message: "管理者ログインが必要です。" }, { status: 401 });
+export async function POST(request: NextRequest) {
+  if (!isGpsMockRouteAvailable()) return Response.json({ message: "Not found" }, { status: 404 });
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return Response.json({
-      message: "Supabase未設定のためDB保存はしていません。画面はデモデータで確認できます。",
-      demo: true,
-      data: sampleGpsAdminData
-    });
+  const authorization = await authorizeGpsApiRequest();
+  if (!authorization.ok) return authorization.response;
+
+  const requestError = validateGpsApiMutationRequest(request);
+  if (requestError) {
+    return Response.json({ message: requestError.message }, { status: requestError.status });
+  }
+  const parsedBody = await parseGpsJsonObject(request);
+  if (!parsedBody.ok) {
+    return Response.json({ message: parsedBody.error.message }, { status: parsedBody.error.status });
   }
 
-  const result = await seedGpsMockData(supabase, admin?.id ?? null);
-  return Response.json({ message: "MV930Gモックデータを投入しました。", result });
+  return Response.json({
+    message: "デモデータを返しました。データベースへの保存は行っていません。",
+    demo: true,
+    data: sampleGpsAdminData
+  });
 }

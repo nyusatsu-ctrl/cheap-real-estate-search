@@ -8,6 +8,7 @@ import {
   type PropertyMemberState
 } from "@/components/PropertyMemberStateBridge";
 import type { PropertyAccessPageState } from "@/lib/property-access";
+import { isGpsAdminPath } from "@/lib/gps/routing";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -16,6 +17,7 @@ import { DIAGNOSIS_APP_NAME } from "@/lib/diagnosis-brand";
 
 export function AppHeader() {
   const pathname = usePathname();
+  if (isGpsAdminPath(pathname)) return null;
   if (pathname.startsWith("/diagnosis/print")) return null;
   const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities") || pathname.startsWith("/admin/sales-help");
   const isTenderRoute =

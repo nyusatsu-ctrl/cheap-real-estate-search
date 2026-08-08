@@ -20,7 +20,9 @@
 - TCP 9300だけを外部公開し、health portは`127.0.0.1`に限定する
 - SSHは管理元IPなど別の安全な運用規則で制限する
 - 1NCE送信元IP範囲は公式に確認できるまで固定値を設定例へ書かない
-- 同時接続、IP/接続別フレームレート、4KiBフレーム、16KiB接続バッファ、idle timeoutを維持する
+- 最大同時接続10、idle timeout 300秒、接続単位30フレーム/分、認証後の端末単位30フレーム/分を維持する
+- 1NCE NATを考慮して送信元IP単位は300フレーム/分、4KiBフレーム、16KiB接続バッファを維持する
+- スプールは64MiBまたは10,000ファイルでfail-closedとし、上限到達時はACKを返さない
 - 標準ログへraw、位置、端末ID、IMEI、ICCID、secretを出さない
 
 ## 起動設定
@@ -28,6 +30,10 @@
 `deploy/mv930g/mv930g.env.example`を秘密管理対象の実ファイルへ転記する。例のままでは受信サービスは無効でloopback bindとなる。公開bindへの変更と`MV930G_RECEIVER_ENABLED=true`は、公開承認後にVPS上だけで行う。
 
 systemd例はDynamicUser、書込先限定、権限昇格禁止を使用する。Dockerの`EXPOSE 9300`はポート公開を実行しないため、実際のpublish規則は別途レビューする。
+
+専用VPSではsystemd/journaldを使用し、serviceのログレートを30秒100件へ制限する。`deploy/mv930g/90-mv930g-journald.conf`を専用VPSの`/etc/systemd/journald.conf.d/`へ配置し、永続ログ64MiB、実行時ログ32MiB、保持7日を上限とする。raw payloadをファイルログへ複製しない。IPv6はreceiverとLightsail firewallの両方で公開しない。
+
+Lightsail firewallはSSHを作業時点の管理元IPv4/32だけへ制限する。TCP 9300は、公開直前に1NCE公式Internet Breakout資料を再取得し、契約中SIMのbreakout modeがManual Asia-Pacific (Tokyo)であることを読み取り確認してから、その時点の公式送信元IPv4だけを個別/32で許可する。Automatic modeは全regionのIP許可が必要で、現在の公式IP件数はLightsail IPv4 firewallの60-rule上限を超えるため、この構成では公開しない。modeまたは公式範囲を取得・照合できなければ9300を公開しない。
 
 ## スプール障害
 

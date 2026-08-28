@@ -32,7 +32,7 @@ type SupabaseErrorLike = {
   message?: string;
 };
 
-const TABLE_MISSING_MESSAGE = "契約管理テーブルが未作成です。supabase/sales-contracts.sql を適用してください。";
+const TABLE_MISSING_MESSAGE = "契約管理テーブルが未作成です。DB管理者が sales contracts baseline migration を適用してください。";
 const EMPTY_LEASE_MATURITY_SUMMARY: SalesLeaseMaturitySummary = {
   total: 0,
   overdue: 0,

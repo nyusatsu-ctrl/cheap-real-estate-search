@@ -64,7 +64,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
 
       {(result.tableMissing || setupMissing) ? (
         <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          契約管理テーブルが未作成です。supabase/sales-contracts.sql をSupabase SQL Editorで適用してください。マイグレーションはこの画面からは実行しません。
+          契約管理テーブルが未作成です。DB管理者が sales contracts baseline migration を適用してください。この画面からは実行しません。
         </div>
       ) : null}
       {result.errorMessage && !result.tableMissing ? (

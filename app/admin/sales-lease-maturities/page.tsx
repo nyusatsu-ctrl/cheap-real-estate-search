@@ -55,7 +55,7 @@ export default async function SalesLeaseMaturitiesPage({ searchParams }: { searc
 
       {(result.tableMissing || setupMissing) ? (
         <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          リース満期管理テーブルが未作成です。supabase/sales-contracts.sql のリース満期管理SQLをSupabase SQL Editorで適用してください。
+          リース満期管理テーブルが未作成です。DB管理者が sales contracts baseline migration を適用してください。
         </div>
       ) : null}
       {result.errorMessage && !result.tableMissing ? (

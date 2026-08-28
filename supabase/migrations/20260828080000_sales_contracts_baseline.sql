@@ -1,3 +1,7 @@
+-- Baseline for the sales contract schema that previously lived in
+-- supabase/sales-contracts.sql. The version is intentionally ordered before
+-- 20260828083618_create_sales_econtracts.sql, which depends on these tables.
+
 create extension if not exists "pgcrypto";
 
 create table if not exists public.sales_customers (
@@ -282,6 +286,34 @@ alter table public.sales_lease_maturities
   add column if not exists renewal_maintenance_fee_amount bigint
     check (renewal_maintenance_fee_amount is null or renewal_maintenance_fee_amount >= 0);
 
+-- The legacy script added these values only to CREATE TABLE. Rebuild the
+-- generated constraint so databases that already ran an older copy receive
+-- the complete status set without rewriting existing rows.
+alter table public.sales_contracts
+  drop constraint if exists sales_contracts_status_check;
+
+alter table public.sales_contracts
+  add constraint sales_contracts_status_check check (status in (
+    'contract_candidate',
+    'negotiating',
+    'terms_pending',
+    'contracted',
+    'waiting_delivery',
+    'delivered',
+    'repayment',
+    'payment_delay_contacted',
+    'payoff_scheduled',
+    'paid_off',
+    'leasing',
+    'lease_ended',
+    'completed',
+    'cancelled',
+    'trouble'
+  )) not valid;
+
+alter table public.sales_contracts
+  validate constraint sales_contracts_status_check;
+
 create index if not exists sales_customers_name_idx on public.sales_customers(name);
 create index if not exists sales_customers_phone_idx on public.sales_customers(phone);
 create index if not exists sales_customers_deleted_at_idx on public.sales_customers(deleted_at);
@@ -318,6 +350,7 @@ create index if not exists sales_audit_logs_actor_idx on public.sales_audit_logs
 create unique index if not exists sales_lease_maturities_active_lease_id_uidx on public.sales_lease_maturities(lease_id) where deleted_at is null;
 create index if not exists sales_lease_maturities_contract_id_idx on public.sales_lease_maturities(contract_id);
 create index if not exists sales_lease_maturities_lease_id_idx on public.sales_lease_maturities(lease_id);
+create index if not exists sales_lease_maturities_renewal_contract_id_idx on public.sales_lease_maturities(renewal_contract_id);
 create index if not exists sales_lease_maturities_maturity_date_idx on public.sales_lease_maturities(maturity_date);
 create index if not exists sales_lease_maturities_maturity_status_idx on public.sales_lease_maturities(maturity_status);
 create index if not exists sales_lease_maturities_customer_choice_idx on public.sales_lease_maturities(customer_choice);
@@ -342,6 +375,18 @@ alter table public.sales_audit_logs enable row level security;
 alter table public.sales_lease_maturities enable row level security;
 alter table public.sales_lease_maturity_histories enable row level security;
 
+revoke all on table public.sales_customers from public, anon, authenticated, service_role;
+revoke all on table public.sales_contracts from public, anon, authenticated, service_role;
+revoke all on table public.sales_vehicles from public, anon, authenticated, service_role;
+revoke all on table public.sales_loans from public, anon, authenticated, service_role;
+revoke all on table public.sales_leases from public, anon, authenticated, service_role;
+revoke all on table public.sales_guarantors from public, anon, authenticated, service_role;
+revoke all on table public.sales_documents from public, anon, authenticated, service_role;
+revoke all on table public.sales_contact_histories from public, anon, authenticated, service_role;
+revoke all on table public.sales_audit_logs from public, anon, authenticated, service_role;
+revoke all on table public.sales_lease_maturities from public, anon, authenticated, service_role;
+revoke all on table public.sales_lease_maturity_histories from public, anon, authenticated, service_role;
+
 grant select, insert, update on public.sales_customers to authenticated;
 grant select, insert, update on public.sales_contracts to authenticated;
 grant select, insert, update on public.sales_vehicles to authenticated;
@@ -354,33 +399,36 @@ grant select, insert on public.sales_audit_logs to authenticated;
 grant select, insert, update on public.sales_lease_maturities to authenticated;
 grant select, insert, update on public.sales_lease_maturity_histories to authenticated;
 
-grant all on public.sales_customers to service_role;
-grant all on public.sales_contracts to service_role;
-grant all on public.sales_vehicles to service_role;
-grant all on public.sales_loans to service_role;
-grant all on public.sales_leases to service_role;
-grant all on public.sales_guarantors to service_role;
-grant all on public.sales_documents to service_role;
-grant all on public.sales_contact_histories to service_role;
-grant all on public.sales_audit_logs to service_role;
-grant all on public.sales_lease_maturities to service_role;
-grant all on public.sales_lease_maturity_histories to service_role;
+grant select, insert, update, delete on public.sales_customers to service_role;
+grant select, insert, update, delete on public.sales_contracts to service_role;
+grant select, insert, update, delete on public.sales_vehicles to service_role;
+grant select, insert, update, delete on public.sales_loans to service_role;
+grant select, insert, update, delete on public.sales_leases to service_role;
+grant select, insert, update, delete on public.sales_guarantors to service_role;
+grant select, insert, update, delete on public.sales_documents to service_role;
+grant select, insert, update, delete on public.sales_contact_histories to service_role;
+grant select, insert, update, delete on public.sales_audit_logs to service_role;
+grant select, insert, update, delete on public.sales_lease_maturities to service_role;
+grant select, insert, update, delete on public.sales_lease_maturity_histories to service_role;
 
 create or replace function public.sales_is_admin()
 returns boolean
 language sql
 security definer
-set search_path = public
+set search_path = ''
 set row_security = off
 stable
 as $$
   select exists (
     select 1
     from public.profiles
-    where id = auth.uid()
+    where id = (select auth.uid())
       and role = 'admin'
   );
 $$;
+
+revoke all on function public.sales_is_admin() from public, anon, authenticated, service_role;
+grant execute on function public.sales_is_admin() to authenticated, service_role;
 
 drop policy if exists "admins manage sales_customers" on public.sales_customers;
 create policy "admins manage sales_customers"

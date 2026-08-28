@@ -22,7 +22,7 @@ export default async function SalesCustomerDetailPage({ params }: { params: Sale
     return (
       <AdminShell email={admin.email} systemName="契約管理システム">
         <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          契約管理テーブルが未作成です。supabase/sales-contracts.sql をSupabase SQL Editorで適用してください。
+          契約管理テーブルが未作成です。DB管理者が sales contracts baseline migration を適用してください。
         </div>
       </AdminShell>
     );

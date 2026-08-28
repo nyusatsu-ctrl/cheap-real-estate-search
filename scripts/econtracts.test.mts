@@ -143,7 +143,18 @@ test("identity matching tolerates harmless Japanese spacing but rejects another 
 
 test("stage-one snapshot contains all required legal and business concepts", () => {
   const document = buildPurchaseIntentDocument(customer, "car");
+  const unreachableCancellation = PURCHASE_INTENT_IMPORTANT_ITEMS.find((item) => item.id === "unreachable_cancellation");
   assert.equal(PURCHASE_INTENT_IMPORTANT_ITEMS.length, 8);
+  assert.equal(
+    unreachableCancellation?.text,
+    "当社が記録が残る方法で最終連絡を行い、その最終連絡後3営業日以内に回答がない場合、個別事情を確認した上で申込者都合のキャンセルとして扱うことがあると理解しました。"
+  );
+  assert.match(
+    document.text,
+    /記録が残る方法で最終連絡を行い、その最終連絡後3営業日以内に回答がない場合、個別事情を確認した上で申込者都合のキャンセルとして扱うことがあります。/
+  );
+  assert.doesNotMatch(document.text, /最後の連絡または回答から3営業日/);
+  assert.doesNotMatch(unreachableCancellation?.text ?? "", /所定期間/);
   for (const phrase of [
     "一般的・汎用的なローン承認を意味するものではなく",
     "他店で同一条件の可決が得られる保証はなく",

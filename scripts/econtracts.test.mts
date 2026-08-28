@@ -28,6 +28,7 @@ import {
   validateVehicleConfirmationTerms
 } from "../lib/econtracts/rules.ts";
 import type { EcontractCustomerSnapshot, VehicleConfirmationTerms } from "../lib/econtracts/types.ts";
+import { getAdminLoginPresentation } from "../lib/admin-login-presentation.ts";
 
 const customer: EcontractCustomerSnapshot = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -73,6 +74,46 @@ const completeFeatureEnvironment = {
   ECONTRACT_EMAIL_FROM: "contracts@example.com",
   ECONTRACT_OTP_PEPPER: "otp-test-pepper"
 };
+
+test("contract admin login uses contract branding only for sales contracts and e-contract routes", async () => {
+  for (const redirectTo of [
+    "/admin/sales-contracts",
+    "/admin/sales-contracts/contract-1?tab=econtract",
+    "/admin/econtracts/contract-1",
+    "/admin/econtracts/contract-1/print"
+  ]) {
+    const presentation = getAdminLoginPresentation(redirectTo);
+    assert.equal(presentation.kind, "contract");
+    assert.equal(presentation.systemName, "契約管理システム");
+    assert.equal(presentation.description, "契約台帳・電子契約・顧客情報を管理するアカウントでログインしてください。");
+    assert.equal(presentation.metadataTitle, "管理者ログイン｜株式会社エコループ｜契約管理システム");
+    assert.equal(presentation.metadataDescription, presentation.description);
+  }
+
+  const diagnosisPresentation = getAdminLoginPresentation("/admin/diagnoses");
+  assert.equal(diagnosisPresentation.kind, "diagnosis");
+  assert.equal(diagnosisPresentation.systemName, "建設業売上アップ診断");
+  assert.equal(diagnosisPresentation.description, "診断者一覧、リード対応状況、診断詳細を管理するアカウントでログインしてください。");
+  assert.equal(diagnosisPresentation.metadataTitle, "管理者ログイン｜建設業売上アップ診断｜株式会社エコループ");
+
+  const gpsPresentation = getAdminLoginPresentation("/admin/gps");
+  assert.equal(gpsPresentation.kind, "gps");
+  assert.equal(gpsPresentation.systemName, "GPS車両管理システム");
+  assert.equal(gpsPresentation.description, "GPS顧客、車両、端末、受信ログを管理するアカウントでログインしてください。");
+  assert.equal(gpsPresentation.metadataTitle, diagnosisPresentation.metadataTitle);
+  assert.equal(getAdminLoginPresentation("/admin/sales-contracts-other").kind, "diagnosis");
+  assert.equal(getAdminLoginPresentation("/admin/econtracts-other").kind, "diagnosis");
+
+  const [loginPage, globalStyles] = await Promise.all([
+    readFile(new URL("../app/admin/login/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8")
+  ]);
+  assert.match(loginPage, /data-admin-login-system=\{presentation\.kind\}/);
+  assert.match(loginPage, /logoSrc="\/brand\/ecoloop-logo\.png"/);
+  assert.match(loginPage, /logoSrc="\/images\/ecoloop-sales-diagnosis-logo\.png"/);
+  assert.match(loginPage, /export async function generateMetadata/);
+  assert.match(globalStyles, /body:has\(\[data-admin-login-system="contract"\]\) > header/);
+});
 
 test("e-contract feature gate is disabled unless explicitly true with all dedicated settings", () => {
   assert.equal(evaluateEcontractFeatureGate({}).enabled, false);

@@ -3,13 +3,9 @@ import { EcoloopAdminBrand } from "@/components/EcoloopAdminBrand";
 import { hasDiagnosisSupabaseEnv } from "@/lib/supabase/diagnosis-server";
 import { hasSupabaseEnv } from "@/lib/supabase/server";
 import { sanitizeAdminRedirectPath } from "@/lib/admin-redirect";
+import { getAdminLoginPresentation } from "@/lib/admin-login-presentation";
 import type { Metadata } from "next";
 import Link from "next/link";
-
-export const metadata: Metadata = {
-  title: "管理者ログイン｜建設業売上アップ診断｜株式会社エコループ",
-  description: "建設業売上アップ診断の診断者一覧、リード対応状況、診断詳細を管理するためのログイン画面です。"
-};
 
 type AdminLoginSearchParams = {
   error?: string;
@@ -19,6 +15,21 @@ type AdminLoginSearchParams = {
   continue?: string;
 };
 
+function resolveRedirectTo(searchParams: AdminLoginSearchParams) {
+  return sanitizeAdminRedirectPath(
+    searchParams.next ?? searchParams.redirectTo ?? searchParams.continue,
+    "/admin/diagnoses"
+  );
+}
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<AdminLoginSearchParams> }): Promise<Metadata> {
+  const presentation = getAdminLoginPresentation(resolveRedirectTo(await searchParams));
+  return {
+    title: presentation.metadataTitle,
+    description: presentation.metadataDescription
+  };
+}
+
 function hasRequiredSupabaseEnv(redirectTo: string) {
   if (redirectTo.startsWith("/admin/diagnoses")) return hasDiagnosisSupabaseEnv();
   if (redirectTo.startsWith("/admin/system-check")) return hasSupabaseEnv() || hasDiagnosisSupabaseEnv();
@@ -27,30 +38,39 @@ function hasRequiredSupabaseEnv(redirectTo: string) {
 
 export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<AdminLoginSearchParams> }) {
   const resolvedSearchParams = await searchParams;
-  const redirectTo = sanitizeAdminRedirectPath(
-    resolvedSearchParams.next ?? resolvedSearchParams.redirectTo ?? resolvedSearchParams.continue,
-    "/admin/diagnoses"
-  );
-  const isGpsLogin = redirectTo === "/admin/gps" || redirectTo.startsWith("/admin/gps/");
+  const redirectTo = resolveRedirectTo(resolvedSearchParams);
+  const presentation = getAdminLoginPresentation(redirectTo);
+  const isContractLogin = presentation.kind === "contract";
   return (
-    <div className="mx-auto max-w-md px-4 py-10">
+    <div data-admin-login-system={presentation.kind} className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <EcoloopAdminBrand
-          showSystemName={false}
-          logoSrc="/images/ecoloop-sales-diagnosis-logo.png"
-          logoWidth={1914}
-          logoHeight={822}
-          logoClassName="h-12"
-          textClassName="text-base"
-          priority
-        />
-        <p className="mt-4 text-sm font-bold text-brand-700">{isGpsLogin ? "GPS車両管理システム" : "建設業売上アップ診断"}</p>
+        {isContractLogin ? (
+          <EcoloopAdminBrand
+            showSystemName
+            systemName={presentation.systemName}
+            logoSrc="/brand/ecoloop-logo.png"
+            logoWidth={134}
+            logoHeight={80}
+            logoClassName="h-12"
+            textClassName="text-sm sm:text-base"
+            priority
+          />
+        ) : (
+          <>
+            <EcoloopAdminBrand
+              showSystemName={false}
+              logoSrc="/images/ecoloop-sales-diagnosis-logo.png"
+              logoWidth={1914}
+              logoHeight={822}
+              logoClassName="h-12"
+              textClassName="text-base"
+              priority
+            />
+            <p className="mt-4 text-sm font-bold text-brand-700">{presentation.systemName}</p>
+          </>
+        )}
         <h1 className="mt-1 text-2xl font-black text-slate-950">管理者ログイン</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          {isGpsLogin
-            ? "GPS顧客、車両、端末、受信ログを管理するアカウントでログインしてください。"
-            : "診断者一覧、リード対応状況、診断詳細を管理するアカウントでログインしてください。"}
-        </p>
+        <p className="mt-2 text-sm text-slate-600">{presentation.description}</p>
         {!hasRequiredSupabaseEnv(redirectTo) ? (
           <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Supabase 環境変数が未設定です。.env.local を設定するとログインできます。

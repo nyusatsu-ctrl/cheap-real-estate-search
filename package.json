@@ -13,6 +13,7 @@
     "test:property-navigation": "node --no-warnings --test --experimental-strip-types scripts/property-navigation.test.mts",
     "test:diagnosis-v2": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2.test.mts scripts/construction-diagnosis-v2-specialty.test.mts scripts/construction-diagnosis-v2-start-form.test.mts scripts/construction-diagnosis-v2-short.test.mts scripts/construction-diagnosis-v2-resume.test.mts scripts/construction-diagnosis-v2-print.test.mts scripts/construction-diagnosis-v2-strategy.test.mts",
     "test:diagnosis-v2-specialty": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2-specialty.test.mts",
+    "test:econtracts": "node --no-warnings --test --experimental-strip-types scripts/econtracts.test.mts",
     "test:gps": "node --test scripts/gps-foundation.test.mts scripts/mv930g-protocol.test.mts",
     "crawl:properties": "node scripts/crawlers/run.mjs",
     "import:properties": "node scripts/import-properties.mjs",
@@ -59,7 +60,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
-    "next": "^16.2.7",
+    "next": "^16.3.3",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -71,8 +72,8 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.7",
-    "postcss": "^8.5.10",
+    "eslint-config-next": "^16.3.3",
+    "postcss": "^8.5.26",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2"
   }

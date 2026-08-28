@@ -7,6 +7,7 @@ import { DocumentsSection } from "@/components/sales-contracts/DocumentsSection"
 import { LeaseMaturityCard } from "@/components/sales-contracts/LeaseMaturityCard";
 import { SalesContractDetail } from "@/components/sales-contracts/SalesContractDetail";
 import { SalesContractForm } from "@/components/sales-contracts/SalesContractForm";
+import { EcontractAdminCard } from "@/components/econtracts/EcontractAdminCard";
 import {
   addLeaseMaturityHistoryAction,
   upsertLeaseMaturityAction
@@ -19,6 +20,7 @@ import {
 } from "@/app/admin/sales-contracts/actions";
 import { requireAdmin } from "@/lib/admin";
 import { getSalesContractDetail } from "@/lib/sales-contracts/data";
+import { getAdminEcontracts } from "@/lib/econtracts/data";
 
 type SalesContractDetailParams = Promise<{ id: string }>;
 type SalesContractDetailSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -39,6 +41,8 @@ export default async function SalesContractDetailPage({
   const { id } = await params;
   const query = await searchParams;
   const error = firstParam(query.error);
+  const econtractError = firstParam(query.econtract_error);
+  const econtractMessage = firstParam(query.econtract_message);
   const created = firstParam(query.created) === "1";
   const result = await getSalesContractDetail(id);
 
@@ -53,6 +57,7 @@ export default async function SalesContractDetailPage({
   }
 
   if (!result.data) notFound();
+  const econtractSummary = await getAdminEcontracts(id);
 
   return (
     <AdminShell email={admin.email} systemName="契約管理システム">
@@ -65,8 +70,11 @@ export default async function SalesContractDetailPage({
       {error ? (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</div>
       ) : null}
+      {econtractError ? <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{econtractError}</div> : null}
+      {econtractMessage ? <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{econtractMessage}</div> : null}
       <div className="space-y-6">
         <SalesContractDetail detail={result.data} hideAction={hideTestSalesContractAction} showCreatedActions={created} />
+        <EcontractAdminCard detail={result.data} summary={econtractSummary} />
         {result.data.contract.contract_type === "lease" ? (
           <LeaseMaturityCard detail={result.data} action={upsertLeaseMaturityAction} historyAction={addLeaseMaturityHistoryAction} />
         ) : null}

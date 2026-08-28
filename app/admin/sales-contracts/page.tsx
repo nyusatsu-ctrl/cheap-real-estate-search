@@ -10,6 +10,9 @@ import {
   VEHICLE_TYPE_OPTIONS
 } from "@/lib/sales-contracts/rules";
 import type { SalesContractFilters } from "@/lib/sales-contracts/types";
+import { getAdminEcontractStatusMap } from "@/lib/econtracts/data";
+import { ECONTRACT_DISABLED_MESSAGE } from "@/lib/econtracts/rules";
+import { isEcontractFeatureEnabled } from "@/lib/econtracts/server";
 
 type SalesContractsSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -47,6 +50,8 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
   const params = await searchParams;
   const filters = getFilters(params);
   const result = await getSalesContractList(filters);
+  const econtractFeatureEnabled = isEcontractFeatureEnabled();
+  const econtractStatuses = await getAdminEcontractStatusMap(result.data.map((item) => item.contract.id));
   const setupMissing = firstParam(params.setup) === "missing";
   const hasActiveFilters = Boolean(filters.keyword || filters.vehicleType || filters.contractType || filters.status || filters.financeCompany || filters.source || filters.nextAction);
 
@@ -70,6 +75,11 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
       {result.errorMessage && !result.tableMissing ? (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
           {result.errorMessage}
+        </div>
+      ) : null}
+      {!econtractFeatureEnabled ? (
+        <div className="mb-4 rounded border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800">
+          {ECONTRACT_DISABLED_MESSAGE}
         </div>
       ) : null}
 
@@ -137,7 +147,7 @@ export default async function SalesContractsPage({ searchParams }: { searchParam
         </div>
       </form>
 
-      <SalesContractTable items={result.data} emptyState={hasActiveFilters ? "filtered" : "onboarding"} />
+      <SalesContractTable items={result.data} emptyState={hasActiveFilters ? "filtered" : "onboarding"} econtractStatuses={econtractStatuses} />
     </AdminShell>
   );
 }

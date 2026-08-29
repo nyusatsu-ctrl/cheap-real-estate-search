@@ -12,17 +12,12 @@ import {
 } from "@/lib/econtracts/crypto";
 import { getEcontractBaseUrl, sendEcontractLinkEmail } from "@/lib/econtracts/email";
 import { insertEcontractEvent, isEcontractFeatureEnabled, requireEcontractFeatureEnabled } from "@/lib/econtracts/server";
-import { ECONTRACT_DISABLED_MESSAGE, validateVehicleConfirmationTerms } from "@/lib/econtracts/rules";
-import {
-  buildPurchaseIntentDocument,
-  buildVehicleConfirmationDocument
-} from "@/lib/econtracts/templates";
+import { canIssueLoanEcontract, ECONTRACT_DISABLED_MESSAGE } from "@/lib/econtracts/rules";
+import { buildEcontractDocument } from "@/lib/econtracts/templates";
 import type {
   EcontractCustomerSnapshot,
   EcontractDocumentSnapshot,
-  EcontractKind,
-  SalesEcontract,
-  VehicleConfirmationTerms
+  SalesEcontract
 } from "@/lib/econtracts/types";
 import type { SalesContract, SalesCustomer, SalesLoan, SalesVehicle } from "@/lib/sales-contracts/types";
 
@@ -35,64 +30,25 @@ type SourceDetail = {
   loan: SalesLoan;
 };
 
-export async function issuePurchaseIntentEcontractAction(formData: FormData) {
+export async function issueEcontractAction(formData: FormData) {
   const admin = await requireAdmin();
   const contractId = requiredString(formData, "contract_id");
   requireAdminEcontractFeature(contractId);
   const client = requireClient();
   const source = await loadSourceDetail(contractId);
-  if (source.contract.contract_type !== "loan" || source.loan.approval_status !== "approved") {
-    fail(contractId, "第1契約は自社ローン審査が可決済みの顧客だけに送信できます。");
-  }
+  requireEligibleSource(source, contractId);
   const customer = buildCustomerSnapshot(source.customer);
-  const document = buildPurchaseIntentDocument(customer, source.contract.vehicle_type);
+  const document = buildEcontractDocument(customer);
   await createAndSendEcontract({
     client,
     adminId: admin.id,
     source,
-    kind: "purchase_intent",
     customer,
     document,
-    terms: { vehicleType: source.contract.vehicle_type }
+    terms: buildTermsSnapshot(source)
   });
   revalidate(contractId);
-  success(contractId, "第1契約をメール送信しました。");
-}
-
-export async function issueVehicleConfirmationEcontractAction(formData: FormData) {
-  const admin = await requireAdmin();
-  const contractId = requiredString(formData, "contract_id");
-  requireAdminEcontractFeature(contractId);
-  const client = requireClient();
-  const source = await loadSourceDetail(contractId);
-  const firstStageResult = await client
-    .from("sales_econtracts")
-    .select("id,status")
-    .eq("contract_id", contractId)
-    .eq("contract_kind", "purchase_intent")
-    .eq("status", "signed")
-    .order("revision", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (firstStageResult.error) throw firstStageResult.error;
-  if (!firstStageResult.data) fail(contractId, "第2契約は第1契約の署名完了後に送信できます。");
-
-  const terms = getVehicleConfirmationTerms(formData, source);
-  const errors = validateVehicleConfirmationTerms(terms);
-  if (errors.length) fail(contractId, errors.join(" / "));
-  const customer = buildCustomerSnapshot(source.customer);
-  const document = buildVehicleConfirmationDocument(customer, terms);
-  await createAndSendEcontract({
-    client,
-    adminId: admin.id,
-    source,
-    kind: "vehicle_confirmation",
-    customer,
-    document,
-    terms
-  });
-  revalidate(contractId);
-  success(contractId, "第2契約をメール送信しました。");
+  success(contractId, "電子契約をメール送信しました。");
 }
 
 export async function resendEcontractAction(formData: FormData) {
@@ -104,9 +60,11 @@ export async function resendEcontractAction(formData: FormData) {
   const result = await client.from("sales_econtracts").select("*").eq("id", econtractId).eq("contract_id", contractId).maybeSingle();
   if (result.error) throw result.error;
   const econtract = result.data as SalesEcontract | null;
-  if (!econtract || econtract.status === "signed" || econtract.status === "cancelled") {
+  if (!econtract || econtract.contract_kind !== "purchase_intent" || econtract.status === "signed" || econtract.status === "cancelled") {
     fail(contractId, "この電子契約は再送できません。");
   }
+  const source = await loadSourceDetail(contractId);
+  requireEligibleSource(source, contractId);
   const destination = econtract.customer_snapshot.email;
   if (!isEmail(destination)) fail(contractId, "顧客のメールアドレスを確認してください。");
   const token = generateOpaqueToken();
@@ -191,28 +149,30 @@ async function createAndSendEcontract(input: {
   client: NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
   adminId: string;
   source: SourceDetail;
-  kind: EcontractKind;
   customer: EcontractCustomerSnapshot;
   document: EcontractDocumentSnapshot;
-  terms: Record<string, unknown> | VehicleConfirmationTerms;
+  terms: Record<string, unknown>;
 }) {
   if (!isEmail(input.customer.email)) fail(input.source.contract.id, "顧客のメールアドレスを登録してください。");
   const baseUrl = getEcontractBaseUrl();
   if (!baseUrl) fail(input.source.contract.id, "電子契約の公開URL設定が未完了です。");
-  const activeResult = await input.client
+  const existingResult = await input.client
     .from("sales_econtracts")
-    .select("id")
+    .select("id,status")
     .eq("contract_id", input.source.contract.id)
-    .eq("contract_kind", input.kind)
-    .in("status", ["draft", "sent", "opened", "verified"])
-    .limit(1);
-  if (activeResult.error) throw activeResult.error;
-  if (activeResult.data?.length) fail(input.source.contract.id, "同じ段階の未完了電子契約があります。再送または取消を使用してください。");
+    .eq("contract_kind", "purchase_intent");
+  if (existingResult.error) throw existingResult.error;
+  if (existingResult.data?.some((contract) => contract.status === "signed")) {
+    fail(input.source.contract.id, "締結済みの電子契約があるため、新しい電子契約は発行できません。");
+  }
+  if (existingResult.data?.some((contract) => ["draft", "sent", "opened", "verified"].includes(contract.status))) {
+    fail(input.source.contract.id, "未完了の電子契約があります。再送または取消を使用してください。");
+  }
   const revisionResult = await input.client
     .from("sales_econtracts")
     .select("revision")
     .eq("contract_id", input.source.contract.id)
-    .eq("contract_kind", input.kind)
+    .eq("contract_kind", "purchase_intent")
     .order("revision", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -220,13 +180,13 @@ async function createAndSendEcontract(input: {
   const revision = Number(revisionResult.data?.revision ?? 0) + 1;
   const token = generateOpaqueToken();
   const now = new Date();
-  const managementNumber = createManagementNumber(input.kind, now);
+  const managementNumber = createManagementNumber("purchase_intent", now);
   const insertResult = await input.client.from("sales_econtracts").insert({
     contract_id: input.source.contract.id,
     customer_id: input.source.customer.id,
     loan_id: input.source.loan.id,
     loan_application_number_snapshot: input.source.loan.application_number,
-    contract_kind: input.kind,
+    contract_kind: "purchase_intent",
     revision,
     management_number: managementNumber,
     status: "draft",
@@ -274,7 +234,7 @@ async function createAndSendEcontract(input: {
       metadata: { deliveryMethod: "email", providerMessageId: delivery.providerMessageId }
     }),
     insertAudit(input.client, input.adminId, econtract.id, "econtract_issue", {
-      contractKind: input.kind,
+      contractKind: "purchase_intent",
       revision,
       managementNumber,
       documentHash: econtract.document_hash,
@@ -317,35 +277,26 @@ function buildCustomerSnapshot(customer: SalesCustomer): EcontractCustomerSnapsh
   };
 }
 
-function getVehicleConfirmationTerms(formData: FormData, source: SourceDetail): VehicleConfirmationTerms {
-  const vehicle = source.vehicle;
-  const loan = source.loan;
+function buildTermsSnapshot(source: SourceDetail) {
   return {
     vehicleType: source.contract.vehicle_type,
-    maker: optionalString(formData, "maker") || vehicle?.maker || "",
-    model: optionalString(formData, "model") || vehicle?.model || "",
-    grade: optionalString(formData, "grade") || vehicle?.grade || "",
-    modelCode: optionalString(formData, "model_code"),
-    firstRegistration: optionalString(formData, "first_registration") || (vehicle?.model_year ? `${vehicle.model_year}年` : ""),
-    mileage: integerField(formData, "mileage", vehicle?.mileage ?? 0),
-    chassisNumber: optionalString(formData, "chassis_number") || vehicle?.chassis_number || "",
-    chassisNumberStatus: formData.get("chassis_number_status") === "confirmed" ? "confirmed" : "pending",
-    vehiclePrice: integerField(formData, "vehicle_price", source.contract.sale_price ?? 0),
-    fees: integerField(formData, "fees", source.contract.fees ?? 0),
-    totalPrice: integerField(formData, "total_price", source.contract.total_price ?? 0),
-    downPayment: integerField(formData, "down_payment", source.contract.down_payment ?? 0),
-    tradeInAmount: integerField(formData, "trade_in_amount", source.contract.trade_in_amount ?? 0),
-    financedAmount: integerField(formData, "financed_amount", source.contract.financed_amount ?? loan.principal ?? 0),
-    installmentCount: integerField(formData, "installment_count", loan.installment_count ?? 0),
-    firstPaymentAmount: integerField(formData, "first_payment_amount", loan.initial_payment_amount ?? 0),
-    monthlyPayment: integerField(formData, "monthly_payment", loan.monthly_payment ?? 0),
-    bonusPayment: optionalString(formData, "bonus_payment") || (loan.bonus_payment_enabled ? `${Number(loan.bonus_payment_amount ?? 0).toLocaleString("ja-JP")}円` : "なし"),
-    deliveryMethod: optionalString(formData, "delivery_method"),
-    deliveryEstimate: optionalString(formData, "delivery_estimate") || source.contract.delivery_date || "",
-    warranty: optionalString(formData, "warranty") || vehicle?.warranty_period || "",
-    specialTerms: optionalString(formData, "special_terms"),
-    auctionPurchase: formData.get("auction_purchase") === "on"
+    desiredVehicle: source.vehicle?.model ?? "",
+    financeCompany: source.loan.finance_company,
+    approvalStatus: source.loan.approval_status,
+    applicationNumber: source.loan.application_number,
+    sourceRowKey: source.contract.source_row_key,
+    sourceRowNumber: source.contract.source_row_number
   };
+}
+
+function requireEligibleSource(source: SourceDetail, contractId: string) {
+  if (!canIssueLoanEcontract({
+    contractType: source.contract.contract_type,
+    approvalStatus: source.loan.approval_status,
+    financeCompany: source.loan.finance_company
+  })) {
+    fail(contractId, "電子契約はプレミアまたはアストで可決済みの自社ローン顧客だけに送信できます。");
+  }
 }
 
 async function invalidateCustomerSessions(client: NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>, econtractId: string, now: string) {
@@ -395,15 +346,6 @@ function requireAdminEcontractFeature(contractId: string) {
 
 function optionalString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim().slice(0, 2000);
-}
-
-function integerField(formData: FormData, key: string, fallback = 0) {
-  const raw = optionalString(formData, key);
-  if (!raw) return fallback;
-  const normalized = raw.normalize("NFKC").replace(/[,\s円回]/g, "").replace(/km$/i, "");
-  if (!/^-?\d+$/.test(normalized)) return -1;
-  const parsed = Number(normalized);
-  return Number.isSafeInteger(parsed) ? parsed : -1;
 }
 
 function isEmail(value: string) {

@@ -3054,6 +3054,13 @@
               openSalesContractRegistration(customer);
             });
           }
+          const econtractButton = tr.querySelector('[data-econtract-sync]');
+          if (econtractButton) {
+            econtractButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              openEcontractCandidate(customer);
+            });
+          }
           tr.addEventListener('click', () => selectCustomer(customer));
           els.rows.appendChild(tr);
         });
@@ -3095,6 +3102,7 @@
             ${detailStatusBadgesHtml(customer, showAstReview)}
             <div class="detail-action-bar">
               <button type="button" id="contractRegisterButton" class="${registrationState.canRegister ? 'contract-ready' : 'danger'}" ${registrationState.canRegister ? '' : 'disabled'}>${escapeHtml(registrationState.buttonLabel || '契約管理へ登録')}</button>
+              ${isEcontractEligible(customer) ? '<button type="button" id="econtractSyncButton" class="contract-ready">電子契約</button>' : ''}
               <button type="button" id="topMarketSearchButton" class="primary">相場取得</button>
               <button type="button" id="premiumRequestButton">プレミア審査依頼</button>
               <button type="button" id="astRequestButton" ${showAstReview ? '' : 'disabled'}>${showAstReview ? 'アスト審査依頼' : 'アスト対象外'}</button>
@@ -3199,6 +3207,10 @@
         document.getElementById('saveButton').addEventListener('click', saveSelected);
         document.getElementById('deleteCustomerButton').addEventListener('click', deleteSelectedCustomer);
         document.getElementById('contractRegisterButton').addEventListener('click', () => openSalesContractRegistration(customer));
+        const econtractSyncButton = document.getElementById('econtractSyncButton');
+        if (econtractSyncButton) {
+          econtractSyncButton.addEventListener('click', () => openEcontractCandidate(customer));
+        }
         document.getElementById('topMarketSearchButton').addEventListener('click', searchMarketForSelected);
         document.getElementById('premiumRequestButton').addEventListener('click', () => setReviewRequest('premium'));
         document.getElementById('astRequestButton').addEventListener('click', () => setReviewRequest('ast'));
@@ -3476,6 +3488,7 @@
           <div class="contract-status-cell">
             ${contractStatusBadgeHtml(status)}
             <button type="button" class="compact" data-contract-register="${escapeHtml(customer.rowKey)}"${disabled}>${buttonLabel}</button>
+            ${isEcontractEligible(customer) ? `<button type="button" class="compact contract-ready" data-econtract-sync="${escapeHtml(customer.rowKey)}">電子契約</button>` : ''}
           </div>
         `;
       }
@@ -3562,6 +3575,32 @@
         if (!opened) {
           showToast('契約管理システムを開けませんでした。ポップアップ許可を確認してください。');
         }
+      }
+
+      function openEcontractCandidate(customer) {
+        if (!isEcontractEligible(customer)) {
+          showToast('電子契約はプレミアまたはアストで可決済みの顧客だけが対象です。');
+          return;
+        }
+        const opened = window.open('about:blank', '_blank');
+        if (!opened) {
+          showToast('契約管理システムを開けませんでした。ポップアップ許可を確認してください。');
+          return;
+        }
+        opened.opener = null;
+        opened.document.title = '電子契約を準備しています';
+        opened.document.body.textContent = '電子契約の確認画面を準備しています…';
+        google.script.run
+          .withSuccessHandler((result) => {
+            const path = String(result && result.url ? result.url : '');
+            const url = path.indexOf('http') === 0 ? path : `${SALES_CONTRACT_APP_URL}${path}`;
+            opened.location.replace(url);
+          })
+          .withFailureHandler((error) => {
+            opened.close();
+            showToast(error && error.message ? error.message : String(error));
+          })
+          .syncEcontractCandidate({ rowNumber: customer.rowNumber, rowKey: customer.rowKey });
       }
 
       function salesContractDetailUrl(customer) {
@@ -3953,6 +3992,16 @@
 
       function isPremiumApproved(customer) {
         return customer && (customer.status === 'プレミア可決' || customer.review1 === '可決');
+      }
+
+      function isEcontractEligible(customer) {
+        if (!customer) return false;
+        const combined = [customer.status, customer.review1, customer.review2].join(' ');
+        if (combined.indexOf('保証人') !== -1) return false;
+        return customer.status === 'プレミア可決'
+          || customer.status === 'アスト可決'
+          || customer.review1 === '可決'
+          || customer.review2 === '可決';
       }
 
       function isAstApproved(customer) {

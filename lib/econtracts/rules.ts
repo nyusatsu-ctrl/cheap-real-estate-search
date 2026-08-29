@@ -1,4 +1,4 @@
-import type { EcontractKind, EcontractStatus, VehicleConfirmationTerms } from "./types";
+import type { EcontractKind, EcontractStatus } from "./types";
 
 export const ECONTRACT_DISABLED_MESSAGE = "電子契約機能は現在無効です";
 
@@ -23,18 +23,43 @@ export function evaluateEcontractFeatureGate(environment: EcontractFeatureEnviro
 }
 
 export const ECONTRACT_KIND_LABELS: Record<EcontractKind, string> = {
-  purchase_intent: "第1契約：購入手続継続確認",
-  vehicle_confirmation: "第2契約：個別車両購入確認"
+  purchase_intent: "電子契約",
+  vehicle_confirmation: "過去の電子契約証跡"
 };
 
 export const ECONTRACT_STATUS_LABELS: Record<EcontractStatus, string> = {
-  draft: "送信準備中",
-  sent: "送信済",
-  opened: "開封済",
-  verified: "本人認証済",
-  signed: "署名済",
+  draft: "未送信",
+  sent: "送信済み",
+  opened: "本人確認／OTP待ち",
+  verified: "契約締結待ち",
+  signed: "締結済み",
   cancelled: "取消済"
 };
+
+type EcontractLoanEligibility = {
+  contractType: string | null | undefined;
+  approvalStatus: string | null | undefined;
+  financeCompany: string | null | undefined;
+};
+
+export function canIssueLoanEcontract(input: EcontractLoanEligibility) {
+  return input.contractType === "loan"
+    && input.approvalStatus === "approved"
+    && (input.financeCompany === "premium" || input.financeCompany === "ast");
+}
+
+export function getEcontractStatusLabel(status: EcontractStatus, linkExpiresAt?: string | null, now = Date.now()) {
+  if (
+    linkExpiresAt
+    && status !== "draft"
+    && status !== "signed"
+    && status !== "cancelled"
+    && getEcontractAvailability(status, linkExpiresAt, now) === "expired"
+  ) {
+    return "期限切れ";
+  }
+  return ECONTRACT_STATUS_LABELS[status];
+}
 
 export function isActiveEcontractStatus(status: EcontractStatus) {
   return status === "draft" || status === "sent" || status === "opened" || status === "verified";
@@ -65,24 +90,6 @@ export function getOtpChallengeAvailability(
   if (!Number.isFinite(new Date(verification.expires_at).getTime()) || new Date(verification.expires_at).getTime() <= now) return "expired";
   if (verification.attempt_count >= verification.max_attempts) return "locked";
   return "pending";
-}
-
-export function validateVehicleConfirmationTerms(terms: VehicleConfirmationTerms) {
-  const errors: string[] = [];
-  if (!terms.maker) errors.push("メーカーを入力してください。");
-  if (!terms.model) errors.push("車名を入力してください。");
-  if (!terms.firstRegistration) errors.push("初度登録／年式を入力してください。");
-  if (!Number.isInteger(terms.mileage) || terms.mileage < 0) errors.push("走行距離を0以上の整数で入力してください。");
-  if (terms.chassisNumberStatus === "confirmed" && !terms.chassisNumber) errors.push("確定済みの車台番号を入力してください。");
-  if (terms.vehiclePrice < 0 || terms.fees < 0 || terms.totalPrice <= 0) errors.push("価格・諸費用・支払総額を正しく入力してください。");
-  if (terms.vehiclePrice + terms.fees !== terms.totalPrice) errors.push("車両本体価格と諸費用の合計を支払総額と一致させてください。");
-  if (terms.downPayment < 0 || terms.tradeInAmount < 0 || terms.financedAmount < 0) errors.push("頭金・下取充当額・ローン等申込額を正しく入力してください。");
-  if (terms.downPayment + terms.tradeInAmount + terms.financedAmount !== terms.totalPrice) errors.push("頭金・下取充当額・ローン等申込額の合計を支払総額と一致させてください。");
-  if (!Number.isInteger(terms.installmentCount) || terms.installmentCount <= 0) errors.push("支払回数を1以上で入力してください。");
-  if (terms.firstPaymentAmount < 0 || terms.monthlyPayment < 0) errors.push("支払額を0以上で入力してください。");
-  if (!terms.deliveryMethod) errors.push("納車方法を入力してください。");
-  if (!terms.deliveryEstimate) errors.push("納車予定を入力してください。");
-  return Array.from(new Set(errors));
 }
 
 export function validateConsentIds(expectedIds: string[], receivedIds: string[]) {

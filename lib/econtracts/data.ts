@@ -2,7 +2,7 @@ import "server-only";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ECONTRACT_DISABLED_MESSAGE } from "@/lib/econtracts/rules";
 import { isEcontractFeatureEnabled } from "@/lib/econtracts/server";
-import type { AdminEcontractSummary, EcontractKind, SalesEcontract } from "@/lib/econtracts/types";
+import type { AdminEcontractStatusSummary, AdminEcontractSummary, EcontractKind, SalesEcontract } from "@/lib/econtracts/types";
 
 const MISSING_MESSAGE = "電子契約テーブルが未作成です。対象 Supabase を確認して migration を適用してください。";
 
@@ -30,14 +30,14 @@ export function getLatestEcontract(contracts: SalesEcontract[], kind: EcontractK
 }
 
 export async function getAdminEcontractStatusMap(contractIds: string[]) {
-  const statusMap: Record<string, Partial<Record<EcontractKind, SalesEcontract["status"]>>> = {};
+  const statusMap: Record<string, Partial<Record<EcontractKind, AdminEcontractStatusSummary>>> = {};
   if (!isEcontractFeatureEnabled()) return statusMap;
   if (!contractIds.length) return statusMap;
   const client = createSupabaseServiceRoleClient();
   if (!client) return statusMap;
   const result = await client
     .from("sales_econtracts")
-    .select("contract_id,contract_kind,status,revision")
+    .select("contract_id,contract_kind,status,link_expires_at,revision")
     .in("contract_id", contractIds)
     .order("revision", { ascending: false });
   if (result.error) return statusMap;
@@ -45,7 +45,12 @@ export async function getAdminEcontractStatusMap(contractIds: string[]) {
     const contractId = String(row.contract_id);
     const kind = row.contract_kind as EcontractKind;
     statusMap[contractId] ??= {};
-    if (!statusMap[contractId][kind]) statusMap[contractId][kind] = row.status as SalesEcontract["status"];
+    if (!statusMap[contractId][kind]) {
+      statusMap[contractId][kind] = {
+        status: row.status as SalesEcontract["status"],
+        linkExpiresAt: String(row.link_expires_at)
+      };
+    }
   }
   return statusMap;
 }

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { EcontractDocument } from "@/components/econtracts/EcontractDocument";
 import { requireAdmin } from "@/lib/admin";
-import { ECONTRACT_DISABLED_MESSAGE, ECONTRACT_KIND_LABELS, ECONTRACT_STATUS_LABELS, getEcontractStatusClass } from "@/lib/econtracts/rules";
+import { ECONTRACT_DISABLED_MESSAGE, ECONTRACT_KIND_LABELS, getEcontractStatusClass, getEcontractStatusLabel } from "@/lib/econtracts/rules";
 import { getAdminEcontractDetail, isEcontractFeatureEnabled } from "@/lib/econtracts/server";
 
 type Params = Promise<{ id: string }>;
@@ -35,12 +35,12 @@ export default async function AdminEcontractDetailPage({ params }: { params: Par
           <Link href={`/admin/sales-contracts/${contract.contract_id}#econtracts`} className="text-sm font-black text-brand-700">販売契約詳細へ戻る</Link>
           <h1 className="mt-2 text-2xl font-black text-slate-950">電子契約・証跡</h1>
         </div>
-        <span className={`rounded px-3 py-1 text-sm font-black ${getEcontractStatusClass(contract.status)}`}>{ECONTRACT_STATUS_LABELS[contract.status]}</span>
+        <span className={`rounded px-3 py-1 text-sm font-black ${getEcontractStatusClass(contract.status)}`}>{getEcontractStatusLabel(contract.status, contract.link_expires_at)}</span>
       </div>
 
       <section className="mb-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Info label="段階" value={ECONTRACT_KIND_LABELS[contract.contract_kind]} />
+          <Info label="種別" value={ECONTRACT_KIND_LABELS[contract.contract_kind]} />
           <Info label="管理番号" value={contract.management_number} />
           <Info label="version" value={contract.document_version} />
           <Info label="revision" value={String(contract.revision)} />

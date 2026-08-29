@@ -12,14 +12,20 @@ import { isGpsAdminPath } from "@/lib/gps/routing";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DIAGNOSIS_APP_NAME } from "@/lib/diagnosis-brand";
+import { getAdminLoginPresentation } from "@/lib/admin-login-presentation";
 
 export function AppHeader() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   if (isGpsAdminPath(pathname)) return null;
   if (pathname.startsWith("/diagnosis/print")) return null;
-  const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities") || pathname.startsWith("/admin/sales-help");
+  const isContractLogin = pathname === "/admin/login" && getAdminLoginPresentation(
+    searchParams.get("next") ?? searchParams.get("redirectTo") ?? searchParams.get("continue") ?? ""
+  ).kind === "contract";
+  const isSalesAdmin = pathname.startsWith("/admin/sales-contracts") || pathname.startsWith("/admin/sales-customers") || pathname.startsWith("/admin/sales-lease-maturities") || pathname.startsWith("/admin/sales-help") || pathname.startsWith("/admin/econtracts");
   const isTenderRoute =
     pathname.startsWith("/tenders")
     || pathname.startsWith("/favorites")
@@ -34,7 +40,7 @@ export function AppHeader() {
   const isDiagnosisRoute =
     pathname.startsWith("/construction-sales-diagnosis")
     || pathname.startsWith("/diagnosis")
-    || pathname === "/admin/login"
+    || (pathname === "/admin/login" && !isContractLogin)
     || pathname.startsWith("/admin/diagnoses");
   const showPropertyMemberState =
     pathname === "/"
@@ -57,7 +63,7 @@ export function AppHeader() {
     ].some((prefix) => pathname.startsWith(prefix));
 
   if (pathname.startsWith("/income-potential")) return <IncomePotentialHeader />;
-  if (isSalesAdmin) return <ContractAdminHeader />;
+  if (isSalesAdmin || isContractLogin) return <ContractAdminHeader />;
   if (isTenderRoute) return <TenderHeader />;
   if (isDiagnosisRoute) return <DiagnosisHeader priority={pathname === "/admin/login"} />;
   return <RealEstateHeader showMemberState={showPropertyMemberState} />;

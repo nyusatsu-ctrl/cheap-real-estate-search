@@ -24,9 +24,34 @@ function resolveRedirectTo(searchParams: AdminLoginSearchParams) {
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<AdminLoginSearchParams> }): Promise<Metadata> {
   const presentation = getAdminLoginPresentation(resolveRedirectTo(await searchParams));
-  return {
+  const baseMetadata: Metadata = {
     title: presentation.metadataTitle,
     description: presentation.metadataDescription
+  };
+  if (presentation.kind !== "contract") return baseMetadata;
+  return {
+    ...baseMetadata,
+    icons: {
+      icon: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }],
+      apple: [{ url: "/brand/ecoloop-logo.png", type: "image/png" }]
+    },
+    openGraph: {
+      title: presentation.metadataTitle,
+      description: presentation.metadataDescription,
+      siteName: "株式会社エコループ｜契約管理システム",
+      images: [{
+        url: "/brand/ecoloop-logo.png",
+        width: 134,
+        height: 80,
+        alt: "株式会社エコループ｜契約管理システム"
+      }]
+    },
+    twitter: {
+      card: "summary",
+      title: presentation.metadataTitle,
+      description: presentation.metadataDescription,
+      images: ["/brand/ecoloop-logo.png"]
+    }
   };
 }
 

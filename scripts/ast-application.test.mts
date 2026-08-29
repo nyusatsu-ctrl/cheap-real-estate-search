@@ -174,8 +174,17 @@ test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ�
   assert.match(output, /ast-print-choice-circle/);
   assert.match(output, /border:\s*\.34mm solid/);
   assert.equal((output.match(/class="ast-print-choice-circle"/g) || []).length, 7, "氏名欄以降の選択グループと保険2件だけを丸で囲む");
-  assert.match(html, /'男': \{ x: 197, y: 1042, width: 50, height: 52/);
+  assert.match(html, /applicantName: \{ x: 323, y: 958, width: 582, height: 74, fontSize: 41/);
+  assert.match(html, /birthYear: \{ x: 625, y: 1064, width: 70, height: 44/);
+  assert.match(html, /postalCode: \{ x: 230, y: 1130, width: 135, height: 43/);
+  assert.match(html, /address: \{ x: 370, y: 1122, width: 675, height: 82, fontSize: 35/);
+  assert.match(html, /workplaceName: \{ x: 360, y: 1416, width: 685, height: 64, fontSize: 37/);
+  assert.match(html, /workPostalCode: \{ x: 400, y: 1500, width: 120, height: 36/);
+  assert.match(html, /workAddress: \{ x: 532, y: 1476, width: 513, height: 72, fontSize: 31/);
+  assert.match(html, /workPhone: \{ x: 330, y: 1572, width: 390, height: 42, fontSize: 29/);
+  assert.match(html, /'男': \{ x: 197, y: 1054, width: 50, height: 52/);
   assert.match(html, /'自己所有': \{ x: 1200, y: 900, width: 110, height: 52/);
+  assert.match(html, /'身内所有': \{ x: 1344, y: 912, width: 115, height: 52/);
   assert.match(html, /'正社員・公務員・役員': \{ x: 1215, y: 1342, width: 265, height: 52/);
   assert.match(html, /'社会保険': \{ x: 1270, y: 1605, width: 150, height: 52/);
   assert.match(output, /data:image\/jpeg;base64,fixture/);

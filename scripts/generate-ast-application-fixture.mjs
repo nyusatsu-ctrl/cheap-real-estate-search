@@ -43,6 +43,7 @@ vm.runInNewContext(script, sandbox, { filename: "AstApplicationEditor.html" });
 
 const dummy = {
   sourceRowKey: "dummy-customer-a",
+  // 原本上段の値は、古い入力値が渡ってもPDFに印字されないことを確認するためのテスト値。
   applicationDate: "2026-08-29",
   applicationRole: "applicant",
   vehicleName: "トヨタ アルファード ハイブリッド",

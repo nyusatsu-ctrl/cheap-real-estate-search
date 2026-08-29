@@ -123,16 +123,12 @@ test("顧客ごとにアスト申込書の自動入力値を作り、推測対�
 
   assert.equal(seedA.sourceRowKey, "row-a");
   assert.equal(seedA.applicantName, "山田 太郎");
-  assert.equal(seedA.vehicleName, "テストカーA");
-  assert.equal(seedA.loanAmountManYen, "120");
   assert.equal(seedA.annualIncomeManYen, "320");
-  assert.equal(seedA.vehicleGrade, "G");
-  assert.equal(seedA.mileageThousandsKm, "", "処分車両の走行距離を購入車両へ流用しない");
-  assert.equal(seedA.salePriceManYen, "", "売買価格を借入額から推測しない");
-  assert.equal(seedA.tradeInPriceManYen, "", "下取価格を推測しない");
+  ["applicationDate", "applicationRole", "vehicleName", "vehicleYear", "vehicleGrade", "vehicleColor", "salesStaff", "loanAmountManYen", "preferredContactDate", "existingLoanLenderCount"].forEach((key) => {
+    assert.equal(key in seedA, false, `原本上段の${key}を自動入力対象にしない`);
+  });
   assert.equal(seedB.sourceRowKey, "row-b");
   assert.equal(seedB.applicantName, "佐藤 花子");
-  assert.equal(seedB.vehicleName, "テストカーB");
   assert.notEqual(seedA.applicantName, seedB.applicantName, "顧客Aの氏名が顧客Bへ混入しない");
 });
 
@@ -144,9 +140,11 @@ test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ�
   assert.match(html, />PDF作成</);
 
   const output = sandbox.buildAstPrintHtml({
+    vehicleName: "上段印字禁止車両",
+    sellerName: "上段印字禁止販売店",
+    loanAmountManYen: "9876543",
     applicantName: "編集後のとても長い申込者氏名テスト",
     address: "熊本県熊本市東区とても長い住所一丁目二番三号テストマンション101号室",
-    loanAmountManYen: "150",
     annualIncomeManYen: "320",
     inspectionStatus: "yes",
     tradeInStatus: "yes",
@@ -163,13 +161,14 @@ test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ�
 
   assert.match(output, /@page \{ size: 515\.905pt 728\.504pt; margin: 0; \}/);
   assert.match(output, /編集後のとても長い申込者氏名テスト/);
-  assert.match(output, /150/);
   assert.match(output, /320/);
+  assert.doesNotMatch(output, /上段印字禁止車両|上段印字禁止販売店|9876543/);
   assert.doesNotMatch(output, />✓</);
   assert.match(output, /ast-print-choice-circle/);
   assert.match(output, /border:\s*\.34mm solid/);
-  assert.equal((output.match(/class="ast-print-choice-circle"/g) || []).length, 12, "原本の全選択グループと保険2件をそれぞれ丸で囲む");
+  assert.equal((output.match(/class="ast-print-choice-circle"/g) || []).length, 7, "氏名欄以降の選択グループと保険2件だけを丸で囲む");
   assert.match(output, /data:image\/jpeg;base64,fixture/);
+  assert.doesNotMatch(html, /車両・販売店情報|借入情報|既往借入・他社借入/);
   assert.doesNotMatch(html, /印字位置調整|微調整モード/);
   assert.match(html, /加入保険（複数選択可）/);
   assert.match(html, /type="checkbox"/);
@@ -179,6 +178,8 @@ test("未入力・電話・郵便番号・生年月日・金額を警告する�
   const { sandbox, html } = await loadAstClient();
   const warnings = sandbox.validateAstApplication({
     applicationDate: "",
+    vehicleName: "",
+    loanAmountManYen: "12万円x",
     applicantName: "",
     postalCode: "123",
     mobilePhone: "09012",
@@ -186,13 +187,14 @@ test("未入力・電話・郵便番号・生年月日・金額を警告する�
     birthYear: "40",
     birthMonth: "13",
     birthDay: "40",
-    loanAmountManYen: "12万円x",
+    annualIncomeManYen: "320万円x",
   });
-  assert.ok(warnings.some((warning: string) => warning.includes("申込日")));
+  assert.ok(warnings.some((warning: string) => warning.includes("申込者氏名")));
   assert.ok(warnings.some((warning: string) => warning.includes("郵便番号")));
   assert.ok(warnings.some((warning: string) => warning.includes("携帯電話")));
   assert.ok(warnings.some((warning: string) => warning.includes("生年月日")));
-  assert.ok(warnings.some((warning: string) => warning.includes("借入申込金額")));
+  assert.ok(warnings.some((warning: string) => warning.includes("年収")));
+  assert.ok(!warnings.some((warning: string) => /申込日|車種名|借入申込金額/.test(warning)));
   assert.match(html, /このままPDF作成へ進みますか/);
 });
 
@@ -210,19 +212,18 @@ test("顧客情報保存は明示的なONが必須で、許可列だけを更新
   const { sandbox, source } = await loadAstServer({
     LockService: { getScriptLock: () => lock },
     getMainSheet_: () => sheet,
-    getHeaderMap_: () => ({ お名前: 1, 電話番号: 2, 審査申込金額: 3, 対応状況: 4, アスト審査結果: 5 }),
+    getHeaderMap_: () => ({ お名前: 1, 電話番号: 2, 審査申込金額: 3, '希望車種(希望車種)': 4, 対応状況: 5, アスト審査結果: 6 }),
     getManagementColumnMap_: () => ({ 担当者: 6 }),
     findCurrentRowNumber_: () => 7,
   });
-  const form = { sourceRowKey: "row-a", applicantName: "編集後氏名", mobilePhone: "090-1234-5678", loanAmountManYen: "150", salesStaff: "高山" };
+  const form = { sourceRowKey: "row-a", applicantName: "編集後氏名", mobilePhone: "090-1234-5678", loanAmountManYen: "150", salesStaff: "高山", vehicleName: "保存禁止車両" };
 
   assert.throws(() => sandbox.saveAstApplicationCustomerFields({ rowKey: "row-a", saveToCustomer: false, form }));
   assert.equal(writes.length, 0, "保存OFFでは既存顧客情報を変更しない");
 
   sandbox.saveAstApplicationCustomerFields({ rowKey: "row-a", rowNumber: 7, saveToCustomer: true, form });
-  assert.deepEqual(writes.map((item) => item.column).sort((a, b) => a - b), [1, 2, 3, 6]);
-  assert.equal(writes.find((item) => item.column === 3)?.value, 1500000);
-  assert.ok(!writes.some((item) => item.column === 4 || item.column === 5), "対応状況・アスト審査結果を変更しない");
+  assert.deepEqual(writes.map((item) => item.column).sort((a, b) => a - b), [1, 2]);
+  assert.ok(!writes.some((item) => item.column >= 3), "上段項目、対応状況、アスト審査結果を変更しない");
   assert.doesNotMatch(source, /GmailApp|MailApp|UrlFetchApp.*FAX|sales_econtracts|署名証跡/);
 });
 

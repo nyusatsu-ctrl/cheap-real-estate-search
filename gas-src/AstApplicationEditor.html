@@ -182,7 +182,7 @@
     </div>
     <div class="ast-editor-body">
       <div class="ast-editor-notice">
-        顧客管理から自動入力した内容も含め、すべての入力値をこの画面で修正できます。空欄は推測せず、そのまま表示しています。ここからアストへの送信・FAX・メール送信は行いません。
+        申込者本人の氏名欄から下だけを自動記入します。顧客管理から自動入力した内容も含め、表示されたすべての入力値を修正できます。原本上段は空欄のままです。値がない項目は推測しません。ここからアストへの送信・FAX・メール送信は行いません。
       </div>
       <div id="astApplicationValidation" class="ast-validation" role="alert"></div>
       <form id="astApplicationForm" novalidate></form>
@@ -205,47 +205,9 @@
 <script>
   // 株式会社アストから事前に運用許可を得た、正式運用対象の機械印字・自動転記機能。
   // アストへの申込送信、FAX送信、メール送信はこの機能では行わない。
-  const AST_FIXED_DEFAULTS = Object.freeze({
-    sellerName: '株式会社エコループ',
-    sellerAddress: '熊本県熊本市東区長嶺東5丁目8-8',
-    sellerPhone: '096-201-7191'
-  });
-
+  // 機械印字は申込者本人の氏名欄以降だけを対象とする。
+  // 車両、販売店、申込条件、現在借入など原本上段は編集・印字せず空欄のままにする。
   const AST_EDITOR_SECTIONS = [
-    {
-      title: '車両・販売店情報',
-      fields: [
-        { name: 'applicationDate', label: '申込日', type: 'date' },
-        { name: 'applicationRole', label: '申込区分', type: 'select', options: [['', '未選択'], ['applicant', '申込者'], ['guarantor', '保証人予定者']] },
-        { name: 'vehicleName', label: '車種名', span: 2 },
-        { name: 'vehicleYear', label: '年式' },
-        { name: 'vehicleGrade', label: 'グレード' },
-        { name: 'vehicleModelCode', label: '型式' },
-        { name: 'chassisNumber', label: '車台番号' },
-        { name: 'vehicleColor', label: '色' },
-        { name: 'mileageThousandsKm', label: '走行距離（千km）', inputmode: 'decimal' },
-        { name: 'inspectionStatus', label: '車検', type: 'select', options: [['', '未選択'], ['none', '無'], ['yes', '有']] },
-        { name: 'inspectionYear', label: '車検満了年' },
-        { name: 'inspectionMonth', label: '車検満了月', inputmode: 'numeric' },
-        { name: 'tradeInStatus', label: '下取車', type: 'select', options: [['', '未選択'], ['none', '無'], ['yes', '有']] },
-        { name: 'tradeInPriceManYen', label: '下取車価格（万円）', inputmode: 'decimal' },
-        { name: 'salePriceManYen', label: '売買価格（万円）', inputmode: 'decimal', help: '下取車差引・諸費用込み。借入申込金額とは別欄です。' },
-        { name: 'purchaseMethod', label: '購入方法', type: 'select', options: [['', '未選択'], ['display', '展示品'], ['auction', 'オークション'], ['otherShop', '他店展示品']] },
-        { name: 'sellerName', label: '販売店名', span: 2 },
-        { name: 'sellerAddress', label: '販売店住所', span: 2 },
-        { name: 'sellerPhone', label: '販売店電話番号' },
-        { name: 'salesStaff', label: '担当者' }
-      ]
-    },
-    {
-      title: '借入情報',
-      fields: [
-        { name: 'loanAmountManYen', label: '借入申込金額（万円）', inputmode: 'decimal', help: '顧客管理の「審査申込金額」から自動換算します。' },
-        { name: 'preferredContactDate', label: '希望連絡日', type: 'date' },
-        { name: 'preferredContactPeriod', label: '希望連絡時間帯', type: 'select', options: [['', '未選択'], ['AM', 'AM'], ['PM', 'PM']] },
-        { name: 'preferredContactTime', label: '希望連絡時刻', type: 'time' }
-      ]
-    },
     {
       title: '申込者情報',
       fields: [
@@ -305,46 +267,12 @@
         { name: 'capitalMillionYen', label: '資本金（百万円）', inputmode: 'decimal' },
         { name: 'insuranceType', label: '加入保険（複数選択可）', type: 'multiselect', span: 2, options: [['社会保険', '社会保険'], ['国民健康保険', '国民健康保険'], ['共済・組合保険', '共済・組合保険'], ['船員保険', '船員保険'], ['その他', 'その他'], ['なし', 'なし']] }
       ]
-    },
-    {
-      title: '既往借入・他社借入',
-      fields: [
-        { name: 'existingLoanLenderCount', label: '貸金業者（件）', inputmode: 'numeric' },
-        { name: 'existingLoanLenderAmountManYen', label: '貸金業者（万円）', inputmode: 'decimal' },
-        { name: 'existingLoanBankCount', label: '銀行等（件）', inputmode: 'numeric' },
-        { name: 'existingLoanBankAmountManYen', label: '銀行等（万円）', inputmode: 'decimal' }
-      ]
     }
   ];
 
   const AST_PRINT_CONFIG = {
     page: { dpi: 300, widthPx: 2150, heightPx: 3035 },
     fields: {
-      vehicleName: { x: 135, y: 150, width: 465, height: 60, fontSize: 32 },
-      vehicleYear: { x: 615, y: 150, width: 275, height: 60, fontSize: 30, align: 'center' },
-      vehicleGrade: { x: 905, y: 150, width: 290, height: 60, fontSize: 30, align: 'center' },
-      vehicleModelCode: { x: 135, y: 250, width: 350, height: 65, fontSize: 30 },
-      chassisNumber: { x: 500, y: 250, width: 505, height: 65, fontSize: 30 },
-      vehicleColor: { x: 1015, y: 250, width: 180, height: 65, fontSize: 29, align: 'center' },
-      mileageThousandsKm: { x: 135, y: 350, width: 145, height: 58, fontSize: 28, align: 'right' },
-      inspectionYear: { x: 500, y: 350, width: 82, height: 58, fontSize: 26, align: 'center' },
-      inspectionMonth: { x: 650, y: 350, width: 42, height: 58, fontSize: 24, align: 'center' },
-      tradeInPriceManYen: { x: 1000, y: 350, width: 135, height: 58, fontSize: 28, align: 'right' },
-      salePriceManYen: { x: 145, y: 450, width: 420, height: 50, fontSize: 33, align: 'right' },
-      sellerName: { x: 1270, y: 205, width: 690, height: 50, fontSize: 35, align: 'center' },
-      sellerAddress: { x: 1270, y: 270, width: 690, height: 80, fontSize: 28, align: 'center', multiline: true },
-      sellerPhone: { x: 1270, y: 365, width: 690, height: 45, fontSize: 29, align: 'center' },
-      salesStaff: { x: 1740, y: 455, width: 190, height: 42, fontSize: 27, align: 'center' },
-      applicationYear: { x: 315, y: 755, width: 45, height: 45, fontSize: 25, align: 'center' },
-      applicationMonth: { x: 445, y: 755, width: 65, height: 45, fontSize: 31, align: 'center' },
-      applicationDay: { x: 570, y: 755, width: 65, height: 45, fontSize: 31, align: 'center' },
-      preferredContactDay: { x: 835, y: 785, width: 55, height: 40, fontSize: 28, align: 'center' },
-      preferredContactTime: { x: 955, y: 785, width: 100, height: 40, fontSize: 27, align: 'center' },
-      loanAmountManYen: { x: 1190, y: 755, width: 220, height: 55, fontSize: 36, align: 'right' },
-      existingLoanLenderCount: { x: 1695, y: 720, width: 75, height: 42, fontSize: 28, align: 'center' },
-      existingLoanLenderAmountManYen: { x: 1765, y: 720, width: 105, height: 42, fontSize: 26, align: 'right' },
-      existingLoanBankCount: { x: 1695, y: 785, width: 75, height: 42, fontSize: 28, align: 'center' },
-      existingLoanBankAmountManYen: { x: 1765, y: 785, width: 105, height: 42, fontSize: 26, align: 'right' },
       applicantKana: { x: 250, y: 910, width: 655, height: 36, fontSize: 24 },
       applicantName: { x: 170, y: 955, width: 735, height: 78, fontSize: 41 },
       birthYear: { x: 625, y: 1050, width: 70, height: 42, fontSize: 29, align: 'center' },
@@ -381,27 +309,6 @@
       capitalMillionYen: { x: 1810, y: 1555, width: 140, height: 40, fontSize: 27, align: 'right' }
     },
     choices: {
-      inspectionStatus: {
-        none: { x: 370, y: 340, width: 75, height: 70, rotate: -4 },
-        yes: { x: 445, y: 340, width: 75, height: 70, rotate: 3 }
-      },
-      tradeInStatus: {
-        none: { x: 780, y: 340, width: 85, height: 70, rotate: -3 },
-        yes: { x: 865, y: 340, width: 85, height: 70, rotate: 3 }
-      },
-      purchaseMethod: {
-        display: { x: 685, y: 430, width: 145, height: 70, rotate: -2 },
-        auction: { x: 820, y: 430, width: 225, height: 70, rotate: 2 },
-        otherShop: { x: 995, y: 430, width: 230, height: 70, rotate: -2 }
-      },
-      applicationRole: {
-        applicant: { x: 705, y: 710, width: 125, height: 65, rotate: -3 },
-        guarantor: { x: 675, y: 780, width: 170, height: 65, rotate: 2 }
-      },
-      preferredContactPeriod: {
-        AM: { x: 925, y: 755, width: 75, height: 44, rotate: -3 },
-        PM: { x: 925, y: 800, width: 75, height: 44, rotate: 2 }
-      },
       gender: {
         '男': { x: 185, y: 1035, width: 75, height: 65, rotate: -4 },
         '女': { x: 270, y: 1035, width: 75, height: 65, rotate: 3 }
@@ -510,30 +417,6 @@
     const calculatedAge = birth.gregorianYear ? calculateAstAge(birth.gregorianYear, birth.month, birth.day) : '';
     return {
       sourceRowKey: String(customer.rowKey || ''),
-      applicationDate: astTodayInputValue(),
-      applicationRole: 'applicant',
-      vehicleName: customer.desiredCar || '',
-      vehicleYear: customer.desiredYear || '',
-      vehicleGrade: getApplicationFieldValue(customer, 'グレード(希望車種)') || '',
-      vehicleModelCode: '',
-      chassisNumber: '',
-      vehicleColor: getApplicationFieldValue(customer, '色(希望車種)') || '',
-      mileageThousandsKm: '',
-      inspectionStatus: '',
-      inspectionYear: '',
-      inspectionMonth: '',
-      tradeInStatus: '',
-      tradeInPriceManYen: '',
-      salePriceManYen: '',
-      purchaseMethod: '',
-      sellerName: AST_FIXED_DEFAULTS.sellerName,
-      sellerAddress: AST_FIXED_DEFAULTS.sellerAddress,
-      sellerPhone: AST_FIXED_DEFAULTS.sellerPhone,
-      salesStaff: customer.assignee || '',
-      loanAmountManYen: astAmountToManYen(customer.applicationAmount, true),
-      preferredContactDate: '',
-      preferredContactPeriod: '',
-      preferredContactTime: '',
       applicantKana: customer.kana || '',
       applicantName: customer.name || '',
       gender: normalizeAstGender(getApplicationFieldValue(customer, '性別')),
@@ -573,11 +456,7 @@
       employmentMonths: employment.months,
       employeeCount: astDigitsOnly(getApplicationFieldValue(customer, '従業員数')),
       capitalMillionYen: '',
-      insuranceType: normalizeAstInsurance(getApplicationFieldValue(customer, '保険証の種類')),
-      existingLoanLenderCount: '',
-      existingLoanLenderAmountManYen: '',
-      existingLoanBankCount: '',
-      existingLoanBankAmountManYen: ''
+      insuranceType: normalizeAstInsurance(getApplicationFieldValue(customer, '保険証の種類'))
     };
   }
 
@@ -746,21 +625,13 @@
   }
 
   function buildAstPrintValues(form) {
-    const application = parseAstDateInput(form.applicationDate);
-    const contact = parseAstDateInput(form.preferredContactDate);
     return Object.assign({}, form, {
-      applicationYear: application.year ? String(application.year).slice(-2) : '',
-      applicationMonth: application.month,
-      applicationDay: application.day,
-      preferredContactDay: contact.day,
-      preferredContactTime: form.preferredContactTime || '',
       postalCode: formatAstPostalCode(form.postalCode),
       workPostalCode: formatAstPostalCode(form.workPostalCode),
       homePhone: formatPrintPhone(form.homePhone || ''),
       mobilePhone: formatPrintPhone(form.mobilePhone || ''),
       emergencyPhone: formatPrintPhone(form.emergencyPhone || ''),
       workPhone: formatPrintPhone(form.workPhone || ''),
-      sellerPhone: formatPrintPhone(form.sellerPhone || ''),
       age: astDigitsOnly(form.age),
       birthYear: astDigitsOnly(form.birthYear),
       birthMonth: astDigitsOnly(form.birthMonth),
@@ -772,14 +643,9 @@
       childrenCount: astDigitsOnly(form.childrenCount),
       parentsSiblingsCount: astDigitsOnly(form.parentsSiblingsCount),
       employeeCount: astDigitsOnly(form.employeeCount),
-      loanAmountManYen: astNumericText(form.loanAmountManYen),
-      tradeInPriceManYen: astNumericText(form.tradeInPriceManYen),
-      salePriceManYen: astNumericText(form.salePriceManYen),
       annualIncomeManYen: astNumericText(form.annualIncomeManYen),
       monthlyIncomeManYen: astNumericText(form.monthlyIncomeManYen),
-      capitalMillionYen: astNumericText(form.capitalMillionYen),
-      existingLoanLenderAmountManYen: astNumericText(form.existingLoanLenderAmountManYen),
-      existingLoanBankAmountManYen: astNumericText(form.existingLoanBankAmountManYen)
+      capitalMillionYen: astNumericText(form.capitalMillionYen)
     });
   }
 
@@ -803,7 +669,6 @@
   function validateAstApplication(values) {
     const warnings = [];
     const required = [
-      ['applicationDate', '申込日'], ['vehicleName', '車種名'], ['loanAmountManYen', '借入申込金額'],
       ['applicantKana', '申込者フリガナ'], ['applicantName', '申込者氏名'], ['gender', '性別'],
       ['birthEra', '生年月日の元号'], ['birthYear', '生年月日の年'], ['birthMonth', '生年月日の月'], ['birthDay', '生年月日の日'], ['age', '年齢'],
       ['postalCode', '郵便番号'], ['address', '住所'], ['housingType', '居住形態'],
@@ -826,7 +691,7 @@
       const calculatedAge = calculateAstAge(birth.year, birth.month, birth.day);
       if (String(calculatedAge) !== String(Number(astDigitsOnly(values.age)))) warnings.push(`年齢は生年月日から計算すると${calculatedAge}歳です`);
     }
-    [['loanAmountManYen', '借入申込金額'], ['salePriceManYen', '売買価格'], ['tradeInPriceManYen', '下取価格'], ['annualIncomeManYen', '年収']].forEach(([key, label]) => {
+    [['annualIncomeManYen', '年収'], ['monthlyIncomeManYen', '月収'], ['capitalMillionYen', '資本金']].forEach(([key, label]) => {
       const text = String(values[key] || '').replace(/[,万円\s]/g, '');
       if (text && !/^\d+(?:\.\d+)?$/.test(text)) warnings.push(`${label}は数字で入力してください`);
       if (text && text.replace(/\D/g, '').length > 7) warnings.push(`${label}の桁数を確認してください`);
@@ -971,19 +836,6 @@
   function formatAstPostalCode(value) {
     const digits = astDigitsOnly(value);
     return digits.length === 7 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : String(value || '');
-  }
-
-  function parseAstDateInput(value) {
-    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return match ? { year: match[1], month: String(Number(match[2])), day: String(Number(match[3])) } : { year: '', month: '', day: '' };
-  }
-
-  function astTodayInputValue() {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 
   document.getElementById('astApplicationCloseButton').addEventListener('click', closeAstApplicationEditor);

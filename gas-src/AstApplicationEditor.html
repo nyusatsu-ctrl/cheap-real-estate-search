@@ -87,6 +87,26 @@
     font: inherit;
   }
   .ast-field textarea { min-height: 68px; resize: vertical; }
+  .ast-multi-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+    min-height: 41px;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    padding: 8px 10px;
+    background: #fff;
+  }
+  .ast-multi-select label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .ast-multi-select input { width: auto; margin: 0; }
   .ast-field input:focus,
   .ast-field select:focus,
   .ast-field textarea:focus {
@@ -283,7 +303,7 @@
         { name: 'employmentMonths', label: '勤続年数（月）', inputmode: 'numeric' },
         { name: 'employeeCount', label: '従業員数', inputmode: 'numeric' },
         { name: 'capitalMillionYen', label: '資本金（百万円）', inputmode: 'decimal' },
-        { name: 'insuranceType', label: '加入保険', type: 'select', span: 2, options: [['', '未選択'], ['社会保険', '社会保険'], ['国民健康保険', '国民健康保険'], ['共済・組合保険', '共済・組合保険'], ['船員保険', '船員保険'], ['その他', 'その他'], ['なし', 'なし']] }
+        { name: 'insuranceType', label: '加入保険（複数選択可）', type: 'multiselect', span: 2, options: [['社会保険', '社会保険'], ['国民健康保険', '国民健康保険'], ['共済・組合保険', '共済・組合保険'], ['船員保険', '船員保険'], ['その他', 'その他'], ['なし', 'なし']] }
       ]
     },
     {
@@ -361,26 +381,65 @@
       capitalMillionYen: { x: 1810, y: 1555, width: 140, height: 40, fontSize: 27, align: 'right' }
     },
     choices: {
-      inspectionStatus: { none: [285, 375], yes: [344, 375] },
-      tradeInStatus: { none: [787, 375], yes: [849, 375] },
-      purchaseMethod: { display: [615, 470], auction: [750, 470], otherShop: [975, 470] },
-      applicationRole: { applicant: [675, 735], guarantor: [675, 800] },
-      preferredContactPeriod: { AM: [900, 765], PM: [900, 810] },
-      gender: { '男': [145, 1070], '女': [225, 1070] },
-      birthEra: { '昭和': [455, 1070], '平成': [545, 1070] },
-      housingType: {
-        '自己所有': [1165, 930], '身内所有': [1285, 930], '社宅官舎': [1410, 930],
-        '一戸建借家': [1545, 930], '賃貸マンション・アパート': [1720, 930],
-        '公営住宅': [1165, 985], 'その他': [1305, 985]
+      inspectionStatus: {
+        none: { x: 370, y: 340, width: 75, height: 70, rotate: -4 },
+        yes: { x: 445, y: 340, width: 75, height: 70, rotate: 3 }
       },
-      spouseStatus: { '有': [1305, 1070], '無': [1380, 1070] },
+      tradeInStatus: {
+        none: { x: 780, y: 340, width: 85, height: 70, rotate: -3 },
+        yes: { x: 865, y: 340, width: 85, height: 70, rotate: 3 }
+      },
+      purchaseMethod: {
+        display: { x: 685, y: 430, width: 145, height: 70, rotate: -2 },
+        auction: { x: 820, y: 430, width: 225, height: 70, rotate: 2 },
+        otherShop: { x: 995, y: 430, width: 230, height: 70, rotate: -2 }
+      },
+      applicationRole: {
+        applicant: { x: 705, y: 710, width: 125, height: 65, rotate: -3 },
+        guarantor: { x: 675, y: 780, width: 170, height: 65, rotate: 2 }
+      },
+      preferredContactPeriod: {
+        AM: { x: 925, y: 755, width: 75, height: 44, rotate: -3 },
+        PM: { x: 925, y: 800, width: 75, height: 44, rotate: 2 }
+      },
+      gender: {
+        '男': { x: 185, y: 1035, width: 75, height: 65, rotate: -4 },
+        '女': { x: 270, y: 1035, width: 75, height: 65, rotate: 3 }
+      },
+      birthEra: {
+        '昭和': { x: 490, y: 1035, width: 75, height: 65, rotate: -2 },
+        '平成': { x: 570, y: 1035, width: 80, height: 65, rotate: 2 }
+      },
+      housingType: {
+        '自己所有': { x: 1138, y: 895, width: 135, height: 65, rotate: -3 },
+        '身内所有': { x: 1262, y: 895, width: 140, height: 65, rotate: 2 },
+        '社宅官舎': { x: 1388, y: 895, width: 145, height: 65, rotate: -2 },
+        '一戸建借家': { x: 1505, y: 895, width: 165, height: 65, rotate: 2 },
+        '賃貸マンション・アパート': { x: 1725, y: 895, width: 275, height: 65, rotate: -2 },
+        '公営住宅': { x: 1138, y: 955, width: 140, height: 65, rotate: 2 },
+        'その他': { x: 1260, y: 955, width: 340, height: 65, rotate: -2 }
+      },
+      spouseStatus: {
+        '有': { x: 1330, y: 1035, width: 70, height: 65, rotate: -3 },
+        '無': { x: 1400, y: 1035, width: 70, height: 65, rotate: 3 }
+      },
       occupationType: {
-        '正社員・公務員・役員': [1240, 1370], 'パート・アルバイト': [1500, 1370], '有期契約社員': [1775, 1370],
-        '法人経営者': [1240, 1415], '個人事業主': [1500, 1415], '年金': [1650, 1415], '主婦': [1775, 1415], 'その他': [1900, 1415]
+        '正社員・公務員・役員': { x: 1210, y: 1335, width: 285, height: 65, rotate: -2 },
+        'パート・アルバイト': { x: 1470, y: 1335, width: 245, height: 65, rotate: 2 },
+        '有期契約社員': { x: 1735, y: 1335, width: 235, height: 65, rotate: -2 },
+        '法人経営者': { x: 1210, y: 1380, width: 210, height: 65, rotate: 2 },
+        '個人事業主': { x: 1430, y: 1380, width: 220, height: 65, rotate: -2 },
+        '年金': { x: 1630, y: 1380, width: 120, height: 65, rotate: 3 },
+        '主婦': { x: 1750, y: 1380, width: 110, height: 65, rotate: -3 },
+        'その他': { x: 1870, y: 1380, width: 130, height: 65, rotate: 2 }
       },
       insuranceType: {
-        '社会保険': [1260, 1630], '国民健康保険': [1430, 1630], '共済・組合保険': [1630, 1630], '船員保険': [1880, 1630],
-        'その他': [1260, 1665], 'なし': [1430, 1665]
+        '社会保険': { x: 1225, y: 1595, width: 190, height: 65, rotate: -3 },
+        '国民健康保険': { x: 1390, y: 1595, width: 220, height: 65, rotate: 2 },
+        '共済・組合保険': { x: 1590, y: 1595, width: 235, height: 65, rotate: -2 },
+        '船員保険': { x: 1810, y: 1595, width: 190, height: 65, rotate: 3 },
+        'その他': { x: 1225, y: 1640, width: 140, height: 65, rotate: 2 },
+        'なし': { x: 1390, y: 1640, width: 110, height: 65, rotate: -3 }
       }
     }
   };
@@ -432,6 +491,9 @@
     let control = '';
     if (field.type === 'select') {
       control = `<select id="${escapeHtml(controlId)}" name="${escapeHtml(field.name)}">${field.options.map(([optionValue, label]) => `<option value="${escapeHtml(optionValue)}"${String(optionValue) === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>`;
+    } else if (field.type === 'multiselect') {
+      const selectedValues = astSelectedChoiceValues(value);
+      control = `<div id="${escapeHtml(controlId)}" class="ast-multi-select" role="group" aria-label="${escapeHtml(field.label)}">${field.options.map(([optionValue, label]) => `<label><input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(optionValue)}"${selectedValues.indexOf(String(optionValue)) !== -1 ? ' checked' : ''}>${escapeHtml(label)}</label>`).join('')}</div>`;
     } else if (field.type === 'textarea') {
       control = `<textarea id="${escapeHtml(controlId)}" name="${escapeHtml(field.name)}">${escapeHtml(value)}</textarea>`;
     } else {
@@ -522,7 +584,10 @@
   function collectAstApplicationForm() {
     const form = document.getElementById('astApplicationForm');
     const values = {};
-    new FormData(form).forEach((value, key) => { values[key] = String(value).trim(); });
+    new FormData(form).forEach((value, key) => {
+      const text = String(value).trim();
+      values[key] = values[key] ? `${values[key]}、${text}` : text;
+    });
     values.sourceRowKey = astEditorState ? astEditorState.sourceRowKey : '';
     return values;
   }
@@ -631,10 +696,12 @@
       const className = `ast-print-value${field.multiline ? ' multiline' : ''}`;
       return `<div class="${className}" style="left:${pxToMm(field.x)}mm;top:${pxToMm(field.y)}mm;width:${pxToMm(field.width)}mm;height:${pxToMm(field.height)}mm;font-size:${pxToMm(fontSize)}mm;text-align:${field.align || 'left'};justify-content:${field.align === 'center' ? 'center' : field.align === 'right' ? 'flex-end' : 'flex-start'};">${escapeHtml(value)}</div>`;
     }).join('');
-    const choices = Object.keys(AST_PRINT_CONFIG.choices).map((key) => {
-      const selected = AST_PRINT_CONFIG.choices[key][form[key]];
-      if (!selected) return '';
-      return `<span class="ast-print-check" style="left:${pxToMm(selected[0])}mm;top:${pxToMm(selected[1])}mm;">✓</span>`;
+    const choices = Object.keys(AST_PRINT_CONFIG.choices).flatMap((key) => {
+      return astSelectedChoiceValues(form[key]).map((selectedValue) => {
+        const circle = AST_PRINT_CONFIG.choices[key][selectedValue];
+        if (!circle) return '';
+        return `<span class="ast-print-choice-circle" aria-hidden="true" style="left:${pxToMm(circle.x)}mm;top:${pxToMm(circle.y)}mm;width:${pxToMm(circle.width)}mm;height:${pxToMm(circle.height)}mm;--ast-circle-rotate:${Number(circle.rotate || 0)}deg;"></span>`;
+      });
     }).join('');
     const warningText = warnings.length ? `未入力・要確認 ${warnings.length}件` : '入力チェック済み';
     const autoPrintHandler = autoPrint ? 'setTimeout(function(){window.print();},450)' : '';
@@ -654,7 +721,8 @@
             .ast-sheet > img { position: absolute; inset: 0; width: 515.905pt; height: 728.504pt; z-index: 1; }
             .ast-print-value { position: absolute; z-index: 2; box-sizing: border-box; display: flex; align-items: center; overflow: hidden; color: #050505; font-weight: 600; line-height: 1.08; white-space: nowrap; letter-spacing: 0; }
             .ast-print-value.multiline { white-space: pre-wrap; word-break: break-all; align-content: center; }
-            .ast-print-check { position: absolute; z-index: 3; color: #000; font-size: 2.2mm; line-height: 1; font-weight: 900; transform: translate(-45%, -30%); }
+            .ast-print-choice-circle { position: absolute; z-index: 3; box-sizing: border-box; border: .34mm solid rgba(0,0,0,.82); border-radius: 52% 48% 50% 46% / 48% 53% 47% 52%; transform: rotate(var(--ast-circle-rotate)); transform-origin: center; pointer-events: none; }
+            .ast-print-choice-circle::after { content: ''; position: absolute; inset: -.22mm -.10mm -.18mm -.16mm; border: .11mm solid rgba(0,0,0,.35); border-radius: 48% 52% 46% 54% / 53% 47% 52% 48%; transform: rotate(2deg); }
             @media print {
               html, body { width: 515.905pt; height: 728.504pt; background: #fff; }
               .ast-print-toolbar { display: none; }
@@ -713,6 +781,13 @@
       existingLoanLenderAmountManYen: astNumericText(form.existingLoanLenderAmountManYen),
       existingLoanBankAmountManYen: astNumericText(form.existingLoanBankAmountManYen)
     });
+  }
+
+  function astSelectedChoiceValues(value) {
+    return Array.from(new Set(String(value || '')
+      .split(/[、,|\n]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)));
   }
 
   function fitAstPrintFont(value, field) {
@@ -865,12 +940,14 @@
 
   function normalizeAstInsurance(value) {
     const text = String(value || '').trim();
-    if (/社会保険/.test(text)) return '社会保険';
-    if (/国民健康保険|国保/.test(text)) return '国民健康保険';
-    if (/(共済|組合保険)/.test(text)) return '共済・組合保険';
-    if (/船員保険/.test(text)) return '船員保険';
-    if (/^(なし|無)$/.test(text)) return 'なし';
-    return text ? 'その他' : '';
+    const selected = [];
+    if (/社会保険/.test(text)) selected.push('社会保険');
+    if (/国民健康保険|国保/.test(text)) selected.push('国民健康保険');
+    if (/(共済|組合保険)/.test(text)) selected.push('共済・組合保険');
+    if (/船員保険/.test(text)) selected.push('船員保険');
+    if (/^(なし|無)$/.test(text)) selected.push('なし');
+    if (!selected.length && text) selected.push('その他');
+    return Array.from(new Set(selected)).join('、');
   }
 
   function astAmountToManYen(value, sourceIsYen) {

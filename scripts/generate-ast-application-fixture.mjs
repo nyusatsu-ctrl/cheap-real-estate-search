@@ -106,7 +106,7 @@ const dummy = {
   employmentMonths: "4",
   employeeCount: "128",
   capitalMillionYen: "50",
-  insuranceType: "社会保険",
+  insuranceType: "社会保険、共済・組合保険",
   existingLoanLenderCount: "1",
   existingLoanLenderAmountManYen: "30",
   existingLoanBankCount: "2",

@@ -8,6 +8,12 @@ var WEBAPP_ALLOWED_USERS = [
   'ecoloop8682@gmail.com'
 ];
 var MARKET_ADMIN_PASSCODE_PROPERTY_KEY = 'MARKET_ADMIN_PASSCODE';
+// 信販会社から得た運用許可に基づくサーバー側の最終ガード。
+// アストは機械印字を正式運用し、プレミアは書面による再許可と変更承認があるまで禁止する。
+var APPLICATION_FORM_MACHINE_PRINT_POLICY = {
+  ast: true,
+  premium: false
+};
 
 function doGet(e) {
   var activeUserEmail = String(Session.getActiveUser().getEmail() || '').toLowerCase();
@@ -134,10 +140,16 @@ function backfillAddressKanaFromWeb() {
 }
 
 function getPremiumTemplateDataUrl() {
+  if (!APPLICATION_FORM_MACHINE_PRINT_POLICY.premium) {
+    throw new Error('プレミア申込書は手書き運用です。機械印字・自動印刷は利用できません。');
+  }
   return HtmlService.createHtmlOutputFromFile('PremiumPrintTemplate').getContent();
 }
 
 function getAstTemplateDataUrl() {
+  if (!APPLICATION_FORM_MACHINE_PRINT_POLICY.ast) {
+    throw new Error('アスト申込書の機械印字は現在利用できません。');
+  }
   return HtmlService.createHtmlOutputFromFile('AstApplicationTemplate').getContent();
 }
 

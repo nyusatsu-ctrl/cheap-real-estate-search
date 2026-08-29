@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { assertSupportedCompany, readLoanFormConfig } from "@/lib/loan-forms/config";
+import { getLoanFormMachinePrintingPolicy } from "@/lib/loan-forms/policy";
 import { createLoanFormPdf } from "@/lib/loan-forms/pdf";
 import type { LoanFormInput } from "@/lib/loan-forms/types";
 
@@ -19,6 +20,13 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest, { params }: { params: Promise<{ company: string }> }) {
   const { company } = await params;
   assertSupportedCompany(company);
+  const policy = getLoanFormMachinePrintingPolicy(company);
+  if (!policy.allowed) {
+    return Response.json(
+      { message: policy.message },
+      { status: 403, headers: { ...corsHeaders, "Cache-Control": "no-store" } }
+    );
+  }
 
   const body = (await request.json()) as Partial<LoanFormInput>;
   const config = await readLoanFormConfig(company);

@@ -1,5 +1,8 @@
 "use client";
 
+// 過去の座標設定を参照できるよう保持しているが、プレミアの機械印字は許可されていない。
+// 書面による再許可と社内の変更承認なしに、このコンポーネントをページから再利用しない。
+
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { loanFormFieldOrder, type LoanFormConfig, type LoanFormFieldKey } from "@/lib/loan-forms/types";
 

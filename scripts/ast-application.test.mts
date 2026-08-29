@@ -148,18 +148,31 @@ test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ�
     address: "熊本県熊本市東区とても長い住所一丁目二番三号テストマンション101号室",
     loanAmountManYen: "150",
     annualIncomeManYen: "320",
+    inspectionStatus: "yes",
+    tradeInStatus: "yes",
+    purchaseMethod: "auction",
+    applicationRole: "applicant",
+    preferredContactPeriod: "PM",
     gender: "女",
+    birthEra: "昭和",
     housingType: "賃貸マンション・アパート",
+    spouseStatus: "有",
     occupationType: "正社員・公務員・役員",
-    insuranceType: "社会保険",
+    insuranceType: "社会保険、共済・組合保険",
   }, "data:image/jpeg;base64,fixture", false, []);
 
   assert.match(output, /@page \{ size: 515\.905pt 728\.504pt; margin: 0; \}/);
   assert.match(output, /編集後のとても長い申込者氏名テスト/);
   assert.match(output, /150/);
   assert.match(output, /320/);
-  assert.match(output, /ast-print-check/);
+  assert.doesNotMatch(output, />✓</);
+  assert.match(output, /ast-print-choice-circle/);
+  assert.match(output, /border:\s*\.34mm solid/);
+  assert.equal((output.match(/class="ast-print-choice-circle"/g) || []).length, 12, "原本の全選択グループと保険2件をそれぞれ丸で囲む");
   assert.match(output, /data:image\/jpeg;base64,fixture/);
+  assert.doesNotMatch(html, /印字位置調整|微調整モード/);
+  assert.match(html, /加入保険（複数選択可）/);
+  assert.match(html, /type="checkbox"/);
 });
 
 test("未入力・電話・郵便番号・生年月日・金額を警告するがPDF作成を禁止しない", async () => {

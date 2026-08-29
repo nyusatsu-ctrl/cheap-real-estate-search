@@ -1,0 +1,235 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import vm from "node:vm";
+
+const root = new URL("../", import.meta.url);
+
+type AstClientSandbox = {
+  buildAstApplicationSeed(customer: unknown): Record<string, string>;
+  buildAstPrintHtml(form: Record<string, string>, templateDataUrl: string, autoPrint: boolean, warnings: string[]): string;
+  validateAstApplication(form: Record<string, string>): string[];
+};
+
+type AstServerSandbox = {
+  saveAstApplicationCustomerFields(payload: Record<string, unknown>): unknown;
+};
+
+async function read(relativePath: string) {
+  return readFile(new URL(relativePath, root), "utf8");
+}
+
+function createElementStub() {
+  return {
+    addEventListener() {},
+    classList: { add() {}, remove() {} },
+    style: {} as Record<string, string>,
+    hidden: true,
+    innerHTML: "",
+    textContent: "",
+    checked: false,
+    disabled: false,
+  };
+}
+
+async function loadAstClient() {
+  const html = await read("gas-src/AstApplicationEditor.html");
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script, "AST editor client script must exist");
+  const elements = new Map<string, ReturnType<typeof createElementStub>>();
+  const getElement = (id: string) => {
+    if (!elements.has(id)) elements.set(id, createElementStub());
+    return elements.get(id)!;
+  };
+  const sandbox = {
+    console,
+    Date,
+    Promise,
+    setTimeout,
+    document: {
+      getElementById: getElement,
+      body: { style: {} as Record<string, string> },
+    },
+    window: { confirm: () => true },
+    state: { selected: null, saving: false },
+    getApplicationFieldValue(customer: { applicationFields?: Array<{ name: string; value: string }> }, name: string) {
+      return customer.applicationFields?.find((field) => field.name === name)?.value || "";
+    },
+    formatPrintPhone(value: string) {
+      const digits = String(value || "").replace(/\D/g, "");
+      if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+      return value;
+    },
+    escapeHtml(value: unknown) {
+      return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    },
+  };
+  vm.runInNewContext(script, sandbox, { filename: "AstApplicationEditor.html" });
+  return { sandbox: sandbox as unknown as AstClientSandbox, html };
+}
+
+async function loadAstServer(overrides: Record<string, unknown> = {}) {
+  const source = await read("gas-src/AstApplication.js");
+  const sandbox = {
+    console,
+    isFinite,
+    normalizePhoneNumber_: (value: string) => String(value || "").replace(/\D/g, ""),
+    ...overrides,
+  };
+  vm.runInNewContext(source, sandbox, { filename: "AstApplication.js" });
+  return { sandbox: sandbox as unknown as AstServerSandbox, source };
+}
+
+test("顧客ごとにアスト申込書の自動入力値を作り、推測対象は空欄にする", async () => {
+  const { sandbox } = await loadAstClient();
+  const fields = (values: Record<string, string>) => Object.entries(values).map(([name, value]) => ({ name, value }));
+  const customerA = {
+    rowKey: "row-a",
+    name: "山田 太郎",
+    kana: "ヤマダ タロウ",
+    phone: "09012345678",
+    address: "熊本県熊本市東区長嶺東1-2-3",
+    birthDate: "昭和55年4月5日",
+    age: "46",
+    workplace: "株式会社テスト",
+    workplaceKana: "カブシキガイシャテスト",
+    workPostalCode: "8600001",
+    workAddress: "熊本県熊本市中央区1-1",
+    workPhone: "0961234567",
+    yearsEmployed: "5年3ヶ月",
+    annualIncome: "320万円",
+    desiredCar: "テストカーA",
+    desiredYear: "2022",
+    applicationAmount: "1200000",
+    assignee: "高山",
+    applicationFields: fields({
+      性別: "男",
+      郵便番号: "8618038",
+      お住まい: "賃貸マンション",
+      "ご家族(配偶者)": "有",
+      "配偶者以外の同居のご家族（子◯人・その他◯人）": "子2人・その他1人",
+      "グレード(希望車種)": "G",
+      "色(希望車種)": "黒",
+      "走行距離(処分・廃車手配車両)": "98000",
+      税込月収: "27万円",
+      職業: "正社員",
+      "保険証の種類": "社会保険",
+    }),
+  };
+  const customerB = { ...customerA, rowKey: "row-b", name: "佐藤 花子", kana: "サトウ ハナコ", desiredCar: "テストカーB" };
+
+  const seedA = sandbox.buildAstApplicationSeed(customerA);
+  const seedB = sandbox.buildAstApplicationSeed(customerB);
+
+  assert.equal(seedA.sourceRowKey, "row-a");
+  assert.equal(seedA.applicantName, "山田 太郎");
+  assert.equal(seedA.vehicleName, "テストカーA");
+  assert.equal(seedA.loanAmountManYen, "120");
+  assert.equal(seedA.annualIncomeManYen, "320");
+  assert.equal(seedA.vehicleGrade, "G");
+  assert.equal(seedA.mileageThousandsKm, "", "処分車両の走行距離を購入車両へ流用しない");
+  assert.equal(seedA.salePriceManYen, "", "売買価格を借入額から推測しない");
+  assert.equal(seedA.tradeInPriceManYen, "", "下取価格を推測しない");
+  assert.equal(seedB.sourceRowKey, "row-b");
+  assert.equal(seedB.applicantName, "佐藤 花子");
+  assert.equal(seedB.vehicleName, "テストカーB");
+  assert.notEqual(seedA.applicantName, seedB.applicantName, "顧客Aの氏名が顧客Bへ混入しない");
+});
+
+test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ反映する", async () => {
+  const { sandbox, html } = await loadAstClient();
+  assert.doesNotMatch(html, /\sreadonly(?:\s|=|>)/i);
+  assert.match(html, /顧客管理の内容に戻す/);
+  assert.match(html, />プレビュー</);
+  assert.match(html, />PDF作成</);
+
+  const output = sandbox.buildAstPrintHtml({
+    applicantName: "編集後のとても長い申込者氏名テスト",
+    address: "熊本県熊本市東区とても長い住所一丁目二番三号テストマンション101号室",
+    loanAmountManYen: "150",
+    annualIncomeManYen: "320",
+    gender: "女",
+    housingType: "賃貸マンション・アパート",
+    occupationType: "正社員・公務員・役員",
+    insuranceType: "社会保険",
+  }, "data:image/jpeg;base64,fixture", false, []);
+
+  assert.match(output, /@page \{ size: 515\.905pt 728\.504pt; margin: 0; \}/);
+  assert.match(output, /編集後のとても長い申込者氏名テスト/);
+  assert.match(output, /150/);
+  assert.match(output, /320/);
+  assert.match(output, /ast-print-check/);
+  assert.match(output, /data:image\/jpeg;base64,fixture/);
+});
+
+test("未入力・電話・郵便番号・生年月日・金額を警告するがPDF作成を禁止しない", async () => {
+  const { sandbox, html } = await loadAstClient();
+  const warnings = sandbox.validateAstApplication({
+    applicationDate: "",
+    applicantName: "",
+    postalCode: "123",
+    mobilePhone: "09012",
+    birthEra: "平成",
+    birthYear: "40",
+    birthMonth: "13",
+    birthDay: "40",
+    loanAmountManYen: "12万円x",
+  });
+  assert.ok(warnings.some((warning: string) => warning.includes("申込日")));
+  assert.ok(warnings.some((warning: string) => warning.includes("郵便番号")));
+  assert.ok(warnings.some((warning: string) => warning.includes("携帯電話")));
+  assert.ok(warnings.some((warning: string) => warning.includes("生年月日")));
+  assert.ok(warnings.some((warning: string) => warning.includes("借入申込金額")));
+  assert.match(html, /このままPDF作成へ進みますか/);
+});
+
+test("顧客情報保存は明示的なONが必須で、許可列だけを更新する", async () => {
+  const writes: Array<{ row: number; column: number; value: unknown }> = [];
+  const sheet = {
+    getRange(row: number, column: number) {
+      return {
+        setNumberFormat() { return this; },
+        setValue(value: unknown) { writes.push({ row, column, value }); return this; },
+      };
+    },
+  };
+  const lock = { tryLock: () => true, releaseLock() {} };
+  const { sandbox, source } = await loadAstServer({
+    LockService: { getScriptLock: () => lock },
+    getMainSheet_: () => sheet,
+    getHeaderMap_: () => ({ お名前: 1, 電話番号: 2, 審査申込金額: 3, 対応状況: 4, アスト審査結果: 5 }),
+    getManagementColumnMap_: () => ({ 担当者: 6 }),
+    findCurrentRowNumber_: () => 7,
+  });
+  const form = { sourceRowKey: "row-a", applicantName: "編集後氏名", mobilePhone: "090-1234-5678", loanAmountManYen: "150", salesStaff: "高山" };
+
+  assert.throws(() => sandbox.saveAstApplicationCustomerFields({ rowKey: "row-a", saveToCustomer: false, form }));
+  assert.equal(writes.length, 0, "保存OFFでは既存顧客情報を変更しない");
+
+  sandbox.saveAstApplicationCustomerFields({ rowKey: "row-a", rowNumber: 7, saveToCustomer: true, form });
+  assert.deepEqual(writes.map((item) => item.column).sort((a, b) => a - b), [1, 2, 3, 6]);
+  assert.equal(writes.find((item) => item.column === 3)?.value, 1500000);
+  assert.ok(!writes.some((item) => item.column === 4 || item.column === 5), "対応状況・アスト審査結果を変更しない");
+  assert.doesNotMatch(source, /GmailApp|MailApp|UrlFetchApp.*FAX|sales_econtracts|署名証跡/);
+});
+
+test("既存プレミア申込書作成機能を維持する", async () => {
+  const [index, webApp, template] = await Promise.all([
+    read("gas-src/Index.html"),
+    read("gas-src/WebApp.js"),
+    read("gas-src/PremiumPrintTemplate.html"),
+  ]);
+  assert.match(index, /id="premiumPdfButton"/);
+  assert.match(index, /function createPremiumApplicationPdf\(\)/);
+  assert.match(index, /function buildPremiumPrintHtml\(/);
+  assert.match(webApp, /function getPremiumTemplateDataUrl\(\)/);
+  assert.match(template, /^data:image\/jpeg;base64,/);
+});
+
+test("公式原本とGAS背景テンプレートをリポジトリ内に保持する", async () => {
+  const template = await read("gas-src/AstApplicationTemplate.html");
+  assert.match(template, /^data:image\/jpeg;base64,/);
+  assert.ok(template.length > 2_000_000, "スキャン原本の背景画像を保持する");
+  const webApp = await read("gas-src/WebApp.js");
+  assert.match(webApp, /function getAstTemplateDataUrl\(\)/);
+});

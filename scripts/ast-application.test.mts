@@ -142,6 +142,9 @@ test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ�
   const output = sandbox.buildAstPrintHtml({
     vehicleName: "上段印字禁止車両",
     sellerName: "上段印字禁止販売店",
+    sellerAddress: "上段印字禁止住所",
+    sellerPhone: "000-0000-0000",
+    salesStaff: "上段印字禁止担当者",
     loanAmountManYen: "9876543",
     applicantName: "編集後のとても長い申込者氏名テスト",
     address: "熊本県熊本市東区とても長い住所一丁目二番三号テストマンション101号室",
@@ -162,11 +165,19 @@ test("編集項目はreadonlyにせず、編集後の値をB5プレビューへ�
   assert.match(output, /@page \{ size: 515\.905pt 728\.504pt; margin: 0; \}/);
   assert.match(output, /編集後のとても長い申込者氏名テスト/);
   assert.match(output, /320/);
-  assert.doesNotMatch(output, /上段印字禁止車両|上段印字禁止販売店|9876543/);
+  assert.match(output, /株式会社エコループ/);
+  assert.match(output, /熊本県熊本市東区長嶺東5丁目8-8/);
+  assert.match(output, /096-201-7191/);
+  assert.match(output, />高山<\/div>/);
+  assert.doesNotMatch(output, /上段印字禁止車両|上段印字禁止販売店|上段印字禁止住所|000-0000-0000|上段印字禁止担当者|9876543/);
   assert.doesNotMatch(output, />✓</);
   assert.match(output, /ast-print-choice-circle/);
   assert.match(output, /border:\s*\.34mm solid/);
   assert.equal((output.match(/class="ast-print-choice-circle"/g) || []).length, 7, "氏名欄以降の選択グループと保険2件だけを丸で囲む");
+  assert.match(html, /'男': \{ x: 197, y: 1042, width: 50, height: 52/);
+  assert.match(html, /'自己所有': \{ x: 1200, y: 900, width: 110, height: 52/);
+  assert.match(html, /'正社員・公務員・役員': \{ x: 1215, y: 1342, width: 265, height: 52/);
+  assert.match(html, /'社会保険': \{ x: 1270, y: 1605, width: 150, height: 52/);
   assert.match(output, /data:image\/jpeg;base64,fixture/);
   assert.doesNotMatch(html, /車両・販売店情報|借入情報|既往借入・他社借入/);
   assert.doesNotMatch(html, /印字位置調整|微調整モード/);

@@ -18,6 +18,7 @@ import {
   ECONTRACT_IMPORTANT_ITEMS,
   buildEcontractDocument
 } from "../lib/econtracts/templates.ts";
+import { buildEcontractLinkEmailContent } from "../lib/econtracts/email-content.ts";
 import {
   ECONTRACT_REQUIRED_CONFIG_KEYS,
   canIssueLoanEcontract,
@@ -236,6 +237,60 @@ test("new operations issue one kind only, block signed reissue and revalidate re
   assert.match(card, /電子契約をメール送信/);
   assert.doesNotMatch(card, /第1契約|第2契約|issueVehicleConfirmation/);
   assert.match(card, /過去の電子契約証跡/);
+});
+
+test("administrator test delivery reuses the formal email and contract content", () => {
+  const shared = {
+    customerName: customer.name,
+    documentTitle: ECONTRACT_DOCUMENT_TITLE,
+    managementNumber: "TEST-PREVIEW-APPLICATION-1"
+  };
+  const customerDelivery = buildEcontractLinkEmailContent({
+    ...shared,
+    signingUrl: "https://contracts.example.com/econtracts/customer-token"
+  });
+  const administratorDelivery = buildEcontractLinkEmailContent({
+    ...shared,
+    signingUrl: "https://contracts.example.com/admin/econtracts/test-preview/contract-1"
+  });
+
+  assert.equal(administratorDelivery.subject, customerDelivery.subject);
+  assert.equal(administratorDelivery.subject, `【株式会社エコループ】${ECONTRACT_DOCUMENT_TITLE}のご確認`);
+  assert.equal(
+    administratorDelivery.text.replace(administratorDelivery.text.match(/https:\/\/[^\s]+/)?.[0] ?? "", "URL"),
+    customerDelivery.text.replace(customerDelivery.text.match(/https:\/\/[^\s]+/)?.[0] ?? "", "URL")
+  );
+  assert.match(administratorDelivery.html, /admin\/econtracts\/test-preview\/contract-1/);
+});
+
+test("administrator test send is read-only and cannot create formal evidence or change customer status", async () => {
+  const [testAction, previewLoader, previewPage, card, email] = await Promise.all([
+    readFile(new URL("../app/admin/sales-contracts/econtract-test-actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/econtracts/test-preview.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/econtracts/test-preview/[contractId]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/econtracts/EcontractAdminCard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/econtracts/email.ts", import.meta.url), "utf8")
+  ]);
+
+  assert.match(testAction, /await requireAdmin\(\)/);
+  assert.match(testAction, /loadEcontractTestPreview\(contractId\)/);
+  assert.match(testAction, /isAuthorizedAdminTestRecipient\(testRecipient, admin\)/);
+  assert.match(testAction, /testRecipient === preview\.customer\.email/);
+  assert.match(testAction, /sendEcontractTestPreviewEmail\(\{\s*testRecipient,/);
+  assert.match(email, /sendEcontractTestPreviewEmail[\s\S]*to: input\.testRecipient[\s\S]*buildEcontractLinkEmailContent\(input\)/);
+
+  for (const source of [testAction, previewLoader]) {
+    assert.doesNotMatch(source, /sales_econtracts|sales_econtract_access_sessions|sales_econtract_verifications|sales_econtract_events/);
+    assert.doesNotMatch(source, /\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.rpc\(/);
+  }
+  assert.match(previewLoader, /\.from\("sales_contracts"\)[\s\S]*\.select\("\*"\)/);
+  assert.match(previewLoader, /canIssueLoanEcontract/);
+  assert.match(previewPage, /テストプレビュー・契約は成立しません/g);
+  assert.match(previewPage, /preview\.document\.importantItems\.map/);
+  assert.doesNotMatch(previewPage, /EcontractSigningForm|sendEcontractOtpAction|verifyEcontractOtpAction|signEcontractAction/);
+  assert.match(card, /電子契約をメール送信/);
+  assert.match(card, /管理者へテスト送信/g);
+  assert.match(card, /sendAdminEcontractTestEmailAction/);
 });
 
 test("OTP verification and all-consent checks still gate signing", async () => {

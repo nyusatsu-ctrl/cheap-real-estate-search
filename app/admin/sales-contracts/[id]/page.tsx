@@ -74,7 +74,7 @@ export default async function SalesContractDetailPage({
       {econtractMessage ? <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{econtractMessage}</div> : null}
       <div className="space-y-6">
         <SalesContractDetail detail={result.data} hideAction={hideTestSalesContractAction} showCreatedActions={created} />
-        <EcontractAdminCard detail={result.data} summary={econtractSummary} />
+        <EcontractAdminCard detail={result.data} summary={econtractSummary} adminEmail={admin.email} />
         {result.data.contract.contract_type === "lease" ? (
           <LeaseMaturityCard detail={result.data} action={upsertLeaseMaturityAction} historyAction={addLeaseMaturityHistoryAction} />
         ) : null}

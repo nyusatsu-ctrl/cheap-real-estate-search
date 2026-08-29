@@ -4,6 +4,7 @@ import {
   issueEcontractAction,
   resendEcontractAction
 } from "@/app/admin/sales-contracts/econtract-actions";
+import { sendAdminEcontractTestEmailAction } from "@/app/admin/sales-contracts/econtract-test-actions";
 import { getLatestEcontract } from "@/lib/econtracts/data";
 import {
   canIssueLoanEcontract,
@@ -13,7 +14,15 @@ import {
 import type { AdminEcontractSummary, SalesEcontract } from "@/lib/econtracts/types";
 import type { SalesContractDetail } from "@/lib/sales-contracts/types";
 
-export function EcontractAdminCard({ detail, summary }: { detail: SalesContractDetail; summary: AdminEcontractSummary }) {
+export function EcontractAdminCard({
+  detail,
+  summary,
+  adminEmail
+}: {
+  detail: SalesContractDetail;
+  summary: AdminEcontractSummary;
+  adminEmail: string;
+}) {
   const current = getLatestEcontract(summary.contracts, "purchase_intent");
   const legacyContracts = summary.contracts.filter((contract) => contract.contract_kind === "vehicle_confirmation");
   const hasSigned = summary.contracts.some((contract) => contract.contract_kind === "purchase_intent" && contract.status === "signed");
@@ -78,6 +87,49 @@ export function EcontractAdminCard({ detail, summary }: { detail: SalesContractD
               {current ? <ContractActions contract={current} contractId={detail.contract.id} /> : null}
             </div>
           </div>
+
+          {eligible ? (
+            <section aria-labelledby="econtract-test-send-title" className="rounded-lg border-2 border-violet-300 bg-violet-50 p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black text-violet-700">管理者専用・正式送信とは別機能</p>
+                  <h3 id="econtract-test-send-title" className="mt-1 text-lg font-black text-violet-950">管理者へテスト送信</h3>
+                  <p className="mt-2 text-sm font-bold leading-6 text-violet-900">
+                    実際のメール文面と契約内容を管理者だけで確認します。顧客メール、正式契約、電子契約ステータス、OTP・署名証跡は変更しません。
+                  </p>
+                </div>
+                <Link
+                  href={`/admin/econtracts/test-preview/${detail.contract.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border border-violet-300 bg-white px-3 py-2 text-xs font-black text-violet-800 focus-ring"
+                >
+                  テストプレビューだけ開く
+                </Link>
+              </div>
+              <form action={sendAdminEcontractTestEmailAction} className="mt-4 grid gap-3">
+                <input type="hidden" name="contract_id" value={detail.contract.id} />
+                <label className="grid gap-1 text-sm font-black text-violet-950">
+                  テスト送信先（管理者アカウント）
+                  <input
+                    type="email"
+                    name="test_recipient"
+                    defaultValue={adminEmail}
+                    required
+                    autoComplete="email"
+                    className="rounded border border-violet-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus-ring"
+                  />
+                </label>
+                <label className="flex items-start gap-2 rounded border border-violet-200 bg-white p-3 text-xs font-bold leading-5 text-violet-950">
+                  <input type="checkbox" name="test_send_confirm" value="confirmed" required className="mt-1" />
+                  <span>顧客には送信せず、正式契約・OTP・署名証跡を作成しないテスト送信であることを確認しました。</span>
+                </label>
+                <button type="submit" className="w-full rounded border-2 border-violet-600 bg-white px-4 py-3 text-sm font-black text-violet-800 shadow-sm focus-ring">
+                  管理者へテスト送信
+                </button>
+              </form>
+            </section>
+          ) : null}
 
           {legacyContracts.length ? (
             <details className="rounded-lg border border-slate-200 bg-white p-4">

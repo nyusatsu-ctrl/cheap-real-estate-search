@@ -182,7 +182,7 @@
     </div>
     <div class="ast-editor-body">
       <div class="ast-editor-notice">
-        申込者本人の氏名欄から下だけを自動記入します。顧客管理から自動入力した内容も含め、表示されたすべての入力値を修正できます。原本上段は空欄のままです。値がない項目は推測しません。ここからアストへの送信・FAX・メール送信は行いません。
+        申込者本人の氏名欄から下だけを自動記入します。上部右側の販売店欄には当社情報を固定印字し、それ以外の原本上段は空欄のままです。顧客管理から自動入力した内容も含め、表示されたすべての入力値を修正できます。値がない項目は推測しません。ここからアストへの送信・FAX・メール送信は行いません。
       </div>
       <div id="astApplicationValidation" class="ast-validation" role="alert"></div>
       <form id="astApplicationForm" novalidate></form>
@@ -205,8 +205,8 @@
 <script>
   // 株式会社アストから事前に運用許可を得た、正式運用対象の機械印字・自動転記機能。
   // アストへの申込送信、FAX送信、メール送信はこの機能では行わない。
-  // 機械印字は申込者本人の氏名欄以降だけを対象とする。
-  // 車両、販売店、申込条件、現在借入など原本上段は編集・印字せず空欄のままにする。
+  // 顧客情報の機械印字は申込者本人の氏名欄以降だけを対象とする。
+  // 上部右側の販売店欄だけは当社固定情報を印字し、車両、申込条件、現在借入などは空欄のままにする。
   const AST_EDITOR_SECTIONS = [
     {
       title: '申込者情報',
@@ -270,83 +270,94 @@
     }
   ];
 
+  const AST_FIXED_PRINT_VALUES = Object.freeze({
+    fixedSellerCompany: '株式会社エコループ',
+    fixedSellerAddress: '熊本県熊本市東区長嶺東5丁目8-8',
+    fixedSellerPhone: '096-201-7191',
+    fixedSellerStaff: '高山'
+  });
+
   const AST_PRINT_CONFIG = {
     page: { dpi: 300, widthPx: 2150, heightPx: 3035 },
     fields: {
-      applicantKana: { x: 250, y: 910, width: 655, height: 36, fontSize: 24 },
-      applicantName: { x: 170, y: 955, width: 735, height: 78, fontSize: 41 },
-      birthYear: { x: 625, y: 1050, width: 70, height: 42, fontSize: 29, align: 'center' },
-      birthMonth: { x: 745, y: 1050, width: 58, height: 42, fontSize: 29, align: 'center' },
-      birthDay: { x: 850, y: 1050, width: 58, height: 42, fontSize: 29, align: 'center' },
-      age: { x: 1025, y: 1050, width: 45, height: 42, fontSize: 27, align: 'center' },
-      postalCode: { x: 170, y: 1115, width: 200, height: 43, fontSize: 26, align: 'center' },
-      address: { x: 370, y: 1110, width: 675, height: 88, fontSize: 31, multiline: true },
+      fixedSellerCompany: { x: 1260, y: 185, width: 710, height: 44, fontSize: 30, align: 'center' },
+      fixedSellerAddress: { x: 1280, y: 255, width: 680, height: 65, fontSize: 24, align: 'center' },
+      fixedSellerPhone: { x: 1430, y: 350, width: 430, height: 44, fontSize: 28, align: 'center' },
+      fixedSellerStaff: { x: 1720, y: 450, width: 230, height: 40, fontSize: 26, align: 'center' },
+      applicantKana: { x: 280, y: 916, width: 625, height: 34, fontSize: 23, align: 'center' },
+      applicantName: { x: 205, y: 958, width: 700, height: 74, fontSize: 41 },
+      birthYear: { x: 625, y: 1040, width: 70, height: 44, fontSize: 29, align: 'center' },
+      birthMonth: { x: 745, y: 1040, width: 58, height: 44, fontSize: 29, align: 'center' },
+      birthDay: { x: 850, y: 1040, width: 58, height: 44, fontSize: 29, align: 'center' },
+      age: { x: 1040, y: 1044, width: 60, height: 42, fontSize: 27, align: 'center' },
+      postalCode: { x: 230, y: 1118, width: 135, height: 43, fontSize: 25, align: 'center' },
+      address: { x: 370, y: 1122, width: 675, height: 82, fontSize: 31, multiline: true },
       residenceYears: { x: 1790, y: 985, width: 60, height: 36, fontSize: 25, align: 'center' },
       residenceMonths: { x: 1940, y: 985, width: 50, height: 36, fontSize: 25, align: 'center' },
       childrenCount: { x: 1580, y: 1048, width: 55, height: 42, fontSize: 28, align: 'center' },
       parentsSiblingsCount: { x: 1910, y: 1048, width: 55, height: 42, fontSize: 28, align: 'center' },
-      homePhone: { x: 1320, y: 1115, width: 650, height: 38, fontSize: 29, align: 'center' },
-      mobilePhone: { x: 1320, y: 1165, width: 650, height: 38, fontSize: 29, align: 'center' },
-      emergencyKana: { x: 520, y: 1218, width: 380, height: 32, fontSize: 22 },
-      emergencyName: { x: 480, y: 1255, width: 420, height: 62, fontSize: 33 },
+      homePhone: { x: 1390, y: 1115, width: 580, height: 38, fontSize: 29, align: 'center' },
+      mobilePhone: { x: 1390, y: 1165, width: 580, height: 38, fontSize: 29, align: 'center' },
+      emergencyKana: { x: 570, y: 1228, width: 330, height: 30, fontSize: 21, align: 'center' },
+      emergencyName: { x: 490, y: 1258, width: 410, height: 60, fontSize: 33, align: 'center' },
       emergencyRelationship: { x: 1015, y: 1250, width: 60, height: 60, fontSize: 25, align: 'center' },
-      emergencyAddress: { x: 1145, y: 1218, width: 825, height: 60, fontSize: 27, multiline: true },
-      emergencyPhone: { x: 1350, y: 1280, width: 600, height: 38, fontSize: 28, align: 'center' },
-      workplaceKana: { x: 255, y: 1350, width: 670, height: 34, fontSize: 22 },
-      workplaceName: { x: 360, y: 1390, width: 685, height: 65, fontSize: 33 },
-      workPostalCode: { x: 360, y: 1470, width: 130, height: 36, fontSize: 23, align: 'center' },
-      workAddress: { x: 520, y: 1465, width: 525, height: 78, fontSize: 27, multiline: true },
-      workPhone: { x: 330, y: 1555, width: 390, height: 38, fontSize: 27, align: 'center' },
-      workExtension: { x: 800, y: 1555, width: 220, height: 38, fontSize: 26, align: 'center' },
-      businessContent: { x: 360, y: 1610, width: 685, height: 56, fontSize: 26, multiline: true },
+      emergencyAddress: { x: 1230, y: 1224, width: 740, height: 58, fontSize: 27, multiline: true, align: 'center' },
+      emergencyPhone: { x: 1490, y: 1282, width: 470, height: 38, fontSize: 28, align: 'center' },
+      workplaceKana: { x: 310, y: 1356, width: 615, height: 32, fontSize: 21, align: 'center' },
+      workplaceName: { x: 360, y: 1392, width: 685, height: 64, fontSize: 33, align: 'center' },
+      workPostalCode: { x: 415, y: 1476, width: 105, height: 36, fontSize: 22, align: 'center' },
+      workAddress: { x: 520, y: 1476, width: 525, height: 72, fontSize: 27, multiline: true },
+      workPhone: { x: 330, y: 1548, width: 390, height: 42, fontSize: 27, align: 'center' },
+      workExtension: { x: 800, y: 1548, width: 220, height: 42, fontSize: 26, align: 'center' },
+      businessContent: { x: 400, y: 1620, width: 645, height: 50, fontSize: 26, multiline: true, align: 'center' },
       department: { x: 1290, y: 1435, width: 220, height: 42, fontSize: 25 },
       position: { x: 1690, y: 1435, width: 270, height: 42, fontSize: 25 },
-      annualIncomeManYen: { x: 1240, y: 1490, width: 260, height: 42, fontSize: 29, align: 'right' },
-      monthlyIncomeManYen: { x: 1710, y: 1490, width: 250, height: 42, fontSize: 29, align: 'right' },
-      employmentYears: { x: 1280, y: 1555, width: 55, height: 40, fontSize: 25, align: 'center' },
-      employmentMonths: { x: 1410, y: 1555, width: 50, height: 40, fontSize: 25, align: 'center' },
-      employeeCount: { x: 1575, y: 1555, width: 65, height: 40, fontSize: 26, align: 'center' },
-      capitalMillionYen: { x: 1810, y: 1555, width: 140, height: 40, fontSize: 27, align: 'right' }
+      annualIncomeManYen: { x: 1240, y: 1500, width: 260, height: 42, fontSize: 29, align: 'right' },
+      monthlyIncomeManYen: { x: 1710, y: 1500, width: 250, height: 42, fontSize: 29, align: 'right' },
+      employmentYears: { x: 1280, y: 1565, width: 55, height: 40, fontSize: 25, align: 'center' },
+      employmentMonths: { x: 1410, y: 1565, width: 50, height: 40, fontSize: 25, align: 'center' },
+      employeeCount: { x: 1575, y: 1565, width: 65, height: 40, fontSize: 26, align: 'center' },
+      capitalMillionYen: { x: 1810, y: 1565, width: 140, height: 40, fontSize: 27, align: 'right' }
     },
     choices: {
       gender: {
-        '男': { x: 185, y: 1035, width: 75, height: 65, rotate: -4 },
-        '女': { x: 270, y: 1035, width: 75, height: 65, rotate: 3 }
+        '男': { x: 197, y: 1042, width: 50, height: 52, rotate: -4 },
+        '女': { x: 282, y: 1042, width: 50, height: 52, rotate: 3 }
       },
       birthEra: {
-        '昭和': { x: 490, y: 1035, width: 75, height: 65, rotate: -2 },
-        '平成': { x: 570, y: 1035, width: 80, height: 65, rotate: 2 }
+        '昭和': { x: 498, y: 1042, width: 64, height: 52, rotate: -2 },
+        '平成': { x: 578, y: 1042, width: 68, height: 52, rotate: 2 }
       },
       housingType: {
-        '自己所有': { x: 1138, y: 895, width: 135, height: 65, rotate: -3 },
-        '身内所有': { x: 1262, y: 895, width: 140, height: 65, rotate: 2 },
-        '社宅官舎': { x: 1388, y: 895, width: 145, height: 65, rotate: -2 },
-        '一戸建借家': { x: 1505, y: 895, width: 165, height: 65, rotate: 2 },
-        '賃貸マンション・アパート': { x: 1725, y: 895, width: 275, height: 65, rotate: -2 },
-        '公営住宅': { x: 1138, y: 955, width: 140, height: 65, rotate: 2 },
-        'その他': { x: 1260, y: 955, width: 340, height: 65, rotate: -2 }
+        '自己所有': { x: 1200, y: 900, width: 110, height: 52, rotate: -3 },
+        '身内所有': { x: 1320, y: 900, width: 115, height: 52, rotate: 2 },
+        '社宅官舎': { x: 1445, y: 900, width: 125, height: 52, rotate: -2 },
+        '一戸建借家': { x: 1570, y: 900, width: 150, height: 52, rotate: 2 },
+        '賃貸マンション・アパート': { x: 1715, y: 900, width: 285, height: 52, rotate: -2 },
+        '公営住宅': { x: 1200, y: 960, width: 115, height: 52, rotate: 2 },
+        'その他': { x: 1320, y: 960, width: 270, height: 52, rotate: -2 }
       },
       spouseStatus: {
-        '有': { x: 1330, y: 1035, width: 70, height: 65, rotate: -3 },
-        '無': { x: 1400, y: 1035, width: 70, height: 65, rotate: 3 }
+        '有': { x: 1340, y: 1042, width: 50, height: 52, rotate: -3 },
+        '無': { x: 1410, y: 1042, width: 50, height: 52, rotate: 3 }
       },
       occupationType: {
-        '正社員・公務員・役員': { x: 1210, y: 1335, width: 285, height: 65, rotate: -2 },
-        'パート・アルバイト': { x: 1470, y: 1335, width: 245, height: 65, rotate: 2 },
-        '有期契約社員': { x: 1735, y: 1335, width: 235, height: 65, rotate: -2 },
-        '法人経営者': { x: 1210, y: 1380, width: 210, height: 65, rotate: 2 },
-        '個人事業主': { x: 1430, y: 1380, width: 220, height: 65, rotate: -2 },
-        '年金': { x: 1630, y: 1380, width: 120, height: 65, rotate: 3 },
-        '主婦': { x: 1750, y: 1380, width: 110, height: 65, rotate: -3 },
-        'その他': { x: 1870, y: 1380, width: 130, height: 65, rotate: 2 }
+        '正社員・公務員・役員': { x: 1215, y: 1342, width: 265, height: 52, rotate: -2 },
+        'パート・アルバイト': { x: 1515, y: 1342, width: 230, height: 52, rotate: 2 },
+        '有期契約社員': { x: 1775, y: 1342, width: 205, height: 52, rotate: -2 },
+        '法人経営者': { x: 1215, y: 1390, width: 190, height: 52, rotate: 2 },
+        '個人事業主': { x: 1430, y: 1390, width: 190, height: 52, rotate: -2 },
+        '年金': { x: 1635, y: 1390, width: 105, height: 52, rotate: 3 },
+        '主婦': { x: 1760, y: 1390, width: 95, height: 52, rotate: -3 },
+        'その他': { x: 1880, y: 1390, width: 115, height: 52, rotate: 2 }
       },
       insuranceType: {
-        '社会保険': { x: 1225, y: 1595, width: 190, height: 65, rotate: -3 },
-        '国民健康保険': { x: 1390, y: 1595, width: 220, height: 65, rotate: 2 },
-        '共済・組合保険': { x: 1590, y: 1595, width: 235, height: 65, rotate: -2 },
-        '船員保険': { x: 1810, y: 1595, width: 190, height: 65, rotate: 3 },
-        'その他': { x: 1225, y: 1640, width: 140, height: 65, rotate: 2 },
-        'なし': { x: 1390, y: 1640, width: 110, height: 65, rotate: -3 }
+        '社会保険': { x: 1270, y: 1605, width: 150, height: 52, rotate: -3 },
+        '国民健康保険': { x: 1420, y: 1605, width: 185, height: 52, rotate: 2 },
+        '共済・組合保険': { x: 1600, y: 1605, width: 205, height: 52, rotate: -2 },
+        '船員保険': { x: 1830, y: 1605, width: 165, height: 52, rotate: 3 },
+        'その他': { x: 1270, y: 1650, width: 145, height: 52, rotate: 2 },
+        'なし': { x: 1420, y: 1650, width: 100, height: 52, rotate: -3 }
       }
     }
   };
@@ -565,7 +576,7 @@
   }
 
   function buildAstPrintHtml(form, templateDataUrl, autoPrint, warnings) {
-    const values = buildAstPrintValues(form);
+    const values = Object.assign({}, AST_FIXED_PRINT_VALUES, buildAstPrintValues(form));
     const pxToMm = (px) => ((px / AST_PRINT_CONFIG.page.dpi) * 25.4).toFixed(4);
     const fields = Object.keys(AST_PRINT_CONFIG.fields).map((key) => {
       const value = String(values[key] || '').trim();

@@ -1,101 +1,115 @@
 import type {
   EcontractCustomerSnapshot,
   EcontractDocumentSnapshot,
-  EcontractImportantItem,
-  VehicleConfirmationTerms
+  EcontractImportantItem
 } from "./types";
 
-export const PURCHASE_INTENT_VERSION = "purchase-intent-2026-08-v1";
-export const VEHICLE_CONFIRMATION_VERSION = "vehicle-confirmation-2026-08-v1";
+export const ECONTRACT_DOCUMENT_VERSION = "loan-purchase-continuation-2026-08-v2";
+export const ECONTRACT_DOCUMENT_TITLE = "自社ローン審査可決後 購入申込・手続継続確認契約書";
 
-export const PURCHASE_INTENT_IMPORTANT_ITEMS: EcontractImportantItem[] = [
-  { id: "approval_scope", text: "今回の審査可決は、自分自身の信用情報のみを理由とした一般的なローン承認ではないことを理解しました。" },
-  { id: "dealer_transaction", text: "株式会社エコループを通じた当該取引についての審査結果であり、他店で同じ結果になる保証はないことを理解しました。" },
-  { id: "purchase_intent", text: "株式会社エコループから車またはバイクを購入する意思があります。" },
-  { id: "not_for_other_dealer", text: "審査可決だけを得て他店で購入する目的ではありません。" },
+export const ECONTRACT_IMPORTANT_ITEMS: EcontractImportantItem[] = [
+  { id: "approval_scope", text: "今回のローン可決は、株式会社エコループを販売店とする今回の取引についての審査結果であり、他店で同じ審査結果になることが保証されているものではないことを理解しました。" },
+  { id: "purchase_preparation", text: "私は株式会社エコループから自動車またはバイクを購入する意思があり、車両探索その他の購入準備を依頼します。" },
+  { id: "vehicle_not_fixed", text: "現時点で個別車両が未確定の場合があり、私が承認していない特定車両を一方的に購入させられるものではないことを理解しました。" },
+  { id: "recorded_vehicle_approval", text: "特定車両が提示された後、LINE、SMS、メールその他記録が残る方法で私が購入手続を承認した場合、株式会社エコループが落札・仕入・陸送・登録準備等へ進むことを理解しました。" },
+  { id: "final_contract_documents", text: "特定車両決定後は通常の売買契約書・注文書・割賦契約書等で条件を確認し、本契約と同じ電子契約を再度締結する必要は原則としてないことを理解しました。" },
   { id: "contact_duty", text: "購入を中止する場合は連絡を途絶させず、株式会社エコループへ連絡します。" },
-  { id: "unreachable_cancellation", text: "当社が記録が残る方法で最終連絡を行い、その最終連絡後3営業日以内に回答がない場合、個別事情を確認した上で申込者都合のキャンセルとして扱うことがあると理解しました。" },
-  { id: "cancellation_cost", text: "自己都合キャンセルの場合、3万円を基準とする費用および実費を、法令上認められる範囲で負担する場合があることを理解しました。" },
-  { id: "second_confirmation", text: "車両確定後は、別途「個別車両購入確認」を行うことを理解しました。" }
+  { id: "unanswered_final_confirmation", text: "最終確認後3営業日以内に回答がない場合、個別事情を確認した上で購入手続が停止・終了される場合があることを理解しました。ただし、回答しなかったことだけで特定車両の購入を承諾したことにはならないことを理解しました。" },
+  { id: "cancellation_cost", text: "自己都合による購入中止で株式会社エコループに損害または費用が生じた場合、3万円を一つの基準として費用が算定される場合がありますが、一律3万円ではなく、消費者契約法その他の法令上認められる範囲に限られることを理解しました。" },
+  { id: "electronic_evidence", text: "本契約を電子的方法で締結し、認証結果・締結日時その他の電子契約記録が証跡として保存されることに同意します。" }
 ];
 
-export const VEHICLE_CONFIRMATION_IMPORTANT_ITEMS: EcontractImportantItem[] = [
-  { id: "vehicle_details", text: "表示された車両の種類、メーカー、車名、グレード、型式、年式、走行距離および車台番号の記載段階を確認しました。" },
-  { id: "price_details", text: "車両本体価格、諸費用、支払総額、頭金、下取充当額およびローン等申込額を確認しました。" },
-  { id: "payment_details", text: "支払回数、第1回支払額、2回目以降支払額およびボーナス払いの有無・内容を確認しました。" },
-  { id: "purchase_instruction", text: "この車両・この条件で購入手続を進め、株式会社エコループが落札、仕入、陸送、登録準備等へ進むことを承認します。" },
-  { id: "post_confirmation_cost", text: "承認後の自己都合キャンセルでは、実際に発生した費用・損害を法令上認められる範囲で負担する場合があることを理解しました。" },
-  { id: "separate_final_contracts", text: "この確認書は、別途締結される最終売買契約書、割賦契約書または信販契約等を置き換えるものではないことを理解しました。" }
-];
-
-export function buildPurchaseIntentDocument(customer: EcontractCustomerSnapshot, vehicleType: "car" | "bike"): EcontractDocumentSnapshot {
-  const vehicleLabel = vehicleType === "bike" ? "バイク" : "自動車";
-  const title = "自社ローン審査可決後 購入手続継続確認契約書";
+export function buildEcontractDocument(customer: EcontractCustomerSnapshot): EcontractDocumentSnapshot {
   const sections = [
-    section("第1条（当事者）", `株式会社エコループ（以下「当社」といいます。）と、申込者 ${customer.name} 様（以下「申込者」といいます。）は、次のとおり購入手続の継続を確認します。`),
-    section("第2条（目的）", `本契約は、自社ローン審査可決後、申込者が当社から${vehicleLabel}を購入する意思を確認し、当社が希望条件の整理、車両探索その他の購入準備を開始するためのものです。本契約は、特定の車両についての最終売買契約そのものではありません。`),
-    section("第3条（審査結果の範囲）", "今回の可決は、申込者本人の信用情報だけによる一般的・汎用的なローン承認を意味するものではなく、当社を販売店とする今回の取引に関する審査結果です。当社と提携先との取引関係、取引条件、販売・管理体制その他を含む総合判断となる場合があります。他店で同一条件の可決が得られる保証はなく、他店で購入する場合は改めて審査が必要です。当社は、審査会社の内部審査基準を保証または開示するものではありません。"),
-    section("第4条（購入意思）", `申込者は、当社から${vehicleLabel}を購入する意思があり、単に審査可決だけを得て他店で購入する目的ではないことを確認します。`),
-    section("第5条（車両探索）", "当社は、申込者の合理的な希望条件に沿う車両を、オークションその他の方法で探索します。車両決定まで1か月以上を要する場合があります。本契約自体に一律30日等の短い失効期限は設けません。ただし、審査会社が定める審査有効期限、再審査の要否、申込者の属性変更その他の事情は別途適用されます。"),
-    section("第6条（連絡義務）", "申込者と当社は、電話、SMS、メール、LINEその他届出済みの方法で連絡します。申込者と連絡が取れない場合、当社は記録が残る方法で最終連絡を行い、その最終連絡後3営業日以内に回答がない場合、個別事情を確認した上で申込者都合のキャンセルとして扱うことがあります。"),
-    section("第7条（申込者都合のキャンセル費用）", "申込者都合で購入手続を中止する場合、当社は、3万円を基準とするキャンセル費用と、オークション関連費、落札後取消費、陸送費、登録準備費、検査費、外部業者への支払その他実際に発生した外部費用を請求することがあります。ただし、無条件に一律3万円を請求するものではなく、消費者契約法その他の強行法規に従い、当該解除によって当社に生ずべき平均的な損害その他法令上認められる範囲を上限とします。同一損害を重ねて請求しません。"),
-    section("第8条（費用請求の除外）", "当社側の事情で購入手続を継続できない場合、申込者の合理的な希望条件に合う車両を用意できない場合、その他申込者の責めに帰することができない合理的な事情がある場合は、前条の費用請求の対象から除外します。"),
-    section("第9条（個別車両の確認）", "車両が確定したときは、車両情報、価格、支払条件、納車、保証その他の条件を記載した「個別車両購入確認書」により、改めて申込者の明確な承認を得ます。"),
-    section("第10条（最終契約との関係）", "本契約および個別車両購入確認書は、別途必要となる最終売買契約書、割賦契約書、信販契約その他の契約を置き換えるものではありません。")
+    paragraphSection("第1条（契約の目的）", [
+      "本契約は、当社を販売店とするローン審査が可決となった後、申込者が当社から自動車またはバイクを購入する意思を確認し、当社に対して車両探索、購入条件の調整その他購入に必要な準備を開始することを依頼するためのものです。",
+      "本契約締結時点では、購入する個別車両がまだ確定していない場合があります。",
+      "したがって、本契約は特定の車両についての最終売買契約そのものではありませんが、申込者が当社から車両を購入する意思を有し、当社に購入準備を依頼したことを確認する契約です。"
+    ]),
+    paragraphSection("第2条（ローン審査結果の範囲）", [
+      "本契約の対象となるローン審査は、当社を販売店とする今回の取引について、当社が取り扱う提携先により可決されたものです。",
+      "今回の審査結果は、申込者本人の信用情報のみを理由とする一般的・汎用的なローン承認を意味するものではなく、販売店、取引条件、申込内容その他の事情を含めた当該取引についての審査結果です。",
+      "そのため、他の販売店において同一または同等の審査結果が得られることを当社が保証するものではありません。",
+      "また、審査会社の審査有効期間、再審査条件、申込者の属性変更その他の事情により、後日再審査等が必要となる場合があります。"
+    ]),
+    paragraphSection("第3条（購入意思の確認）", [
+      "申込者は、当社から自動車またはバイクを購入する意思があり、単にローン審査の可決のみを得ることや、その審査結果を利用して他の販売店から車両を購入することを目的として申し込んだものではないことを確認します。"
+    ]),
+    paragraphSection("第4条（購入準備および車両探索）", [
+      "申込者は、本契約締結後、当社が申込者の希望条件を確認し、車両探索、見積作成、オークション調査、仕入準備その他必要な業務を開始することを承認します。",
+      "当社は、申込者から提示された車種、価格、年式、走行距離、色、装備その他の希望条件を踏まえ、合理的な範囲で対象車両を探索します。",
+      "中古車および中古バイクは個体ごとに状態や価格が異なるため、希望条件に完全に一致する車両を確保できることや、一定期間内に車両を確定できることを保証するものではありません。",
+      "車両決定まで1か月以上を要する場合があります。"
+    ]),
+    paragraphSection("第5条（特定車両の提示と承認）", [
+      "当社が購入候補となる車両を提示した場合、申込者は車両情報、価格その他提示された条件を確認します。",
+      "申込者が、LINE、SMS、メールその他記録が残る方法により特定の車両について購入手続を進めることを承認した場合、当社はその承認に基づき、落札、仕入、陸送、登録準備、整備、検査その他必要な手続へ進むことができます。",
+      "当社は、申込者が承認していない特定車両を一方的に購入対象として確定するものではありません。"
+    ]),
+    paragraphSection("第6条（特定車両決定後の書類）", [
+      "特定車両が決定した際に、本契約と同趣旨の電子契約を再度締結することは原則として必要ありません。",
+      "特定車両が確定した後、車両本体価格、諸費用、支払総額、ローン条件、納車条件、保証内容その他必要な事項については、売買契約書、注文書、割賦契約書、信販会社所定の契約書類その他必要な書面または電磁的記録によって別途確認します。",
+      "本契約は、これらの最終的な売買契約書、割賦契約書または信販会社との契約を置き換えるものではありません。"
+    ]),
+    paragraphSection("第7条（連絡および回答）", [
+      "申込者は、車両探索および購入手続を円滑に行うため、当社から電話、SMS、メール、LINEその他届出済みの連絡先へ連絡があった場合、合理的な期間内に回答するよう努めるものとします。",
+      "申込者が購入を取りやめる場合には、連絡を途絶させるのではなく、速やかに当社へその旨を連絡するものとします。",
+      "当社が通常の連絡を行っても申込者から回答を得られない場合、当社はSMS、メール、LINEその他記録が残る方法により最終確認を行うことがあります。",
+      "その最終確認後3営業日以内に回答がなく、かつ、それまでの連絡経過その他の個別事情を考慮して購入手続を継続する意思を確認できない場合、当社は車両探索その他の手続を停止または終了することがあります。",
+      "ただし、申込者が回答しなかったことだけを理由として、特定車両の購入を承諾したものとはみなしません。また、回答がなかったことだけによって当然にキャンセル費用が発生するものでもありません。"
+    ]),
+    paragraphSection("第8条（購入中止と費用負担）", [
+      "本契約締結後、申込者の都合により購入手続を中止した結果、当社に合理的な損害または費用が発生した場合、当社は法令上認められる範囲で、その損害または費用の負担を申込者に求めることがあります。"
+    ]),
+    paragraphSection("第9条（費用の算定）", [
+      "当社では、審査可決後の購入準備、車両探索、オークション調査、購入手配その他の業務に要する費用等を考慮し、3万円を一つの基準としてキャンセルに伴う費用を算定する場合があります。",
+      "ただし、3万円を無条件または一律に請求するものではありません。",
+      "請求額は、キャンセルの時期、当社が既に行った業務、実際に発生した費用その他の事情を踏まえ、当該解除に伴って当社に生ずべき平均的な損害その他法令上認められる範囲内で算定します。",
+      "申込者から求めがあった場合、当社は請求内容について合理的な範囲で説明します。",
+      "申込者が第5条に基づき特定車両について購入手続を進めることを承認し、その承認に基づいて当社が落札、仕入、陸送、登録準備、整備、検査その他の手続へ進んだ後に、申込者都合で購入を中止した場合には、オークション関連費用、落札後の取消費用、陸送費、保管費、登録準備費、整備費、検査費、外部業者への支払その他当該購入手続のために実際に発生した費用または損害を請求額の算定に含めることがあります。",
+      "これらについても、消費者契約法その他の法令上認められる範囲を上限とし、同一の損害または費用を重複して請求することはありません。"
+    ]),
+    paragraphSection("第10条（費用請求を行わない場合等）", [
+      "当社側の事情により取引を継続できない場合、申込者の合理的な希望条件に適合する車両を用意できない場合、審査会社側の事情によりローン利用ができなくなった場合で申込者に責任がないとき、その他申込者の責めに帰することができない合理的な事情がある場合には、その事情に応じて前2条の費用請求を行わない、または減額するものとします。",
+      "法令上申込者に認められる解除権その他の権利がある場合は、その法令が優先します。"
+    ]),
+    paragraphSection("第11条（再審査等）", [
+      "本契約締結後であっても、審査会社の審査有効期間経過、申込者の勤務先・収入・債務状況その他申込内容の変更、審査会社の判断その他の事情によって、再審査、条件変更またはローン利用ができなくなる場合があります。",
+      "本契約は、ローン利用が将来にわたり必ず維持されることを保証するものではありません。"
+    ]),
+    paragraphSection("第12条（電子契約および証跡）", [
+      "申込者は、本契約を電磁的方法により締結することに同意します。",
+      "当社は、本契約締結時の契約内容、申込者情報、確認項目、締結日時、メール認証結果、IPアドレス、利用端末情報その他当社システムが取得する締結記録を、本契約が締結されたことを確認するための証跡として保存します。",
+      "申込者が、本人に送信された認証コードを入力し、本契約内容および重要事項を確認した上で「契約する」旨の操作を行った時点で、本契約は成立します。"
+    ]),
+    paragraphSection("第13条（協議）", [
+      "本契約に定めのない事項または本契約の解釈について疑義が生じた場合、当社と申込者は、法令および信義誠実の原則に従い、誠実に協議して解決を図るものとします。"
+    ])
   ];
-  return buildDocument(title, PURCHASE_INTENT_VERSION, sections, PURCHASE_INTENT_IMPORTANT_ITEMS);
+  return buildDocument(ECONTRACT_DOCUMENT_TITLE, ECONTRACT_DOCUMENT_VERSION, customer, sections, ECONTRACT_IMPORTANT_ITEMS);
 }
 
-export function buildVehicleConfirmationDocument(customer: EcontractCustomerSnapshot, terms: VehicleConfirmationTerms): EcontractDocumentSnapshot {
-  const vehicleLabel = terms.vehicleType === "bike" ? "バイク" : "自動車";
-  const title = "個別車両購入確認書";
-  const chassis = terms.chassisNumberStatus === "confirmed"
-    ? terms.chassisNumber
-    : `${terms.chassisNumber || "未記載"}（現時点では未確定。判明後に最終契約書類等で確認します。）`;
-  const sections = [
-    section("第1条（当事者と目的）", `株式会社エコループ（以下「当社」といいます。）と、申込者 ${customer.name} 様（以下「申込者」といいます。）は、次の${vehicleLabel}および購入条件を確認し、購入手続を進めることを確認します。`),
-    detailsSection("第2条（対象車両）", [
-      ["車両区分", vehicleLabel], ["メーカー", terms.maker], ["車名", terms.model], ["グレード", terms.grade || "記載なし"],
-      ["型式", terms.modelCode || "記載なし"], ["初度登録／年式", terms.firstRegistration], ["走行距離", `${formatNumber(terms.mileage)}km`], ["車台番号", chassis]
-    ]),
-    detailsSection("第3条（価格・支払条件）", [
-      ["車両本体価格", formatYen(terms.vehiclePrice)], ["諸費用", formatYen(terms.fees)], ["支払総額", formatYen(terms.totalPrice)],
-      ["頭金", formatYen(terms.downPayment)], ["下取充当額", formatYen(terms.tradeInAmount)], ["ローン等申込額", formatYen(terms.financedAmount)], ["支払回数", `${terms.installmentCount}回`],
-      ["第1回支払額", formatYen(terms.firstPaymentAmount)], ["2回目以降支払額", formatYen(terms.monthlyPayment)], ["ボーナス払い", terms.bonusPayment || "なし"]
-    ]),
-    detailsSection("第4条（納車・保証等）", [
-      ["納車方法", terms.deliveryMethod], ["納車予定", terms.deliveryEstimate], ["保証内容", terms.warranty || "別途案内のとおり"],
-      ["オークション仕入れ", terms.auctionPurchase ? "該当" : "非該当"], ["特記事項", terms.specialTerms || "なし"]
-    ]),
-    section("第5条（購入承認）", "申込者は、上記車両および条件を確認し、「この車両・この条件で購入手続を進めてください」と明確に承認します。申込者の承認後、当社は落札、仕入、陸送、登録準備その他の手続へ進むことができます。"),
-    section("第6条（承認後のキャンセル）", "申込者の承認に基づき当社が仕入その他の手続へ進んだ後、申込者都合でキャンセルする場合、当社は実際に発生した費用および損害を請求することがあります。ただし、消費者契約法その他の強行法規に従い、法令上認められる範囲を上限とし、同一損害を重ねて請求しません。"),
-    section("第7条（最終契約との関係）", "本確認書は、別途必要となる最終売買契約書、割賦契約書、信販契約その他の契約を置き換えるものではありません。各契約書類の内容に相違がある場合は、法令および各契約の性質に従って確認します。")
-  ];
-  return buildDocument(title, VEHICLE_CONFIRMATION_VERSION, sections, VEHICLE_CONFIRMATION_IMPORTANT_ITEMS);
-}
-
-function buildDocument(title: string, version: string, sections: Section[], importantItems: EcontractImportantItem[]): EcontractDocumentSnapshot {
+function buildDocument(title: string, version: string, customer: EcontractCustomerSnapshot, sections: Section[], importantItems: EcontractImportantItem[]): EcontractDocumentSnapshot {
   const html = [
     `<article class="econtract-document">`,
     `<h1>${escapeHtml(title)}</h1>`,
     `<p class="econtract-company">株式会社エコループ</p>`,
+    `<p class="econtract-applicant">申込者：${escapeHtml(customer.name)} 様</p>`,
     ...sections.map((item) => `<section><h2>${escapeHtml(item.heading)}</h2>${item.html}</section>`),
     `</article>`
   ].join("");
-  const text = [title, "株式会社エコループ", ...sections.flatMap((item) => [item.heading, item.text])].join("\n\n");
+  const text = [title, "株式会社エコループ", `申込者：${customer.name} 様`, ...sections.flatMap((item) => [item.heading, item.text])].join("\n\n");
   return { title, version, html, text, importantItems };
 }
 
 type Section = { heading: string; html: string; text: string };
 
-function section(heading: string, body: string): Section {
-  return { heading, html: `<p>${escapeHtml(body)}</p>`, text: body };
-}
-
-function detailsSection(heading: string, rows: Array<[string, string]>): Section {
-  const html = `<dl>${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>`;
-  const text = rows.map(([label, value]) => `${label}: ${value}`).join("\n");
-  return { heading, html, text };
+function paragraphSection(heading: string, paragraphs: string[]): Section {
+  return {
+    heading,
+    html: paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join(""),
+    text: paragraphs.join("\n")
+  };
 }
 
 function escapeHtml(value: string) {
@@ -106,12 +120,4 @@ function escapeHtml(value: string) {
     '"': "&quot;",
     "'": "&#39;"
   })[character] ?? character);
-}
-
-function formatYen(value: number) {
-  return `${formatNumber(value)}円`;
-}
-
-function formatNumber(value: number) {
-  return Number(value).toLocaleString("ja-JP");
 }

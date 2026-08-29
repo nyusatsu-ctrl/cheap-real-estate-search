@@ -80,6 +80,6 @@ export function createManagementNumber(kind: "purchase_intent" | "vehicle_confir
     month: "2-digit",
     day: "2-digit"
   }).format(now).replaceAll("-", "");
-  const stage = kind === "purchase_intent" ? "P1" : "P2";
+  const stage = kind === "purchase_intent" ? "EC" : "LEGACY";
   return `EL-${date}-${stage}-${randomBytes(8).toString("hex").toUpperCase()}`;
 }

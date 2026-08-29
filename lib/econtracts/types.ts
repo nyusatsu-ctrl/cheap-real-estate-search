@@ -149,6 +149,11 @@ export type AdminEcontractSummary = {
   errorMessage?: string;
 };
 
+export type AdminEcontractStatusSummary = {
+  status: EcontractStatus;
+  linkExpiresAt: string;
+};
+
 export type PublicEcontractView = {
   contract: SalesEcontract;
   identityConfirmed: boolean;

@@ -19,8 +19,8 @@ import {
 } from "@/lib/sales-contracts/rules";
 import { LOAN_REVIEW_APP_URL } from "@/lib/sales-contracts/source";
 import type { SalesContractListItem } from "@/lib/sales-contracts/types";
-import { ECONTRACT_STATUS_LABELS, getEcontractStatusClass } from "@/lib/econtracts/rules";
-import type { EcontractKind, EcontractStatus } from "@/lib/econtracts/types";
+import { getEcontractStatusClass, getEcontractStatusLabel } from "@/lib/econtracts/rules";
+import type { AdminEcontractStatusSummary, EcontractKind } from "@/lib/econtracts/types";
 
 type SalesContractTableEmptyState = "default" | "onboarding" | "filtered";
 
@@ -31,7 +31,7 @@ export function SalesContractTable({
 }: {
   items: SalesContractListItem[];
   emptyState?: SalesContractTableEmptyState;
-  econtractStatuses?: Record<string, Partial<Record<EcontractKind, EcontractStatus>>>;
+  econtractStatuses?: Record<string, Partial<Record<EcontractKind, AdminEcontractStatusSummary>>>;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -57,8 +57,7 @@ export function SalesContractTable({
               <th className="px-3 py-3">支払開始日</th>
               <th className="px-3 py-3">支払終了日</th>
               <th className="px-3 py-3">ステータス</th>
-              <th className="px-3 py-3">第1電子契約</th>
-              <th className="px-3 py-3">第2電子契約</th>
+              <th className="px-3 py-3">電子契約</th>
               <th className="px-3 py-3">次回対応日</th>
               <th className="px-3 py-3">詳細</th>
             </tr>
@@ -106,8 +105,7 @@ export function SalesContractTable({
                       <p className="mt-1 text-xs font-bold text-violet-700">未確定</p>
                     ) : null}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3"><EcontractStatusBadge status={econtractStatuses[item.contract.id]?.purchase_intent} /></td>
-                  <td className="whitespace-nowrap px-3 py-3"><EcontractStatusBadge status={econtractStatuses[item.contract.id]?.vehicle_confirmation} /></td>
+                  <td className="whitespace-nowrap px-3 py-3"><EcontractStatusBadge summary={econtractStatuses[item.contract.id]?.purchase_intent} /></td>
                   <td className="whitespace-nowrap px-3 py-3">
                     <NextActionDate value={nextActionDate} />
                   </td>
@@ -121,7 +119,7 @@ export function SalesContractTable({
             })}
             {items.length === 0 ? (
               <tr>
-                <td colSpan={22} className="px-3 py-8">
+                <td colSpan={21} className="px-3 py-8">
                   <EmptySalesContractsState variant={emptyState} />
                 </td>
               </tr>
@@ -133,9 +131,9 @@ export function SalesContractTable({
   );
 }
 
-function EcontractStatusBadge({ status }: { status: EcontractStatus | undefined }) {
-  if (!status) return <span className="text-xs font-semibold text-slate-400">未作成</span>;
-  return <Badge className={getEcontractStatusClass(status)}>{ECONTRACT_STATUS_LABELS[status]}</Badge>;
+function EcontractStatusBadge({ summary }: { summary: AdminEcontractStatusSummary | undefined }) {
+  if (!summary) return <span className="text-xs font-semibold text-slate-400">未送信</span>;
+  return <Badge className={getEcontractStatusClass(summary.status)}>{getEcontractStatusLabel(summary.status, summary.linkExpiresAt)}</Badge>;
 }
 
 function EmptySalesContractsState({ variant }: { variant: SalesContractTableEmptyState }) {

@@ -10,9 +10,9 @@ import {
 } from "@/app/econtracts/[token]/actions";
 import { maskCustomerName } from "@/lib/econtracts/crypto";
 import {
-  ECONTRACT_STATUS_LABELS,
   getEcontractAvailability,
-  getEcontractStatusClass
+  getEcontractStatusClass,
+  getEcontractStatusLabel
 } from "@/lib/econtracts/rules";
 import {
   findEcontractByToken,
@@ -76,7 +76,7 @@ export default async function EcontractPage({ params, searchParams }: { params: 
             <p className="mt-2 text-sm font-semibold text-slate-600">契約管理番号: {econtract.management_number}</p>
           </div>
           <span className={`rounded px-3 py-1 text-sm font-black ${getEcontractStatusClass(econtract.status)}`}>
-            {ECONTRACT_STATUS_LABELS[econtract.status]}
+            {getEcontractStatusLabel(econtract.status, econtract.link_expires_at, requestTime.getTime())}
           </span>
         </div>
       </header>

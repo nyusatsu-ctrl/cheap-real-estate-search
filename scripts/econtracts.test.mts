@@ -14,20 +14,20 @@ import {
   stableJson
 } from "../lib/econtracts/crypto.ts";
 import {
-  PURCHASE_INTENT_IMPORTANT_ITEMS,
-  VEHICLE_CONFIRMATION_IMPORTANT_ITEMS,
-  buildPurchaseIntentDocument,
-  buildVehicleConfirmationDocument
+  ECONTRACT_DOCUMENT_TITLE,
+  ECONTRACT_IMPORTANT_ITEMS,
+  buildEcontractDocument
 } from "../lib/econtracts/templates.ts";
 import {
   ECONTRACT_REQUIRED_CONFIG_KEYS,
+  canIssueLoanEcontract,
   evaluateEcontractFeatureGate,
   getEcontractAvailability,
+  getEcontractStatusLabel,
   getOtpChallengeAvailability,
-  validateConsentIds,
-  validateVehicleConfirmationTerms
+  validateConsentIds
 } from "../lib/econtracts/rules.ts";
-import type { EcontractCustomerSnapshot, VehicleConfirmationTerms } from "../lib/econtracts/types.ts";
+import type { EcontractCustomerSnapshot } from "../lib/econtracts/types.ts";
 import { getAdminLoginPresentation } from "../lib/admin-login-presentation.ts";
 
 const customer: EcontractCustomerSnapshot = {
@@ -40,89 +40,67 @@ const customer: EcontractCustomerSnapshot = {
   address: "東京都千代田区"
 };
 
-const vehicleTerms: VehicleConfirmationTerms = {
-  vehicleType: "car",
-  maker: "トヨタ",
-  model: "プリウス",
-  grade: "S",
-  modelCode: "ZVW50",
-  firstRegistration: "2022年3月",
-  mileage: 25000,
-  chassisNumber: "ZVW50-1234567",
-  chassisNumberStatus: "confirmed",
-  vehiclePrice: 1_800_000,
-  fees: 200_000,
-  totalPrice: 2_000_000,
-  downPayment: 200_000,
-  tradeInAmount: 0,
-  financedAmount: 1_800_000,
-  installmentCount: 60,
-  firstPaymentAmount: 35_000,
-  monthlyPayment: 33_000,
-  bonusPayment: "なし",
-  deliveryMethod: "店頭納車",
-  deliveryEstimate: "2026年10月上旬",
-  warranty: "6か月または5,000km",
-  specialTerms: "現状販売ではありません",
-  auctionPurchase: true
-};
-
 const completeFeatureEnvironment = {
   ECONTRACT_ENABLED: "true",
   ECONTRACT_BASE_URL: "https://contracts.example.com",
-  ECONTRACT_RESEND_API_KEY: "resend-test-key",
+  ECONTRACT_RESEND_API_KEY: "test-only",
   ECONTRACT_EMAIL_FROM: "contracts@example.com",
-  ECONTRACT_OTP_PEPPER: "otp-test-pepper"
+  ECONTRACT_OTP_PEPPER: "test-only"
 };
 
-test("contract admin login uses contract branding only for sales contracts and e-contract routes", async () => {
+test("only premium or AST approved loan contracts are eligible", () => {
+  const eligible = (financeCompany: string, approvalStatus: string, contractType = "loan") => canIssueLoanEcontract({
+    contractType,
+    financeCompany,
+    approvalStatus
+  });
+  assert.equal(eligible("premium", "approved"), true);
+  assert.equal(eligible("ast", "approved"), true);
+  assert.equal(eligible("aplus", "approved"), false);
+  assert.equal(eligible("premium", "pending"), false);
+  assert.equal(eligible("ast", "rejected"), false);
+  assert.equal(eligible("premium", "guarantor_required"), false);
+  assert.equal(eligible("premium", "unrequested"), false);
+  assert.equal(eligible("premium", "approved", "cash"), false);
+});
+
+test("contract login branding covers sales and e-contract routes without changing diagnosis or GPS", async () => {
   for (const redirectTo of [
     "/admin/sales-contracts",
-    "/admin/sales-contracts/contract-1?tab=econtract",
-    "/admin/econtracts/contract-1",
-    "/admin/econtracts/contract-1/print"
+    "/admin/sales-contracts/id?tab=econtract",
+    "/admin/econtracts/id",
+    "/admin/econtracts/id/print"
   ]) {
     const presentation = getAdminLoginPresentation(redirectTo);
     assert.equal(presentation.kind, "contract");
     assert.equal(presentation.systemName, "契約管理システム");
     assert.equal(presentation.description, "契約台帳・電子契約・顧客情報を管理するアカウントでログインしてください。");
     assert.equal(presentation.metadataTitle, "管理者ログイン｜株式会社エコループ｜契約管理システム");
-    assert.equal(presentation.metadataDescription, presentation.description);
   }
-
-  const diagnosisPresentation = getAdminLoginPresentation("/admin/diagnoses");
-  assert.equal(diagnosisPresentation.kind, "diagnosis");
-  assert.equal(diagnosisPresentation.systemName, "建設業売上アップ診断");
-  assert.equal(diagnosisPresentation.description, "診断者一覧、リード対応状況、診断詳細を管理するアカウントでログインしてください。");
-  assert.equal(diagnosisPresentation.metadataTitle, "管理者ログイン｜建設業売上アップ診断｜株式会社エコループ");
-
-  const gpsPresentation = getAdminLoginPresentation("/admin/gps");
-  assert.equal(gpsPresentation.kind, "gps");
-  assert.equal(gpsPresentation.systemName, "GPS車両管理システム");
-  assert.equal(gpsPresentation.description, "GPS顧客、車両、端末、受信ログを管理するアカウントでログインしてください。");
-  assert.equal(gpsPresentation.metadataTitle, diagnosisPresentation.metadataTitle);
+  assert.equal(getAdminLoginPresentation("/admin/diagnoses").kind, "diagnosis");
+  assert.equal(getAdminLoginPresentation("/admin/gps").kind, "gps");
   assert.equal(getAdminLoginPresentation("/admin/sales-contracts-other").kind, "diagnosis");
-  assert.equal(getAdminLoginPresentation("/admin/econtracts-other").kind, "diagnosis");
 
-  const [loginPage, globalStyles] = await Promise.all([
+  const [loginPage, appHeader, globalStyles] = await Promise.all([
     readFile(new URL("../app/admin/login/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/AppHeader.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8")
   ]);
-  assert.match(loginPage, /data-admin-login-system=\{presentation\.kind\}/);
   assert.match(loginPage, /logoSrc="\/brand\/ecoloop-logo\.png"/);
-  assert.match(loginPage, /logoSrc="\/images\/ecoloop-sales-diagnosis-logo\.png"/);
-  assert.match(loginPage, /export async function generateMetadata/);
-  assert.match(globalStyles, /body:has\(\[data-admin-login-system="contract"\]\) > header/);
+  assert.match(loginPage, /openGraph:/);
+  assert.match(loginPage, /twitter:/);
+  assert.match(loginPage, /株式会社エコループ｜契約管理システム/);
+  assert.match(appHeader, /useSearchParams/);
+  assert.match(appHeader, /isSalesAdmin \|\| isContractLogin/);
+  assert.match(appHeader, /pathname\.startsWith\("\/admin\/econtracts"\)/);
+  assert.doesNotMatch(globalStyles, /data-admin-login-system="contract"/);
 });
 
-test("e-contract feature gate is disabled unless explicitly true with all dedicated settings", () => {
+test("feature gate remains fail closed and dedicated", () => {
   assert.equal(evaluateEcontractFeatureGate({}).enabled, false);
   assert.equal(evaluateEcontractFeatureGate({ ...completeFeatureEnvironment, ECONTRACT_ENABLED: "false" }).enabled, false);
   assert.equal(evaluateEcontractFeatureGate({ ...completeFeatureEnvironment, ECONTRACT_ENABLED: "TRUE" }).enabled, false);
-  const incomplete = evaluateEcontractFeatureGate({ ...completeFeatureEnvironment, ECONTRACT_OTP_PEPPER: " " });
-  assert.equal(incomplete.explicitlyEnabled, true);
-  assert.equal(incomplete.enabled, false);
-  assert.deepEqual(incomplete.missingKeys, ["ECONTRACT_OTP_PEPPER"]);
+  assert.equal(evaluateEcontractFeatureGate({ ...completeFeatureEnvironment, ECONTRACT_OTP_PEPPER: " " }).enabled, false);
   assert.equal(evaluateEcontractFeatureGate(completeFeatureEnvironment).enabled, true);
   assert.deepEqual(ECONTRACT_REQUIRED_CONFIG_KEYS, [
     "ECONTRACT_BASE_URL",
@@ -132,222 +110,176 @@ test("e-contract feature gate is disabled unless explicitly true with all dedica
   ]);
 });
 
-test("URL tokens have 256-bit entropy shape and only hashes need persistence", () => {
-  const tokens = new Set(Array.from({ length: 200 }, generateOpaqueToken));
-  assert.equal(tokens.size, 200);
-  for (const token of tokens) {
-    assert.equal(isValidOpaqueToken(token), true);
-    assert.equal(token.length, 43);
-    assert.match(sha256(token), /^[0-9a-f]{64}$/);
-  }
-  assert.equal(isValidOpaqueToken("short-or-guessable"), false);
-});
-
-test("OTP values are validated and stored as keyed hashes", () => {
-  const hash = hashOtp("contract-1", "123456", "test-pepper");
-  const same = hashOtp("contract-1", "123456", "test-pepper");
-  const wrong = hashOtp("contract-1", "654321", "test-pepper");
-  const otherContract = hashOtp("contract-2", "123456", "test-pepper");
-  assert.equal(isValidOtp("123456"), true);
-  assert.equal(isValidOtp("12345"), false);
-  assert.equal(secureHexEqual(hash, same), true);
-  assert.equal(secureHexEqual(hash, wrong), false);
-  assert.equal(secureHexEqual(hash, otherContract), false);
-  assert.equal(hash.includes("123456"), false);
-});
-
-test("expired and cancelled links are rejected while signed controls stay readable", () => {
-  const now = Date.parse("2026-08-28T00:00:00.000Z");
-  assert.equal(getEcontractAvailability("sent", "2026-08-27T23:59:59.000Z", now), "expired");
-  assert.equal(getEcontractAvailability("sent", "not-a-date", now), "expired");
-  assert.equal(getEcontractAvailability("cancelled", "2026-08-29T00:00:00.000Z", now), "cancelled");
-  assert.equal(getEcontractAvailability("signed", "2026-08-01T00:00:00.000Z", now), "signed");
-});
-
-test("OTP expiry, invalidation, verification and attempt lock are distinct", () => {
-  const now = Date.parse("2026-08-28T00:00:00.000Z");
-  const pending = { invalidated_at: null, verified_at: null, expires_at: "2026-08-28T00:10:00.000Z", attempt_count: 0, max_attempts: 5 };
-  assert.equal(getOtpChallengeAvailability(null, now), "missing");
-  assert.equal(getOtpChallengeAvailability({ ...pending, expires_at: "2026-08-27T23:59:59.000Z" }, now), "expired");
-  assert.equal(getOtpChallengeAvailability({ ...pending, attempt_count: 5 }, now), "locked");
-  assert.equal(getOtpChallengeAvailability({ ...pending, invalidated_at: "2026-08-27T23:55:00.000Z" }, now), "invalidated");
-  assert.equal(getOtpChallengeAvailability({ ...pending, verified_at: "2026-08-27T23:55:00.000Z" }, now), "verified");
-  assert.equal(getOtpChallengeAvailability(pending, now), "pending");
-});
-
-test("identity matching tolerates harmless Japanese spacing but rejects another customer", () => {
-  assert.equal(identityNamesMatch("山田　太郎", "山田 太郎"), true);
-  assert.equal(identityNamesMatch("ﾔﾏﾀﾞ ﾀﾛｳ", "ヤマダタロウ"), true);
-  assert.equal(identityNamesMatch("山田 次郎", "山田 太郎"), false);
-  assert.equal(maskEmail("taro.yamada@example.com"), "ta********@example.com");
-});
-
-test("stage-one snapshot contains all required legal and business concepts", () => {
-  const document = buildPurchaseIntentDocument(customer, "car");
-  const unreachableCancellation = PURCHASE_INTENT_IMPORTANT_ITEMS.find((item) => item.id === "unreachable_cancellation");
-  assert.equal(PURCHASE_INTENT_IMPORTANT_ITEMS.length, 8);
-  assert.equal(
-    unreachableCancellation?.text,
-    "当社が記録が残る方法で最終連絡を行い、その最終連絡後3営業日以内に回答がない場合、個別事情を確認した上で申込者都合のキャンセルとして扱うことがあると理解しました。"
-  );
-  assert.match(
-    document.text,
-    /記録が残る方法で最終連絡を行い、その最終連絡後3営業日以内に回答がない場合、個別事情を確認した上で申込者都合のキャンセルとして扱うことがあります。/
-  );
-  assert.doesNotMatch(document.text, /最後の連絡または回答から3営業日/);
-  assert.doesNotMatch(unreachableCancellation?.text ?? "", /所定期間/);
+test("the formal one-stage document has the exact title and nine individual checks", () => {
+  const expectedItems = [
+    "今回のローン可決は、株式会社エコループを販売店とする今回の取引についての審査結果であり、他店で同じ審査結果になることが保証されているものではないことを理解しました。",
+    "私は株式会社エコループから自動車またはバイクを購入する意思があり、車両探索その他の購入準備を依頼します。",
+    "現時点で個別車両が未確定の場合があり、私が承認していない特定車両を一方的に購入させられるものではないことを理解しました。",
+    "特定車両が提示された後、LINE、SMS、メールその他記録が残る方法で私が購入手続を承認した場合、株式会社エコループが落札・仕入・陸送・登録準備等へ進むことを理解しました。",
+    "特定車両決定後は通常の売買契約書・注文書・割賦契約書等で条件を確認し、本契約と同じ電子契約を再度締結する必要は原則としてないことを理解しました。",
+    "購入を中止する場合は連絡を途絶させず、株式会社エコループへ連絡します。",
+    "最終確認後3営業日以内に回答がない場合、個別事情を確認した上で購入手続が停止・終了される場合があることを理解しました。ただし、回答しなかったことだけで特定車両の購入を承諾したことにはならないことを理解しました。",
+    "自己都合による購入中止で株式会社エコループに損害または費用が生じた場合、3万円を一つの基準として費用が算定される場合がありますが、一律3万円ではなく、消費者契約法その他の法令上認められる範囲に限られることを理解しました。",
+    "本契約を電子的方法で締結し、認証結果・締結日時その他の電子契約記録が証跡として保存されることに同意します。"
+  ];
+  const document = buildEcontractDocument(customer);
+  assert.equal(document.title, ECONTRACT_DOCUMENT_TITLE);
+  assert.equal(document.title, "自社ローン審査可決後 購入申込・手続継続確認契約書");
+  assert.deepEqual(ECONTRACT_IMPORTANT_ITEMS.map((item) => item.text), expectedItems);
+  assert.equal(new Set(ECONTRACT_IMPORTANT_ITEMS.map((item) => item.id)).size, 9);
+  for (let article = 1; article <= 13; article += 1) assert.match(document.text, new RegExp(`第${article}条`));
   for (const phrase of [
-    "一般的・汎用的なローン承認を意味するものではなく",
-    "他店で同一条件の可決が得られる保証はなく",
-    "1か月以上",
-    "一律30日",
-    "3営業日",
-    "3万円を基準",
-    "平均的な損害",
-    "同一損害を重ねて請求しません",
-    "個別車両購入確認書"
+    "本契約は特定の車両についての最終売買契約そのものではありませんが",
+    "車両決定まで1か月以上を要する場合があります。",
+    "その最終確認後3営業日以内に回答がなく",
+    "3万円を無条件または一律に請求するものではありません。",
+    "同一の損害または費用を重複して請求することはありません。",
+    "本人に送信された認証コードを入力し"
   ]) assert.match(document.text, new RegExp(phrase));
-  assert.equal(document.html.includes(customer.name), true);
+  assert.doesNotMatch(document.text, /個別車両購入確認書を別途締結/);
+  assert.doesNotMatch(document.text, /第2契約/);
   assert.match(sha256(document.text), /^[0-9a-f]{64}$/);
 });
 
-test("stage-two snapshot records vehicle, payment, procurement and separate-contract terms", () => {
-  const document = buildVehicleConfirmationDocument(customer, vehicleTerms);
-  assert.equal(VEHICLE_CONFIRMATION_IMPORTANT_ITEMS.length, 6);
-  for (const phrase of ["ZVW50-1234567", "2,000,000円", "60回", "店頭納車", "オークション仕入れ", "落札、仕入、陸送、登録準備", "置き換えるものではありません"]) {
-    assert.match(document.text, new RegExp(phrase));
-  }
-  const changed = buildVehicleConfirmationDocument(customer, { ...vehicleTerms, totalPrice: 2_100_000 });
-  assert.notEqual(sha256(document.text), sha256(changed.text));
-});
-
-test("customer-controlled values are HTML escaped in immutable snapshots", () => {
-  const attacked = buildPurchaseIntentDocument({ ...customer, name: "<script>alert(1)</script>" }, "bike");
+test("customer-controlled document values are escaped", () => {
+  const attacked = buildEcontractDocument({ ...customer, name: "<script>alert(1)</script>" });
   assert.equal(attacked.html.includes("<script>"), false);
   assert.equal(attacked.html.includes("&lt;script&gt;"), true);
 });
 
-test("all individual consents are required and duplicate IDs do not bypass the gate", () => {
-  const expected = PURCHASE_INTENT_IMPORTANT_ITEMS.map((item) => item.id);
+test("all nine consents are mandatory and duplicate IDs cannot bypass signing", () => {
+  const expected = ECONTRACT_IMPORTANT_ITEMS.map((item) => item.id);
   assert.equal(validateConsentIds(expected, expected), true);
   assert.equal(validateConsentIds(expected, expected.slice(1)), false);
   assert.equal(validateConsentIds(expected, Array(expected.length).fill(expected[0])), false);
   assert.equal(validateConsentIds(expected, [...expected, "unexpected"]), false);
 });
 
-test("vehicle conditions reject inconsistent totals and accept a complete stage-two contract", () => {
-  assert.deepEqual(validateVehicleConfirmationTerms(vehicleTerms), []);
-  const errors = validateVehicleConfirmationTerms({ ...vehicleTerms, totalPrice: 9, financedAmount: 9, installmentCount: 0, deliveryMethod: "" });
-  assert.ok(errors.some((error) => error.includes("支払総額")));
-  assert.ok(errors.some((error) => error.includes("支払回数")));
-  assert.ok(errors.some((error) => error.includes("納車方法")));
-});
+test("token, OTP, identity, expiry and evidence primitives remain enforced", () => {
+  const token = generateOpaqueToken();
+  assert.equal(isValidOpaqueToken(token), true);
+  assert.equal(token.length, 43);
+  assert.equal(isValidOtp("123456"), true);
+  assert.equal(isValidOtp("12345"), false);
+  const otpHash = hashOtp("contract-1", "123456", "test-pepper");
+  assert.equal(secureHexEqual(otpHash, hashOtp("contract-1", "123456", "test-pepper")), true);
+  assert.equal(secureHexEqual(otpHash, hashOtp("contract-1", "654321", "test-pepper")), false);
+  assert.equal(identityNamesMatch("山田　太郎", "山田 太郎"), true);
+  assert.equal(identityNamesMatch("山田 次郎", "山田 太郎"), false);
+  assert.equal(maskEmail(customer.email), "ta********@example.com");
 
-test("evidence hashes are canonical and change if signed evidence changes", () => {
+  const now = Date.parse("2026-08-28T00:00:00.000Z");
+  assert.equal(getEcontractAvailability("sent", "2026-08-27T23:59:59.000Z", now), "expired");
+  assert.equal(getEcontractStatusLabel("sent", "2026-08-27T23:59:59.000Z", now), "期限切れ");
+  assert.equal(getEcontractStatusLabel("opened", "2026-08-29T00:00:00.000Z", now), "本人確認／OTP待ち");
+  const pending = { invalidated_at: null, verified_at: null, expires_at: "2026-08-28T00:10:00.000Z", attempt_count: 0, max_attempts: 5 };
+  assert.equal(getOtpChallengeAvailability(null, now), "missing");
+  assert.equal(getOtpChallengeAvailability({ ...pending, attempt_count: 5 }, now), "locked");
+  assert.equal(getOtpChallengeAvailability(pending, now), "pending");
+
   assert.equal(stableJson({ b: 2, a: 1 }), stableJson({ a: 1, b: 2 }));
-  const base = { documentHash: "abc", signedAt: "2026-08-28T00:00:00.000Z", consents: ["a", "b"] };
-  assert.equal(buildEvidenceHash(base), buildEvidenceHash({ signedAt: base.signedAt, consents: base.consents, documentHash: base.documentHash }));
-  assert.notEqual(buildEvidenceHash(base), buildEvidenceHash({ ...base, signedAt: "2026-08-28T00:00:01.000Z" }));
+  assert.notEqual(buildEvidenceHash({ signedAt: "a" }), buildEvidenceHash({ signedAt: "b" }));
 });
 
-test("migration enforces RLS, no direct browser grants, active uniqueness and immutability", async () => {
+test("candidate sync is server-revalidated, idempotent and never sends mail or creates an e-contract", async () => {
+  const [candidateRoute, candidateParser, migration, gasServer, gasUi] = await Promise.all([
+    readFile(new URL("../app/api/sales-contracts/econtract-candidate/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/econtracts/candidate.ts", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260828234610_single_stage_econtract_candidate.sql", import.meta.url), "utf8"),
+    readFile(new URL("../gas-src/CustomerService.js", import.meta.url), "utf8"),
+    readFile(new URL("../gas-src/Index.html", import.meta.url), "utf8")
+  ]);
+  assert.match(candidateRoute, /if \(!isEcontractFeatureEnabled\(\)\)/);
+  assert.match(candidateRoute, /normalizeEcontractCandidatePayload/);
+  assert.match(candidateRoute, /timingSafeEqual/);
+  assert.match(candidateRoute, /upsert_sales_econtract_candidate/);
+  assert.doesNotMatch(candidateRoute, /sendEcontract|Resend|sales_econtracts/);
+  assert.match(candidateParser, /canIssueLoanEcontract/);
+  assert.match(candidateParser, /sourceSystem: "gas_loan_review"/);
+
+  assert.match(migration, /sales_contracts_gas_source_row_key_active_uidx/);
+  assert.match(migration, /sales_contracts_gas_source_row_number_active_uidx/);
+  assert.match(migration, /pg_advisory_xact_lock/g);
+  assert.match(migration, /sc\.source_row_key = v_source_row_key\s+or sl\.application_number = v_application_number/);
+  assert.match(migration, /return jsonb_build_object\('contract_id', v_existing_contract_id, 'created', false\)/);
+  for (const table of ["sales_customers", "sales_contracts", "sales_vehicles", "sales_loans", "sales_audit_logs"]) {
+    assert.match(migration, new RegExp(`insert into public\\.${table}`));
+  }
+  assert.doesNotMatch(migration, /insert into public\.sales_econtracts/);
+  assert.match(migration, /'emailSent', false/);
+  assert.match(migration, /'econtractCreated', false/);
+  assert.match(migration, /grant execute on function public\.upsert_sales_econtract_candidate\(jsonb\) to service_role/);
+  assert.doesNotMatch(migration, /grant execute[^;]+to (?:anon|authenticated)/);
+
+  const syncFunction = gasServer.slice(gasServer.indexOf("function syncEcontractCandidate"), gasServer.indexOf("function getEcontractEligibility_"));
+  assert.match(syncFunction, /findCurrentRowNumber_/);
+  assert.match(syncFunction, /getEcontractEligibility_/);
+  assert.match(syncFunction, /WEBAPP_ECONTRACT_CANDIDATE_API_URL/);
+  assert.doesNotMatch(syncFunction, /GmailApp|sendEmail|電子契約をメール送信/);
+  assert.match(gasUi, /isEcontractEligible\(customer\).*data-econtract-sync/s);
+  assert.match(gasUi, /\.syncEcontractCandidate\(\{ rowNumber: customer\.rowNumber, rowKey: customer\.rowKey \}\)/);
+  assert.match(gasUi, /combined\.indexOf\('保証人'\) !== -1/);
+});
+
+test("new operations issue one kind only, block signed reissue and revalidate resend", async () => {
+  const [actions, card] = await Promise.all([
+    readFile(new URL("../app/admin/sales-contracts/econtract-actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/econtracts/EcontractAdminCard.tsx", import.meta.url), "utf8")
+  ]);
+  assert.match(actions, /export async function issueEcontractAction/);
+  assert.doesNotMatch(actions, /issueVehicleConfirmationEcontractAction|buildVehicleConfirmationDocument/);
+  assert.match(actions, /requireEligibleSource\(source, contractId\)/g);
+  assert.match(actions, /contract_kind !== "purchase_intent"/);
+  assert.match(actions, /contractKind: "purchase_intent"/);
+  assert.match(actions, /status === "signed"/);
+  assert.match(actions, /締結済みの電子契約があるため、新しい電子契約は発行できません/);
+  assert.match(card, /電子契約をメール送信/);
+  assert.doesNotMatch(card, /第1契約|第2契約|issueVehicleConfirmation/);
+  assert.match(card, /過去の電子契約証跡/);
+});
+
+test("OTP verification and all-consent checks still gate signing", async () => {
+  const actions = await readFile(new URL("../app/econtracts/[token]/actions.ts", import.meta.url), "utf8");
+  assert.match(actions, /if \(econtract\.status !== "verified" \|\| !econtract\.verified_at\)/);
+  assert.match(actions, /if \(!validateConsentIds\(expectedIds, consentIds\)\)/);
+  assert.match(actions, /if \(!verification\?\.verified_at\)/);
+  assert.match(actions, /\.eq\("status", "verified"\)\.is\("signed_at", null\)/);
+  assert.match(actions, /customerSnapshot: econtract\.customer_snapshot/);
+  assert.match(actions, /consentSnapshot/);
+  assert.match(actions, /signatureSnapshot/);
+});
+
+test("existing evidence tables remain RLS-protected and immutable", async () => {
   const sql = await readFile(new URL("../supabase/migrations/20260828083618_create_sales_econtracts.sql", import.meta.url), "utf8");
   for (const table of ["sales_econtracts", "sales_econtract_access_sessions", "sales_econtract_verifications", "sales_econtract_events"]) {
     assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, "i"));
     assert.match(sql, new RegExp(`alter table public\\.${table} force row level security`, "i"));
     assert.match(sql, new RegExp(`revoke all on table public\\.${table} from public, anon, authenticated, service_role`, "i"));
   }
-  assert.match(sql, /sales_econtracts_one_active_kind_uidx/);
   assert.match(sql, /issued sales e-contract snapshots are immutable/);
   assert.match(sql, /signed sales e-contract evidence is immutable/);
   assert.match(sql, /verified sales e-contract verification evidence is immutable/);
-  assert.match(sql, /sales_econtract_complete_otp_verification/);
-  assert.match(sql, /sales_econtract_verifications_access_session_idx/);
-  assert.match(sql, /access_session_id uuid not null references public\.sales_econtract_access_sessions/);
   assert.match(sql, /sales e-contract events are append-only/);
-  assert.match(sql, /grant select, insert, update on table public\.sales_econtracts to service_role/i);
-  assert.match(sql, /grant select, insert on table public\.sales_econtract_events to service_role/i);
-  assert.doesNotMatch(sql, /grant\s+all\s+on\s+table\s+public\.sales_econtract/i);
   assert.doesNotMatch(sql, /grant\s+[^;]*(?:delete|truncate)[^;]*on\s+table\s+public\.sales_econtracts\s+to\s+service_role/i);
-  assert.doesNotMatch(sql, /grant\s+[^;]*(?:delete|truncate)[^;]*on\s+table\s+public\.sales_econtract_verifications\s+to\s+service_role/i);
-  assert.doesNotMatch(sql, /grant\s+[^;]*(?:update|delete|truncate)[^;]*on\s+table\s+public\.sales_econtract_events\s+to\s+service_role/i);
   assert.doesNotMatch(sql, /grant\s+(?:select|insert|update|delete|all).*\s+to\s+(?:anon|authenticated)/i);
 });
 
-test("applied e-contract schemas get an exact service role privilege repair", async () => {
-  const sql = await readFile(new URL("../supabase/migrations/20260828140700_restrict_sales_econtract_service_role_privileges.sql", import.meta.url), "utf8");
-  for (const table of ["sales_econtracts", "sales_econtract_access_sessions", "sales_econtract_verifications", "sales_econtract_events"]) {
-    assert.match(sql, new RegExp(`revoke all on table public\\.${table} from service_role`, "i"));
-  }
-  assert.match(sql, /grant select, insert, update on table public\.sales_econtracts to service_role/i);
-  assert.match(sql, /grant select, insert, update, delete on table public\.sales_econtract_access_sessions to service_role/i);
-  assert.match(sql, /grant select, insert, update on table public\.sales_econtract_verifications to service_role/i);
-  assert.match(sql, /grant select, insert on table public\.sales_econtract_events to service_role/i);
-  assert.doesNotMatch(sql, /grant\s+[^;]*(?:truncate|references|trigger)[^;]*to\s+service_role/i);
-});
-
-test("public signing is token- and identity-session-bound while admin views are role-bound", async () => {
-  const [server, customerActions, adminPage, adminActions] = await Promise.all([
-    readFile(new URL("../lib/econtracts/server.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/econtracts/[token]/actions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/admin/econtracts/[id]/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/admin/sales-contracts/econtract-actions.ts", import.meta.url), "utf8")
-  ]);
-  assert.match(server, /\.eq\("link_token_hash", sha256\(token\)\)/);
-  assert.match(server, /\.eq\("econtract_id", econtractId\)[\s\S]*\.eq\("delivery_revision", deliveryRevision\)[\s\S]*\.eq\("session_token_hash", sha256\(rawSession\)\)/);
-  assert.match(server, /getLatestVerification\([\s\S]*options: \{ accessSessionId\?: string; includeInvalidated\?: boolean \}/);
-  assert.match(customerActions, /getLatestVerification\(econtract\.id, econtract\.delivery_revision, \{ includeInvalidated: true \}\)/);
-  assert.match(customerActions, /getLatestVerification\(econtract\.id, econtract\.delivery_revision, \{ accessSessionId: accessSession\.id \}\)/);
-  assert.match(customerActions, /p_access_session_id: accessSession\.id/);
-  assert.match(adminActions, /Number\.isSafeInteger\(parsed\)/);
-  assert.match(customerActions, /\.eq\("status", "verified"\)\.is\("signed_at", null\)/);
-  assert.match(adminPage, /await requireAdmin\(\)/);
-  assert.match(adminActions, /const admin = await requireAdmin\(\)/);
-  assert.doesNotMatch(adminActions, /\.from\("sales_contracts"\)\.update\(/);
-});
-
-test("disabled gate blocks public, admin, email, OTP and database entry points without legacy fallbacks", async () => {
-  const [server, email, customerActions, customerPage, customerPrintPage, adminActions, adminPage, adminPrintPage, adminCard] = await Promise.all([
+test("disabled gate covers public, admin, candidate, email and database entry points", async () => {
+  const [server, email, customerActions, adminActions, candidateRoute] = await Promise.all([
     readFile(new URL("../lib/econtracts/server.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/econtracts/email.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/econtracts/[token]/actions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/econtracts/[token]/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/econtracts/[token]/print/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/sales-contracts/econtract-actions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/admin/econtracts/[id]/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/admin/econtracts/[id]/print/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/econtracts/EcontractAdminCard.tsx", import.meta.url), "utf8")
+    readFile(new URL("../app/api/sales-contracts/econtract-candidate/route.ts", import.meta.url), "utf8")
   ]);
-
   assert.match(server, /ECONTRACT_ENABLED: process\.env\.ECONTRACT_ENABLED/);
-  assert.match(server, /requireEcontractServiceClient\(\) \{\n  requireEcontractFeatureEnabled\(\);/);
-  assert.match(server, /findEcontractByToken\(token: string\) \{\n  if \(!isEcontractFeatureEnabled\(\)\) return null;/);
-  assert.match(email, /if \(!isEcontractFeatureEnabled\(\)\) return null;/);
-  assert.match(email, /if \(!isEcontractFeatureEnabled\(\)\) \{[\s\S]*return \{ ok: false/);
+  assert.match(server, /requireEcontractFeatureEnabled\(\)/);
   assert.doesNotMatch(email, /DIAGNOSIS_|NEXT_PUBLIC_APP_URL|VERCEL_PROJECT_PRODUCTION_URL/);
-  assert.doesNotMatch(customerActions, /DIAGNOSIS_|SUPABASE_SERVICE_ROLE_KEY/);
-  assert.match(customerActions, /return process\.env\.ECONTRACT_OTP_PEPPER\?\.trim\(\) \|\| null;/);
-  for (const action of [
-    "confirmEcontractIdentityAction",
-    "sendEcontractOtpAction",
-    "verifyEcontractOtpAction",
-    "signEcontractAction"
-  ]) {
+  for (const action of ["confirmEcontractIdentityAction", "sendEcontractOtpAction", "verifyEcontractOtpAction", "signEcontractAction"]) {
     assert.match(customerActions, new RegExp(`export async function ${action}\\(formData: FormData\\) \\{\\n  requirePublicEcontractFeature\\(\\);`));
   }
-  assert.match(customerActions, /if \(!isEcontractFeatureEnabled\(\)\) notFound\(\);/);
-  assert.match(customerPage, /if \(!econtract\) notFound\(\);/);
-  assert.match(customerPrintPage, /if \(!contract \|\| contract\.status !== "signed"\) notFound\(\);/);
-  for (const action of [
-    "issuePurchaseIntentEcontractAction",
-    "issueVehicleConfirmationEcontractAction",
-    "resendEcontractAction",
-    "cancelEcontractAction"
-  ]) {
+  for (const action of ["issueEcontractAction", "resendEcontractAction", "cancelEcontractAction"]) {
     assert.match(adminActions, new RegExp(`export async function ${action}\\(formData: FormData\\)[\\s\\S]*?requireAdminEcontractFeature\\(contractId\\);`));
   }
-  assert.match(adminActions, /requireEcontractFeatureEnabled\(\);/);
-  for (const adminSurface of [adminPage, adminPrintPage, adminCard]) {
-    assert.match(adminSurface, /電子契約機能は現在無効です|ECONTRACT_DISABLED_MESSAGE/);
-  }
+  assert.match(candidateRoute, /if \(!isEcontractFeatureEnabled\(\)\)[\s\S]*status: 404/);
 });

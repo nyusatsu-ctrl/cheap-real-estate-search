@@ -11,10 +11,6 @@ body {
   color: #0f172a;
 }
 
-body:has([data-admin-login-system="contract"]) > header {
-  display: none;
-}
-
 button,
 input,
 select,

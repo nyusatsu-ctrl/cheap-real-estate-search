@@ -51,6 +51,7 @@ var WEBAPP_PREMIUM_DENIAL_EMAIL_FROM = 'info@ecoloop-loan.net';
 var WEBAPP_PREMIUM_DENIAL_EMAIL_FROM_NAME = '株式会社エコループ';
 var WEBAPP_PREMIUM_DENIAL_EMAIL_ALIAS_ERROR = 'info@ecoloop-loan.net がGmailの送信元エイリアスに登録されていないため、送信できません。Gmail設定で送信元アドレスを追加してください。';
 var WEBAPP_SALES_CONTRACT_STATUS_API_URL = 'https://cheap-real-estate-search.vercel.app/api/sales-contracts/loan-review-status';
+var WEBAPP_ECONTRACT_CANDIDATE_API_URL = 'https://cheap-real-estate-search.vercel.app/api/sales-contracts/econtract-candidate';
 var WEBAPP_LOAN_REVIEW_API_SECRET_PROPERTY_KEY = 'LOAN_REVIEW_API_SECRET';
 var WEBAPP_SALES_CONTRACT_STATUS_BATCH_SIZE = 100;
 
@@ -583,6 +584,93 @@ function markSalesContractStatusesUnchecked_(customers, reason) {
       reason: reason || ''
     };
   });
+}
+
+function syncEcontractCandidate(payload) {
+  if (!payload || !payload.rowKey) {
+    throw new Error('電子契約の対象が指定されていません。画面を再読み込みしてください。');
+  }
+
+  var secret = String(PropertiesService.getScriptProperties().getProperty(WEBAPP_LOAN_REVIEW_API_SECRET_PROPERTY_KEY) || '').trim();
+  if (!secret) {
+    throw new Error('電子契約連携の認証設定が未完了です。管理者へ連絡してください。');
+  }
+
+  var sheet = getMainSheet_();
+  var headerMap = getHeaderMap_(sheet);
+  var managementMap = getManagementColumnMap_(headerMap);
+  var rowNumber = findCurrentRowNumber_(sheet, payload);
+  if (!rowNumber) {
+    throw new Error('対象の申込行が見つかりません。画面を再読み込みしてください。');
+  }
+
+  var row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  var rowKey = buildApplicationRowKey_(row, headerMap);
+  var status = normalizeStatusLabel_(getManagedCell_(row, managementMap, '対応状況') || getManagedCell_(row, managementMap, '対応ステータス') || '');
+  var premiumReview = String(getManagedCell_(row, managementMap, 'プレミアファイナンス審査結果') || '未依頼').trim();
+  var astReview = String(getManagedCell_(row, managementMap, 'アスト審査結果') || '未依頼').trim();
+  var eligibility = getEcontractEligibility_(status, premiumReview, astReview);
+  if (!eligibility.eligible) {
+    throw new Error('電子契約はプレミアまたはアストで可決済みの顧客だけが対象です。');
+  }
+
+  var requestType = String(getCellByHeader_(row, headerMap, 'ご希望') || '');
+  var response = UrlFetchApp.fetch(WEBAPP_ECONTRACT_CANDIDATE_API_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'x-loan-review-secret': secret
+    },
+    payload: JSON.stringify({
+      sourceSystem: 'gas_loan_review',
+      sourceRowKey: rowKey,
+      sourceRowNumber: rowNumber,
+      sourceReceivedAt: getCellByHeader_(row, headerMap, '受信日時') || '',
+      applicationNumber: rowKey,
+      customerName: getCellByHeader_(row, headerMap, 'お名前') || '',
+      customerKana: getCellByHeader_(row, headerMap, 'フリガナ') || '',
+      phone: normalizeDisplayValue_('電話番号', getCellByHeader_(row, headerMap, '電話番号')),
+      email: getCellByHeader_(row, headerMap, 'メールアドレス') || '',
+      address: getCellByHeader_(row, headerMap, '住所') || '',
+      vehicleType: requestType.indexOf('バイク') !== -1 ? 'bike' : 'car',
+      desiredVehicle: getCellByHeader_(row, headerMap, '希望車種(希望車種)') || '',
+      contractType: 'loan',
+      financeCompany: eligibility.financeCompany,
+      approvalStatus: 'approved'
+    }),
+    muteHttpExceptions: true
+  });
+
+  var statusCode = Number(response.getResponseCode());
+  var parsed;
+  try {
+    parsed = JSON.parse(response.getContentText() || '{}');
+  } catch (error) {
+    parsed = {};
+  }
+  if (statusCode < 200 || statusCode >= 300 || !parsed.url) {
+    throw new Error(String(parsed.message || '電子契約候補を契約管理へ連携できませんでした。'));
+  }
+
+  return {
+    created: parsed.created === true,
+    contractId: String(parsed.contract_id || ''),
+    url: String(parsed.url || '')
+  };
+}
+
+function getEcontractEligibility_(status, premiumReview, astReview) {
+  var combined = [status, premiumReview, astReview].join(' ');
+  if (combined.indexOf('保証人') !== -1) {
+    return { eligible: false, financeCompany: '' };
+  }
+  if (status === 'アスト可決' || astReview === '可決') {
+    return { eligible: true, financeCompany: 'ast' };
+  }
+  if (status === 'プレミア可決' || premiumReview === '可決') {
+    return { eligible: true, financeCompany: 'premium' };
+  }
+  return { eligible: false, financeCompany: '' };
 }
 
 function buildDisplayDuplicateKey_(customer) {

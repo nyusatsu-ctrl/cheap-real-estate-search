@@ -1650,6 +1650,8 @@
       </div>
     </div>
 
+    <?!= include('AstApplicationEditor'); ?>
+
     <script>
       const IS_MARKET_ADMIN = document.body.dataset.marketAdmin === '1';
       const MARKET_ADMIN_PASSCODE = <?!= typeof marketAdminPasscodeJson !== 'undefined' ? marketAdminPasscodeJson : '""' ?>;
@@ -3170,6 +3172,7 @@
             ${showAstReview ? selectField('アスト審査結果', 'review2', customer.review2, state.reviewOptions) : hiddenField('review2', customer.review2)}
             <div class="actions" style="justify-content:flex-start;">
               <button type="button" id="premiumPdfButton" class="primary">プレミア申込書を作成</button>
+              <button type="button" id="astPdfButton" class="primary">アスト申込書を作成</button>
               <button type="button" id="premiumDenialEmailButton" class="danger">プレミア否決メール送信</button>
             </div>
             <div class="detail-subtitle">メモ・備考</div>
@@ -3217,6 +3220,7 @@
         document.getElementById('callJumpButton').addEventListener('click', () => focusDetailSection('callForm', 'callResult'));
         document.getElementById('statusJumpButton').addEventListener('click', () => focusDetailSection('managementForm', 'status'));
         document.getElementById('premiumPdfButton').addEventListener('click', createPremiumApplicationPdf);
+        document.getElementById('astPdfButton').addEventListener('click', openAstApplicationEditor);
         document.getElementById('premiumDenialEmailButton').addEventListener('click', openPremiumDenialEmailModal);
         document.getElementById('marketSearchButton').addEventListener('click', searchMarketForSelected);
         document.querySelectorAll('[data-market-candidate]').forEach((button) => {

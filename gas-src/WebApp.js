@@ -137,6 +137,10 @@ function getPremiumTemplateDataUrl() {
   return HtmlService.createHtmlOutputFromFile('PremiumPrintTemplate').getContent();
 }
 
+function getAstTemplateDataUrl() {
+  return HtmlService.createHtmlOutputFromFile('AstApplicationTemplate').getContent();
+}
+
 function escapeHtmlForDebug_(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')

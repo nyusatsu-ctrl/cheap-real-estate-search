@@ -1,15 +1,18 @@
+import { loanFormMachinePrintingPolicy } from "@/lib/loan-forms/policy";
+
 export default function PremiumLoanFormPage() {
+  const premiumPolicy = loanFormMachinePrintingPolicy.premium;
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <p className="text-sm font-bold text-slate-500">プレミア申込書</p>
-      <h1 className="mt-1 text-2xl font-black text-slate-950">顧客詳細画面から作成してください</h1>
+      <h1 className="mt-1 text-2xl font-black text-slate-950">手書き運用です</h1>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        申込書用の手入力フォームは使用しません。自社ローン審査管理アプリで顧客を選択し、顧客詳細画面の
-        「プレミア申込書を作成」ボタンからPDFを作成します。
+        {premiumPolicy.message} プレミアからの回答に基づく運用です。申込書は承認済みの手書き手順で作成してください。
       </p>
-      <a href="/loan/forms/premium/adjust" className="mt-5 inline-flex rounded border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">
-        印字位置調整を開く
-      </a>
+      <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+        プレミアの審査依頼、審査結果管理、否決メールなど、申込書印字以外の既存業務は引き続き利用できます。
+      </p>
     </div>
   );
 }

@@ -1653,6 +1653,13 @@
     <?!= include('AstApplicationEditor'); ?>
 
     <script>
+      // 申込書の機械印字に関する信販会社別の運用許可境界。
+      // アストは事前許可済みのため正式運用を維持する。
+      // プレミアは機械印字・自動印刷不可の回答を受けているため、書面による再許可と変更承認なしに有効化しない。
+      const APPLICATION_FORM_PRINT_POLICY = Object.freeze({
+        astMachinePrintingAllowed: true,
+        premiumMachinePrintingAllowed: false
+      });
       const IS_MARKET_ADMIN = document.body.dataset.marketAdmin === '1';
       const MARKET_ADMIN_PASSCODE = <?!= typeof marketAdminPasscodeJson !== 'undefined' ? marketAdminPasscodeJson : '""' ?>;
       const INITIAL_LOAN_REVIEW_PARAMS = <?!= typeof initialLoanReviewParamsJson !== 'undefined' ? initialLoanReviewParamsJson : '{}' ?>;
@@ -3171,7 +3178,7 @@
             ${selectField('プレミアファイナンス審査結果', 'review1', customer.review1, state.reviewOptions)}
             ${showAstReview ? selectField('アスト審査結果', 'review2', customer.review2, state.reviewOptions) : hiddenField('review2', customer.review2)}
             <div class="actions" style="justify-content:flex-start;">
-              <button type="button" id="premiumPdfButton" class="primary">プレミア申込書を作成</button>
+              <button type="button" id="premiumPdfButton" disabled title="プレミア申込書は手書き運用です。機械印字・自動印刷は利用できません。">プレミア申込書（手書き運用）</button>
               <button type="button" id="astPdfButton" class="primary">アスト申込書を作成</button>
               <button type="button" id="premiumDenialEmailButton" class="danger">プレミア否決メール送信</button>
             </div>
@@ -3816,6 +3823,10 @@
       }
 
       async function createPremiumApplicationPdf() {
+        if (!APPLICATION_FORM_PRINT_POLICY.premiumMachinePrintingAllowed) {
+          showToast('プレミア申込書は手書き運用です。機械印字・自動印刷は利用できません。');
+          return;
+        }
         if (!state.selected || state.saving) {
           return;
         }

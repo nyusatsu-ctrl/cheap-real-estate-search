@@ -213,17 +213,41 @@ test("顧客情報保存は明示的なONが必須で、許可列だけを更新
   assert.doesNotMatch(source, /GmailApp|MailApp|UrlFetchApp.*FAX|sales_econtracts|署名証跡/);
 });
 
-test("既存プレミア申込書作成機能を維持する", async () => {
-  const [index, webApp, template] = await Promise.all([
+test("アスト機械印字を正式運用で維持し、プレミア機械印字だけを全入口で停止する", async () => {
+  const [index, webApp, template, policy, premiumPage, premiumAdjustPage, premiumPdfRoute, premiumConfigRoute, nextPolicy] = await Promise.all([
     read("gas-src/Index.html"),
     read("gas-src/WebApp.js"),
     read("gas-src/PremiumPrintTemplate.html"),
+    read("docs/application-form-printing-policy.md"),
+    read("app/loan/forms/premium/page.tsx"),
+    read("app/loan/forms/premium/adjust/page.tsx"),
+    read("app/api/loan-forms/[company]/pdf/route.ts"),
+    read("app/api/loan-forms/[company]/config/route.ts"),
+    read("lib/loan-forms/policy.ts"),
   ]);
-  assert.match(index, /id="premiumPdfButton"/);
+  assert.match(index, /astMachinePrintingAllowed:\s*true/);
+  assert.match(index, /premiumMachinePrintingAllowed:\s*false/);
+  assert.match(index, /id="premiumPdfButton"[^>]*disabled/);
+  assert.match(index, /if \(!APPLICATION_FORM_PRINT_POLICY\.premiumMachinePrintingAllowed\)/);
+  assert.match(index, /id="astPdfButton" class="primary">アスト申込書を作成/);
+  assert.match(index, /id="premiumRequestButton"/);
+  assert.match(index, /id="premiumDenialEmailButton"/);
   assert.match(index, /function createPremiumApplicationPdf\(\)/);
   assert.match(index, /function buildPremiumPrintHtml\(/);
-  assert.match(webApp, /function getPremiumTemplateDataUrl\(\)/);
+  assert.match(webApp, /premium:\s*false/);
+  assert.match(webApp, /function getPremiumTemplateDataUrl\(\)[\s\S]*?if \(!APPLICATION_FORM_MACHINE_PRINT_POLICY\.premium\)/);
+  assert.match(webApp, /ast:\s*true/);
+  assert.match(webApp, /function getAstTemplateDataUrl\(\)[\s\S]*?if \(!APPLICATION_FORM_MACHINE_PRINT_POLICY\.ast\)/);
   assert.match(template, /^data:image\/jpeg;base64,/);
+  assert.match(policy, /アスト申込書作成.*正式運用対象/);
+  assert.match(policy, /プレミア申込書は手書き運用/);
+  assert.match(policy, /プレミアの審査依頼、審査結果管理、否決メール/);
+  assert.match(premiumPage, /手書き運用です/);
+  assert.doesNotMatch(premiumPage, /印字位置調整を開く/);
+  assert.match(premiumAdjustPage, /redirect\("\/loan\/forms\/premium"\)/);
+  assert.match(nextPolicy, /premium:[\s\S]*?allowed:\s*false/);
+  assert.match(premiumPdfRoute, /if \(!policy\.allowed\)[\s\S]*?status:\s*403/);
+  assert.match(premiumConfigRoute, /if \(!getLoanFormMachinePrintingPolicy\(company\)\.allowed\)/);
 });
 
 test("公式原本とGAS背景テンプレートをリポジトリ内に保持する", async () => {

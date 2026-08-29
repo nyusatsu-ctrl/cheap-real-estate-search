@@ -1,6 +1,7 @@
 // ============================================================
 // アスト申込書
 // 申込書作成は印刷専用です。送信・審査依頼・契約作成は行いません。
+// 自動記入と顧客情報への任意保存は、原本の申込者氏名欄以降だけを対象とします。
 // 顧客管理への保存は、画面で明示的に選択された場合だけ、この許可リストを使います。
 // ============================================================
 
@@ -29,11 +30,7 @@ var AST_CUSTOMER_SAVE_FIELD_MAP = {
   emergencyKana: 'フリガナ(独り暮らしの場合)',
   emergencyAddress: '住所(独り暮らしの場合)',
   emergencyRelationship: '間柄(独り暮らしの場合)',
-  emergencyPhone: '電話番号(独り暮らしの場合)',
-  vehicleName: '希望車種(希望車種)',
-  vehicleYear: '年式(希望車種)',
-  vehicleGrade: 'グレード(希望車種)',
-  vehicleColor: '色(希望車種)'
+  emergencyPhone: '電話番号(独り暮らしの場合)'
 };
 
 var AST_CUSTOMER_PHONE_FIELDS = {
@@ -110,8 +107,6 @@ function buildAstCustomerUpdates_(form) {
   updates['居住年数'] = buildAstDurationForCustomer_(form.residenceYears, form.residenceMonths);
   updates['勤続年数'] = buildAstDurationForCustomer_(form.employmentYears, form.employmentMonths);
   updates['配偶者以外の同居のご家族（子◯人・その他◯人）'] = buildAstFamilyForCustomer_(form);
-  updates['審査申込金額'] = astManYenToYen_(form.loanAmountManYen);
-  updates['担当者'] = astString_(form.salesStaff);
 
   return updates;
 }
@@ -146,18 +141,6 @@ function buildAstFamilyForCustomer_(form) {
     return '';
   }
   return '子' + (children || '0') + '人・その他' + (others || '0') + '人';
-}
-
-function astManYenToYen_(value) {
-  var text = astString_(value).replace(/,/g, '').replace(/万円/g, '');
-  if (!text) {
-    return '';
-  }
-  var amount = Number(text);
-  if (!isFinite(amount) || amount < 0) {
-    return '';
-  }
-  return Math.round(amount * 10000);
 }
 
 function isAstPhoneColumn_(columnName) {

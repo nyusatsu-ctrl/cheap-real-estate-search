@@ -229,7 +229,8 @@ var WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS = 240000;
 var WEBAPP_PENDING_MARKET_LOOKUP_MAX_SCAN_ROWS_PER_RUN = 120;
 var WEBAPP_PENDING_MARKET_LOOKUP_CURSOR_PROPERTY_KEY = 'PENDING_BIKE_MARKET_LOOKUP_CURSOR_ROW';
 var WEBAPP_PENDING_MARKET_LOOKUP_LOCK_TIMEOUT_MS = 1000;
-var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v21-high-price-outlier-display';
+var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v22-multi-model-year-context';
+var WEBAPP_BIKE_MARKET_MAX_MODELS_PER_REQUEST = 3;
 var WEBAPP_BIKE_MARKET_GOOBIKE_BASE_URL = 'https://goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_ALTERNATE_BASE_URL = 'https://www.goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_SOURCE = 'GooBike';
@@ -270,6 +271,7 @@ var GOOBIKE_MODEL_MASTER_MAKER_PAGES = [
 ];
 var GOOBIKE_MODEL_MASTER_SEEDS = [
   { maker: 'ホンダ', officialModelName: 'ＡＤＶ１６０', sourceUrl: 'https://www.goobike.com/maker-honda/car-adv160/index.html' },
+  { maker: 'ホンダ', officialModelName: 'フォルツァ', sourceUrl: 'https://www.goobike.com/maker-honda/car-forza/index.html' },
   { maker: 'ホンダ', officialModelName: 'ＭＡＧＮＡ　ＦＩＦＴＹ', sourceUrl: 'https://www.goobike.com/maker-honda/car-magna_fifty/index.html' },
   { maker: 'ホンダ', officialModelName: 'ＣＢＲ４００Ｒ', sourceUrl: 'https://www.goobike.com/maker-honda/car-cbr400r/index.html' },
   { maker: 'ホンダ', officialModelName: 'スーパーカブ１１０プロ', sourceUrl: 'https://www.goobike.com/maker-honda/car-super_cub_110_pro/index.html' },
@@ -303,7 +305,8 @@ var GOOBIKE_MODEL_MASTER_SEEDS = [
   { maker: 'HARLEY-DAVIDSON', officialModelName: 'ＦＸＬＲＳ　ローライダーＳ', sourceUrl: 'https://www.goobike.com/maker-harley_davidson/car-fxlrs_low_rider_s/index.html' }
 ];
 var BIKE_MODEL_ALIASES = {
-  cb400sf: ['cb400sf', 'cb 400 sf', 'cb400 super four', 'cb 400 super four', 'cb400スーパーフォア', 'cb400 superfour', 'cb400sf vtec', 'ＣＢ４００Ｓｕｐｅｒ Ｆｏｕｒ'],
+  cb400sf: ['cb400sf', 'cb 400 sf', 'cb400 super four', 'cb 400 super four', 'cb400スーパーフォア', 'cb400スーパーフォアsf', 'cb400 superfour', 'cb400sf vtec', 'ＣＢ４００Ｓｕｐｅｒ Ｆｏｕｒ'],
+  forza: ['フォルツァ', 'フォルツァ250', 'フォルツァ 250', 'forza', 'forza250', 'forza 250', 'mf06', 'mf08', 'mf10', 'mf12', 'mf13', 'mf15', 'mf17'],
   ninjazx4rse: ['ninjazx4rse', 'ninja zx-4r se', 'ninja zx4r se', 'ニンジャzx4rse', 'ニンジャzx-4r se', 'ｎｉｎｊａ ｚｘ−４ｒ ｓｅ', 'zx400p'],
   bmws1000r: ['bmws1000r', 'bmw s1000r', 's1000r', 's 1000 r', 'bmw s 1000 r'],
   dragstar250: ['ドラッグスター250', 'ドラッグスター 250', 'ドラッグスター250cc', 'dragstar250', 'drag star 250', 'DragStar250', 'DRAGSTAR250', 'xvs250', 'XVS250'],
@@ -1629,6 +1632,17 @@ function getStoredBikeMarketStatus_(normalizedResult, summary) {
 }
 
 function getBikeMarketResultMessage_(summary) {
+  if (summary && Array.isArray(summary.modelResults) && summary.modelResults.length > 1) {
+    var successCount = summary.modelResults.filter(function(result) {
+      return result && result.status === 'success';
+    }).length;
+    if (successCount === summary.modelResults.length) {
+      return summary.modelResults.length + '車種分の相場情報を別々に保存しました。';
+    }
+    if (successCount > 0) {
+      return successCount + '/' + summary.modelResults.length + '車種分の相場を取得しました。取得できなかった車種も個別に表示しています。';
+    }
+  }
   var normalizedError = normalizeBikeMarketDisplayError_(summary && summary.errorMessage);
   if (!normalizedError) {
     return '相場情報を保存しました。';
@@ -2325,6 +2339,7 @@ function buildBikeMarketState_(row, headerMap, hasBikeMarketCsv) {
   var savedMarketStatus = getCellByHeader_(row, headerMap, '相場_ステータス');
   var savedErrorCode = getCellByHeader_(row, headerMap, '相場_エラーコード');
   var rawSummary = safeParseJson_(getCellByHeader_(row, headerMap, '相場_生データ'));
+  var modelResults = getBikeMarketModelResults_(rawSummary);
   var aggregation = getBikeMarketAggregation_(rawSummary);
   if (!isBikeMarketAggregationSuccess_(aggregation)) {
     aggregation = readBikeMarketAggregationFromSavedColumns_(row, row, headerMap);
@@ -2410,6 +2425,12 @@ function buildBikeMarketState_(row, headerMap, hasBikeMarketCsv) {
     priceWarning: aggregation.price_warning || '',
     noDataReason: rawSummary && rawSummary.noDataReason ? rawSummary.noDataReason : '',
     modelCandidateOptions: getBikeMarketDisplayCandidateOptions_(rawSummary),
+    modelResults: modelResults,
+    modelCount: modelResults.length || 1,
+    successfulModelCount: modelResults.filter(function(result) { return result.status === 'success'; }).length,
+    normalizedYearLabel: rawSummary && rawSummary.normalizedYearLabel
+      ? rawSummary.normalizedYearLabel
+      : getBikeMarketYearConditionLabel_(normalizeYearInput_(searchYear || currentYear)),
     priceAggregation: aggregation,
     mappingError: aggregationValidation.valid ? '' : aggregationValidation.message,
     marketStatus: hasSuccessValues ? 'success' : savedMarketStatus,
@@ -2421,6 +2442,32 @@ function buildBikeMarketState_(row, headerMap, hasBikeMarketCsv) {
     searchBikeName: searchBikeName,
     searchYear: searchYear
   };
+}
+
+function getBikeMarketModelResults_(summary) {
+  if (!summary || !Array.isArray(summary.modelResults)) {
+    return [];
+  }
+  return summary.modelResults.map(function(result) {
+    var item = result || {};
+    var aggregation = getBikeMarketAggregation_(item);
+    var success = isBikeMarketAggregationSuccess_(aggregation);
+    return {
+      bikeName: item.bikeName || item.requestedBikeName || '',
+      requestedBikeName: item.requestedBikeName || item.bikeName || '',
+      resolvedBikeName: item.resolvedBikeName || '',
+      yearInput: item.yearInput || summary.yearInput || '',
+      normalizedYearLabel: item.normalizedYearLabel || summary.normalizedYearLabel || '',
+      status: success ? 'success' : (item.status || 'error'),
+      noDataReason: item.noDataReason || '',
+      errorCode: success ? '' : (item.errorCode || ''),
+      errorMessage: success ? '' : normalizeBikeMarketDisplayError_(item.errorMessage || ''),
+      fetchedAt: item.fetchedAt || summary.fetchedAt || '',
+      sources: Array.isArray(item.sources) ? item.sources : [],
+      modelCandidateOptions: Array.isArray(item.modelCandidateOptions) ? item.modelCandidateOptions : [],
+      priceAggregation: aggregation
+    };
+  });
 }
 
 function getBikeMarketAggregation_(summary) {
@@ -2769,33 +2816,149 @@ function parseDateTimeValue_(value) {
 }
 
 function getBikeMarketSummaryWithCache_(bikeName, yearInput, now) {
-  var normalizedYear = normalizeYearInput_(yearInput);
   var multipleCandidates = splitMultipleBikeModelInput_(bikeName);
   if (multipleCandidates.length > 1) {
-    return buildBikeMarketModelConfirmSummary_(
+    return buildBikeMarketMultiModelSummary_(
       bikeName,
       yearInput,
-      Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'),
-      'multiple_model_candidates',
-      multipleCandidates
+      multipleCandidates.slice(0, WEBAPP_BIKE_MARKET_MAX_MODELS_PER_REQUEST),
+      now
     );
   }
+  return getSingleBikeMarketSummaryWithCache_(bikeName, yearInput, now);
+}
+
+function getSingleBikeMarketSummaryWithCache_(bikeName, yearInput, now) {
+  var normalizedYear = normalizeYearInput_(yearInput);
   var modelResolution = resolveGoobikeOfficialModelForInput_(bikeName);
   var cacheModelKey = modelResolution.status === 'resolved' ? modelResolution.normalizedModelName : normalizeBikeMarketKeyPart_(bikeName);
   var cacheKey = WEBAPP_BIKE_MARKET_CACHE_VERSION + '|' + cacheModelKey + '|' + normalizedYear.cachePart;
   var cached = getBikeMarketCache_(cacheKey, now);
   if (cached && isBikeMarketSummaryCacheable_(cached)) {
     cached.fromCache = true;
-    return cached;
+    return annotateBikeMarketYearCondition_(cached, normalizedYear);
   }
 
   var summary = buildBikeMarketSummaryFromManualCsv_(bikeName, yearInput, normalizedYear, now);
   if (summary && summary.status === 'no_data') {
     summary = buildBikeMarketSummaryFromGoobike_(bikeName, yearInput, normalizedYear, now, modelResolution);
   }
+  annotateBikeMarketYearCondition_(summary, normalizedYear);
   if (isBikeMarketSummaryCacheable_(summary)) {
     saveBikeMarketCache_(cacheKey, bikeName, yearInput, summary, now);
   }
+  return summary;
+}
+
+function buildBikeMarketMultiModelSummary_(bikeName, yearInput, modelNames, now) {
+  var normalizedYear = normalizeYearInput_(yearInput);
+  var fetchedAt = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+  var modelResults = [];
+  var sources = [];
+  var warnings = [];
+
+  (modelNames || []).forEach(function(modelName) {
+    var modelSummary;
+    try {
+      modelSummary = getSingleBikeMarketSummaryWithCache_(modelName, yearInput, now);
+    } catch (error) {
+      modelSummary = buildBikeMarketSystemErrorSummary_(
+        modelName,
+        yearInput,
+        fetchedAt,
+        error && error.message ? error.message : String(error || ''),
+        WEBAPP_BIKE_MARKET_ERROR_CODES.SYSTEM_ERROR,
+        error && error.stack ? error.stack : ''
+      );
+      annotateBikeMarketYearCondition_(modelSummary, normalizedYear);
+    }
+    var compact = compactBikeMarketModelResult_(modelName, modelSummary, normalizedYear);
+    modelResults.push(compact);
+    (compact.sources || []).forEach(function(source) {
+      if (source && sources.indexOf(source) === -1) {
+        sources.push(source);
+      }
+    });
+  });
+
+  var successfulResults = modelResults.filter(function(result) { return result.status === 'success'; });
+  var modelCheckResults = modelResults.filter(function(result) { return result.status === 'model_check'; });
+  var noDataResults = modelResults.filter(function(result) { return result.status === 'no_data'; });
+  var primary = successfulResults[0] || modelResults[0] || compactBikeMarketModelResult_(bikeName, null, normalizedYear);
+  var overallStatus = successfulResults.length > 0 ? 'success' : (noDataResults.length + modelCheckResults.length === modelResults.length ? 'no_data' : 'error');
+  var errorMessage = '';
+  var noDataReason = '';
+  if (!successfulResults.length && modelCheckResults.length) {
+    errorMessage = WEBAPP_BIKE_MARKET_ERROR_MODEL_CONFIRM;
+    noDataReason = 'model_confirmation_required';
+  } else if (!successfulResults.length && noDataResults.length === modelResults.length) {
+    errorMessage = WEBAPP_BIKE_MARKET_ERROR_NO_MATCH;
+    noDataReason = 'no_match';
+  } else if (!successfulResults.length) {
+    errorMessage = WEBAPP_BIKE_MARKET_ERROR_SYSTEM;
+    noDataReason = 'fetch_error';
+  }
+
+  if (successfulResults.length === modelResults.length) {
+    warnings.push(modelResults.length + '車種を別々に取得しました。価格は車種間で混ぜずに集計しています。');
+  } else if (successfulResults.length > 0) {
+    warnings.push(successfulResults.length + '/' + modelResults.length + '車種を取得しました。取得できなかった車種は個別に表示しています。');
+  }
+
+  return {
+    bikeName: bikeName || '',
+    requestedBikeName: bikeName || '',
+    primaryBikeName: primary.bikeName || '',
+    yearInput: yearInput || '',
+    normalizedYear: normalizedYear,
+    normalizedYearLabel: getBikeMarketYearConditionLabel_(normalizedYear),
+    sources: sources,
+    status: overallStatus,
+    errorMessage: errorMessage,
+    errorCode: overallStatus === 'error' ? WEBAPP_BIKE_MARKET_ERROR_CODES.SYSTEM_ERROR : '',
+    noDataReason: noDataReason,
+    fetchedAt: fetchedAt,
+    warnings: warnings,
+    modelCount: modelResults.length,
+    successfulModelCount: successfulResults.length,
+    modelResults: modelResults,
+    priceAggregation: primary.priceAggregation,
+    listings: []
+  };
+}
+
+function compactBikeMarketModelResult_(bikeName, summary, normalizedYear) {
+  summary = summary || {};
+  var aggregation = getBikeMarketAggregation_(summary);
+  var success = isBikeMarketAggregationSuccess_(aggregation);
+  var normalizedError = normalizeBikeMarketDisplayError_(summary.errorMessage || '');
+  var status = success ? 'success' : (normalizedError === WEBAPP_BIKE_MARKET_ERROR_MODEL_CONFIRM ? 'model_check' : (summary.status === 'no_data' ? 'no_data' : 'error'));
+  var modelCandidateOptions = Array.isArray(summary.modelCandidateOptions) ? summary.modelCandidateOptions.slice(0, WEBAPP_GOOBIKE_MODEL_MASTER_CANDIDATE_MAX) : [];
+  return {
+    bikeName: bikeName || summary.bikeName || '',
+    requestedBikeName: summary.requestedBikeName || summary.bikeName || bikeName || '',
+    resolvedBikeName: summary.usedGoobikeOfficialModelName || summary.primaryBikeName || '',
+    yearInput: summary.yearInput || '',
+    normalizedYear: normalizedYear,
+    normalizedYearLabel: getBikeMarketYearConditionLabel_(normalizedYear),
+    status: status,
+    noDataReason: summary.noDataReason || '',
+    errorCode: summary.errorCode || '',
+    errorMessage: normalizedError,
+    fetchedAt: summary.fetchedAt || '',
+    sources: Array.isArray(summary.sources) ? summary.sources.slice() : [],
+    warnings: Array.isArray(summary.warnings) ? summary.warnings.slice(0, 5) : [],
+    modelCandidateOptions: modelCandidateOptions,
+    priceAggregation: aggregation
+  };
+}
+
+function annotateBikeMarketYearCondition_(summary, normalizedYear) {
+  if (!summary) {
+    return summary;
+  }
+  summary.normalizedYear = normalizedYear;
+  summary.normalizedYearLabel = getBikeMarketYearConditionLabel_(normalizedYear);
   return summary;
 }
 
@@ -3690,9 +3853,10 @@ function buildGoobikeFreeSearchUrl_(phrase, normalizedYear) {
     query: phrase,
     limit: '30'
   };
-  if (normalizedYear && normalizedYear.valid && !normalizedYear.unspecified && normalizedYear.from) {
-    payload.syear1 = String(normalizedYear.from);
-    payload.syear2 = String(normalizedYear.to || normalizedYear.from);
+  if (normalizedYear && normalizedYear.valid && !normalizedYear.unspecified && (normalizedYear.from || normalizedYear.to)) {
+    var yearBounds = getBikeMarketRequestYearBounds_(normalizedYear);
+    payload.syear1 = String(yearBounds.from);
+    payload.syear2 = String(yearBounds.to);
   }
   var query = Object.keys(payload).filter(function(key) {
     return payload[key] !== '';
@@ -3806,11 +3970,12 @@ function buildGoobikeSearchResultUrl_(searchIds, normalizedYear) {
     used_car: '1',
     siborikomi: 'on'
   };
-  if (normalizedYear && normalizedYear.valid && !normalizedYear.unspecified && normalizedYear.from) {
-    payload.syear1 = String(normalizedYear.from);
-    payload.syear2 = String(normalizedYear.to || normalizedYear.from);
-    payload.nenshiki_start = String(normalizedYear.from);
-    payload.nenshiki_end = String(normalizedYear.to || normalizedYear.from);
+  if (normalizedYear && normalizedYear.valid && !normalizedYear.unspecified && (normalizedYear.from || normalizedYear.to)) {
+    var yearBounds = getBikeMarketRequestYearBounds_(normalizedYear);
+    payload.syear1 = String(yearBounds.from);
+    payload.syear2 = String(yearBounds.to);
+    payload.nenshiki_start = String(yearBounds.from);
+    payload.nenshiki_end = String(yearBounds.to);
   }
   var query = Object.keys(payload).filter(function(key) {
     return payload[key] !== '';
@@ -5421,6 +5586,22 @@ function normalizeYearInput_(value) {
   if (unspecifiedTerms[text]) {
     return { raw: text, cachePart: '', from: null, to: null, unspecified: true, valid: true };
   }
+
+  var yearTokenPattern = '((?:令和|平成|昭和)(?:元|[0-9]+)?|[RrHhSs](?:元|[0-9]+)?|(?:19|20)[0-9]{2})';
+  var fromMatch = text.match(new RegExp(yearTokenPattern + '(?:年式|年)?(?:以降|以後|から|より後|より新しい)'));
+  if (fromMatch) {
+    var fromYear = parseBikeMarketYearBoundary_(fromMatch[1]);
+    if (fromYear) {
+      return { raw: text, cachePart: fromYear + '+', from: fromYear, to: null, unspecified: false, valid: true };
+    }
+  }
+  var toMatch = text.match(new RegExp(yearTokenPattern + '(?:年式|年)?(?:以前|まで|以下|より前|より古い)'));
+  if (toMatch) {
+    var toYear = parseBikeMarketYearBoundary_(toMatch[1]);
+    if (toYear) {
+      return { raw: text, cachePart: '-' + toYear, from: null, to: toYear, unspecified: false, valid: true };
+    }
+  }
   var rangeMatch = text.match(/^(.+?)[〜～~-](.+)$/);
   if (rangeMatch) {
     var rangeFrom = parseSingleBikeMarketYear_(rangeMatch[1]);
@@ -5437,6 +5618,52 @@ function normalizeYearInput_(value) {
     return { raw: text, cachePart: String(year), from: year, to: year, unspecified: false, valid: true };
   }
   return { raw: text, cachePart: text, from: null, to: null, unspecified: false, valid: false };
+}
+
+function parseBikeMarketYearBoundary_(value) {
+  var text = trimFullWidth(String(value || ''))
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(char) {
+      return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
+    })
+    .replace(/\s+/g, '')
+    .replace(/年式$/, '')
+    .replace(/年$/, '');
+  if (/^(?:令和|R|r)$/.test(text)) {
+    return 2019;
+  }
+  if (/^(?:平成|H|h)$/.test(text)) {
+    return 1989;
+  }
+  if (/^(?:昭和|S|s)$/.test(text)) {
+    return 1926;
+  }
+  return parseSingleBikeMarketYear_(text);
+}
+
+function getBikeMarketRequestYearBounds_(normalizedYear) {
+  var currentYear = new Date().getFullYear();
+  return {
+    from: normalizedYear && normalizedYear.from ? normalizedYear.from : 1900,
+    to: normalizedYear && normalizedYear.to ? normalizedYear.to : currentYear + 1
+  };
+}
+
+function getBikeMarketYearConditionLabel_(normalizedYear) {
+  if (!normalizedYear || !normalizedYear.valid) {
+    return '年式条件を判定できません';
+  }
+  if (normalizedYear.unspecified || (!normalizedYear.from && !normalizedYear.to)) {
+    return '年式指定なし';
+  }
+  if (normalizedYear.from && normalizedYear.to) {
+    return normalizedYear.from === normalizedYear.to
+      ? normalizedYear.from + '年式'
+      : normalizedYear.from + '年～' + normalizedYear.to + '年式';
+  }
+  if (normalizedYear.from) {
+    return normalizedYear.from + '年式以降';
+  }
+  return normalizedYear.to + '年式以前';
 }
 
 function parseSingleBikeMarketYear_(value) {
@@ -5486,7 +5713,13 @@ function isYearMatched_(listingYear, normalizedYear) {
   if (!listingYear) {
     return false;
   }
-  return listingYear >= normalizedYear.from && listingYear <= normalizedYear.to;
+  if (normalizedYear.from && listingYear < normalizedYear.from) {
+    return false;
+  }
+  if (normalizedYear.to && listingYear > normalizedYear.to) {
+    return false;
+  }
+  return true;
 }
 
 function normalizeBikeMarketKeyPart_(value) {
@@ -5520,6 +5753,7 @@ function normalizeBikeMarketNameText_(value) {
 function getDefaultBikeModelPrioritySearchWord_(canonicalKey) {
   var priorities = {
     cb400sf: 'CB400 SUPER FOUR',
+    forza: 'フォルツァ',
     ninjazx4rse: 'Ninja ZX-4R SE',
     bmws1000r: 'BMW S1000R',
     dragstar250: 'ドラッグスター 250',
@@ -6569,6 +6803,21 @@ function getBikeModelDictionaryEntryForName_(bikeName) {
   return best;
 }
 
+function getExactBikeModelDictionaryEntryForName_(bikeName) {
+  var key = normalizeBikeMarketKeyPart_(bikeName);
+  if (!key) {
+    return null;
+  }
+  var entries = getBikeModelDictionaryEntries_();
+  for (var i = 0; i < entries.length; i++) {
+    var keys = [entries[i].canonicalKey, entries[i].canonicalName].concat(entries[i].aliases || []).map(normalizeBikeMarketKeyPart_);
+    if (keys.indexOf(key) !== -1) {
+      return entries[i];
+    }
+  }
+  return null;
+}
+
 function isBikeModelDictionaryExcluded_(entry, listingKey) {
   var excludes = entry && entry.excludes ? entry.excludes : [];
   for (var i = 0; i < excludes.length; i++) {
@@ -6636,27 +6885,42 @@ function buildBikeModelInputAnalysis_(bikeName) {
 
 function splitMultipleBikeModelInput_(bikeName) {
   var raw = trimFullWidth(String(bikeName || ''))
+    .replace(/(?:の)?(?:どちらか|どちらでも|いずれか)(?:を)?(?:希望)?$/g, '')
+    .replace(/希望$/g, '')
     .replace(/など$/g, '')
     .replace(/等$/g, '')
     .trim();
   if (!raw) {
     return [];
   }
-  var explicitSeparator = /(?:または|\bor\b|\/|、|,|・)/i.test(raw);
-  if (!explicitSeparator && getBikeModelDictionaryEntryForName_(raw)) {
+  var explicitSeparator = /(?:または|又は|もしくは|あるいは|\bor\b|と|か|\/|、|,|・|\r|\n)/i.test(raw);
+  if (!explicitSeparator && getExactBikeModelDictionaryEntryForName_(raw)) {
     return [raw];
+  }
+  if (!explicitSeparator) {
+    var knownModelParts = splitBikeModelInputByKnownDictionary_(raw);
+    if (knownModelParts.length > 1) {
+      return knownModelParts.slice(0, WEBAPP_BIKE_MARKET_MAX_MODELS_PER_REQUEST);
+    }
   }
   if (!explicitSeparator && isLikelySingleBikeModelPhrase_(raw)) {
     return [raw];
   }
   var normalized = raw
-    .replace(/(?:または|\bor\b)/ig, '|')
+    .replace(/(?:または|又は|もしくは|あるいは|\bor\b)/ig, '|')
+    .replace(/[とか]/g, '|')
+    .replace(/[\r\n]+/g, '|')
     .replace(/[\/、,・]/g, '|')
     .replace(/\s+/g, function(match) {
       return explicitSeparator ? match : '|';
     });
   var parts = normalized.split('|').map(function(part) {
-    return trimFullWidth(part).replace(/など$/g, '').replace(/等$/g, '').trim();
+    return trimFullWidth(part)
+      .replace(/(?:の)?(?:どちらか|どちらでも|いずれか)(?:を)?(?:希望)?$/g, '')
+      .replace(/希望$/g, '')
+      .replace(/など$/g, '')
+      .replace(/等$/g, '')
+      .trim();
   }).filter(function(part) {
     return part && !/^(など|等)$/.test(part);
   });
@@ -6675,7 +6939,34 @@ function splitMultipleBikeModelInput_(bikeName) {
       result.push(part);
     }
   });
-  return result.length > 1 ? result : [raw];
+  return result.length > 1 ? result.slice(0, WEBAPP_BIKE_MARKET_MAX_MODELS_PER_REQUEST) : [raw];
+}
+
+function splitBikeModelInputByKnownDictionary_(bikeName) {
+  var tokens = trimFullWidth(String(bikeName || '')).split(/\s+/).filter(function(token) { return token !== ''; });
+  if (tokens.length < 2) {
+    return [];
+  }
+
+  function resolveFrom_(startIndex) {
+    if (startIndex >= tokens.length) {
+      return [];
+    }
+    for (var endIndex = tokens.length; endIndex > startIndex; endIndex--) {
+      var phrase = tokens.slice(startIndex, endIndex).join(' ');
+      if (!getExactBikeModelDictionaryEntryForName_(phrase)) {
+        continue;
+      }
+      var remainder = resolveFrom_(endIndex);
+      if (endIndex === tokens.length || remainder.length > 0) {
+        return [phrase].concat(remainder);
+      }
+    }
+    return [];
+  }
+
+  var result = resolveFrom_(0);
+  return result.length > 1 ? result : [];
 }
 
 function isLikelySingleBikeModelPhrase_(bikeName) {

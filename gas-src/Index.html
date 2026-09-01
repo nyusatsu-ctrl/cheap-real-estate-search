@@ -1837,6 +1837,7 @@
       const SALES_CONTRACT_REGISTRATION_URL = `${SALES_CONTRACT_APP_URL}/admin/sales-contracts/new`;
       const QUICK_FILTERS = [
         { value: '', label: 'すべて', tone: 'blue' },
+        { value: 'activePreScreening', label: '進行中の仮審査', tone: 'green' },
         { value: 'new', label: '新規受付', tone: 'blue' },
         { value: 'calling', label: '架電中', tone: 'amber' },
         { value: 'reviewing', label: '審査中', tone: 'amber' },
@@ -3099,6 +3100,8 @@
       function matchesQuickFilter(customer, filterValue) {
         if (!filterValue) return true;
         switch (filterValue) {
+          case 'activePreScreening':
+            return isActivePreScreeningApplication(customer);
           case 'new':
             return String(customer && customer.status ? customer.status : '') === '新規受付';
           case 'calling':
@@ -4197,6 +4200,13 @@
         const status = String(customer.status || '');
         if (status.indexOf('架電中') !== -1) return true;
         return safeNumber(customer.callCount) >= 1 && !isWorkflowClosed(customer);
+      }
+
+      function isActivePreScreeningApplication(customer) {
+        if (!customer || String(customer.applicationType || '').trim() !== '仮審査申込') {
+          return false;
+        }
+        return !isWorkflowClosed(customer) && !isAnyDenied(customer);
       }
 
       function isWorkflowClosed(customer) {

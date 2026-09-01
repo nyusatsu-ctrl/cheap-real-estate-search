@@ -15,6 +15,7 @@
     "test:diagnosis-v2-specialty": "node --no-warnings --test --experimental-strip-types scripts/construction-diagnosis-v2-specialty.test.mts",
     "test:econtracts": "node --no-warnings --test --experimental-strip-types scripts/econtracts.test.mts",
     "test:ast-application": "node --no-warnings --test --experimental-strip-types scripts/ast-application.test.mts",
+    "test:bike-market": "node --no-warnings --test --experimental-strip-types scripts/bike-market.test.mts",
     "test:gps": "node --test scripts/gps-foundation.test.mts scripts/mv930g-protocol.test.mts",
     "crawl:properties": "node scripts/crawlers/run.mjs",
     "import:properties": "node scripts/import-properties.mjs",

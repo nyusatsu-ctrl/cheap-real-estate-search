@@ -30,6 +30,7 @@ import {
 } from "../lib/econtracts/rules.ts";
 import type { EcontractCustomerSnapshot } from "../lib/econtracts/types.ts";
 import { getAdminLoginPresentation } from "../lib/admin-login-presentation.ts";
+import { isKnownAdminTestRecipient } from "../lib/econtracts/test-recipient.ts";
 
 const customer: EcontractCustomerSnapshot = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -263,6 +264,18 @@ test("administrator test delivery reuses the formal email and contract content",
   assert.match(administratorDelivery.html, /admin\/econtracts\/test-preview\/contract-1/);
 });
 
+test("administrator test recipient matching safely supports plus aliases and normalized registered admins", () => {
+  const currentAdmin = { id: "admin-1", email: "admin+gps@example.com" };
+  assert.equal(isKnownAdminTestRecipient("admin+gps@example.com", currentAdmin), true);
+  assert.equal(isKnownAdminTestRecipient(" ADMIN+GPS@EXAMPLE.COM ", currentAdmin), true);
+  assert.equal(
+    isKnownAdminTestRecipient("second+sales@example.com", currentAdmin, ["Second+Sales@Example.com"]),
+    true
+  );
+  assert.equal(isKnownAdminTestRecipient("customer@example.com", currentAdmin, ["admin@example.com"]), false);
+  assert.equal(isKnownAdminTestRecipient("", currentAdmin, ["admin@example.com"]), false);
+});
+
 test("administrator test send is read-only and cannot create formal evidence or change customer status", async () => {
   const [testAction, previewLoader, previewPage, card, email] = await Promise.all([
     readFile(new URL("../app/admin/sales-contracts/econtract-test-actions.ts", import.meta.url), "utf8"),
@@ -284,6 +297,8 @@ test("administrator test send is read-only and cannot create formal evidence or 
     assert.doesNotMatch(source, /\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.rpc\(/);
   }
   assert.match(previewLoader, /\.from\("sales_contracts"\)[\s\S]*\.select\("\*"\)/);
+  assert.match(previewLoader, /\.from\("profiles"\)[\s\S]*\.select\("email"\)[\s\S]*\.eq\("role", "admin"\)/);
+  assert.doesNotMatch(previewLoader, /\.eq\("email", normalizedRecipient\)/);
   assert.match(previewLoader, /canIssueLoanEcontract/);
   assert.match(previewPage, /テストプレビュー・契約は成立しません/g);
   assert.match(previewPage, /preview\.document\.importantItems\.map/);

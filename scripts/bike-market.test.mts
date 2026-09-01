@@ -7,8 +7,13 @@ const root = new URL("../", import.meta.url);
 
 type BikeMarketSandbox = {
   WEBAPP_BIKE_MODEL_DICTIONARY_RUNTIME_CACHE: unknown;
+  WEBAPP_GOOBIKE_MODEL_MASTER_RUNTIME_CACHE: unknown;
   getDefaultBikeModelDictionaryEntries_(): unknown;
+  getGoobikeModelMasterSeedRows_(updatedAt: string): unknown;
   normalizeBikeMarketKeyPart_(value: string): string;
+  normalizeGoobikeSearchPhrase_(value: string): string;
+  getBikeModelSearchPhrases_(value: string): string[];
+  buildGoobikeDiagnosisUrls_(bikeName: string, normalizedYear: { valid: boolean; unspecified: boolean; from: number | null; to: number | null }): string[];
   getBikeMarketModelMatchInfo_(input: string, title: string): { matched: boolean };
   splitMultipleBikeModelInput_(value: string): string[];
   normalizeYearInput_(value: string): { cachePart: string; from: number | null; to: number | null; unspecified: boolean; valid: boolean };
@@ -191,6 +196,27 @@ test("空白や接続詞で併記されたフォルツァとCB400SFを2車種へ
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァとCB400スーパーフォアSF")), ["フォルツァ", "CB400スーパーフォアSF"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァかCB400SFどちらか希望")), ["フォルツァ", "CB400SF"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァ / CB400SF")), ["フォルツァ", "CB400SF"]);
+});
+
+test("フォルツァの日本語検索語を消さず、ひらがな・カタカナ・英字を相互照合する", async () => {
+  const { sandbox, source } = await loadBikeMarketServer();
+  sandbox.WEBAPP_GOOBIKE_MODEL_MASTER_RUNTIME_CACHE = sandbox.getGoobikeModelMasterSeedRows_("2026/09/02 12:00:00");
+
+  assert.equal(sandbox.normalizeGoobikeSearchPhrase_("フォルツァ"), "フォルツァ");
+  assert.equal(sandbox.normalizeGoobikeSearchPhrase_("スーパーカブ110プロ"), "スーパーカブ110プロ");
+  assert.equal(sandbox.normalizeBikeMarketKeyPart_("ふぉるつぁ"), sandbox.normalizeBikeMarketKeyPart_("フォルツァ"));
+  assert.equal(sandbox.getBikeMarketModelMatchInfo_("ふぉるつぁ", "HONDA FORZA 2025").matched, true);
+  assert.equal(sandbox.getBikeMarketModelMatchInfo_("FORZA", "ホンダ フォルツァ 2025年モデル").matched, true);
+  assert.equal(sandbox.getBikeMarketModelMatchInfo_("しーびー400すーぱーふぉあ", "HONDA CB400 SUPER FOUR VTEC").matched, true);
+
+  const phrases = Array.from(sandbox.getBikeModelSearchPhrases_("フォルツァ"));
+  assert.ok(phrases.includes("フォルツァ"));
+  assert.ok(phrases.some((phrase) => /^forza$/i.test(phrase)));
+
+  const urls = Array.from(sandbox.buildGoobikeDiagnosisUrls_("ふぉるつぁ", sandbox.normalizeYearInput_("2002年式以降")));
+  assert.equal(urls[0], "https://www.goobike.com/maker-honda/car-forza/index.html");
+  assert.ok(urls.some((url) => url.includes("%E3%83%95%E3%82%A9%E3%83%AB%E3%83%84%E3%82%A1")));
+  assert.match(source, /mergeGoobikeModelMasterRows_\(seedRows\.concat\(rows\)\)/);
 });
 
 test("年式欄の以降・以前・元号表現を検索範囲へ変換する", async () => {

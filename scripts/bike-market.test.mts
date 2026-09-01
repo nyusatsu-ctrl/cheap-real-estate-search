@@ -11,6 +11,15 @@ type BikeMarketSandbox = {
   normalizeBikeMarketKeyPart_(value: string): string;
   getBikeMarketModelMatchInfo_(input: string, title: string): { matched: boolean };
   splitMultipleBikeModelInput_(value: string): string[];
+  normalizeYearInput_(value: string): { cachePart: string; from: number | null; to: number | null; unspecified: boolean; valid: boolean };
+  isYearMatched_(listingYear: number, normalizedYear: { from: number | null; to: number | null; unspecified: boolean; valid: boolean }): boolean;
+  buildGoobikeFreeSearchUrl_(bikeName: string, normalizedYear: { from: number | null; to: number | null; unspecified: boolean; valid: boolean }): string;
+  getBikeMarketSummaryWithCache_(bikeName: string, yearInput: string, now: Date): {
+    modelCount?: number;
+    successfulModelCount?: number;
+    normalizedYearLabel?: string;
+    modelResults?: Array<{ bikeName: string; status: string; normalizedYearLabel: string; priceAggregation: { average_price: number } }>;
+  };
   summarizeBikeListings_(
     bikeName: string,
     yearInput: string,
@@ -174,6 +183,86 @@ test("メーカー名やグレードを含む1車種は複数候補として誤�
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("CBR250RR MC22")), ["CBR250RR MC22"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("NMAX125 PCX125 CUB110")), ["NMAX125", "PCX125", "CUB110"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("マグナ50 または エイプ50")), ["マグナ50", "エイプ50"]);
+});
+
+test("空白や接続詞で併記されたフォルツァとCB400SFを2車種へ分ける", async () => {
+  const { sandbox } = await loadBikeMarketServer();
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァ CB400SF")), ["フォルツァ", "CB400SF"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァとCB400スーパーフォアSF")), ["フォルツァ", "CB400スーパーフォアSF"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァかCB400SFどちらか希望")), ["フォルツァ", "CB400SF"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァ / CB400SF")), ["フォルツァ", "CB400SF"]);
+});
+
+test("年式欄の以降・以前・元号表現を検索範囲へ変換する", async () => {
+  const { sandbox } = await loadBikeMarketServer();
+  const since2002 = sandbox.normalizeYearInput_("2002年式以降");
+  assert.equal(since2002.cachePart, "2002+");
+  assert.equal(since2002.from, 2002);
+  assert.equal(since2002.to, null);
+  assert.equal(sandbox.isYearMatched_(2001, since2002), false);
+  assert.equal(sandbox.isYearMatched_(2002, since2002), true);
+  assert.equal(sandbox.isYearMatched_(2026, since2002), true);
+
+  const reiwa = sandbox.normalizeYearInput_("令和以降");
+  assert.equal(reiwa.from, 2019);
+  assert.equal(reiwa.to, null);
+  assert.equal(sandbox.normalizeYearInput_("令和3年以降で希望").from, 2021);
+  assert.equal(sandbox.normalizeYearInput_("平成30年以降").from, 2018);
+
+  const until2010 = sandbox.normalizeYearInput_("2010年式以前");
+  assert.equal(until2010.from, null);
+  assert.equal(until2010.to, 2010);
+  assert.equal(sandbox.isYearMatched_(2010, until2010), true);
+  assert.equal(sandbox.isYearMatched_(2011, until2010), false);
+
+  const searchUrl = sandbox.buildGoobikeFreeSearchUrl_("フォルツァ", since2002);
+  assert.match(searchUrl, /syear1=2002/);
+  assert.match(searchUrl, new RegExp(`syear2=${new Date().getFullYear() + 1}`));
+});
+
+test("2車種は同じ年式条件で個別取得し、価格を混ぜずに保持する", async () => {
+  const { context, sandbox } = await loadBikeMarketServer();
+  vm.runInContext(`
+    getSingleBikeMarketSummaryWithCache_ = function(bikeName, yearInput, now) {
+      var average = bikeName === 'フォルツァ' ? 410000 : 780000;
+      return {
+        bikeName: bikeName,
+        yearInput: yearInput,
+        status: 'success',
+        fetchedAt: '2026/09/02 12:00:00',
+        sources: ['GooBike'],
+        priceAggregation: {
+          extracted_count: 5,
+          year_matched_count: 5,
+          price_available_count: 5,
+          calculation_target_count: 5,
+          min_price: average - 100000,
+          max_price: average + 100000,
+          average_price: average,
+          simple_average_price: average,
+          median_price: average,
+          trimmed_average_price: average,
+          reference_market_price: average,
+          calculation_method: 'median_3_to_6_items'
+        }
+      };
+    };
+  `, context);
+  const result = sandbox.getBikeMarketSummaryWithCache_("フォルツァ CB400SF", "2002年式以降", new Date("2026-09-02T03:00:00Z"));
+  assert.equal(result.modelCount, 2);
+  assert.equal(result.successfulModelCount, 2);
+  assert.equal(result.normalizedYearLabel, "2002年式以降");
+  assert.deepEqual(Array.from(result.modelResults || [], (item) => item.bikeName), ["フォルツァ", "CB400SF"]);
+  assert.deepEqual(Array.from(result.modelResults || [], (item) => item.priceAggregation.average_price), [410000, 780000]);
+  assert.deepEqual(Array.from(result.modelResults || [], (item) => item.normalizedYearLabel), ["2002年式以降", "2002年式以降"]);
+});
+
+test("審査管理画面は2車種の相場を別カードで表示する", async () => {
+  const html = await read("gas-src/Index.html");
+  assert.match(html, /function marketMultiModelResultsHtml/);
+  assert.match(html, /車種を別々に取得しています/);
+  assert.match(html, /market-model-result-head/);
+  assert.match(html, /2002年式以降 \/ 令和以降/);
 });
 
 test("CB400SFとGooBikeのSUPER FOUR表記を同一車種として扱う", async () => {

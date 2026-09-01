@@ -583,6 +583,51 @@
         background: #fff;
       }
 
+      .market-multi-summary {
+        display: grid;
+        gap: 12px;
+        margin-top: 10px;
+      }
+
+      .market-multi-summary-note {
+        color: var(--green);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .market-model-result {
+        border: 1px solid #b7e4d6;
+        border-radius: 9px;
+        background: #f6fffb;
+        padding: 10px;
+      }
+
+      .market-model-result-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .market-model-result-head strong {
+        font-size: 15px;
+      }
+
+      .market-model-result-head span {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+      }
+
+      .market-model-result-error {
+        margin-top: 8px;
+        border-radius: 7px;
+        background: #fff;
+        padding: 10px;
+        color: var(--muted);
+        white-space: pre-line;
+      }
+
       .market-summary-status {
         font-weight: 700;
         color: var(--green);
@@ -4639,6 +4684,8 @@
       function marketCardHtml(customer) {
         const market = customer.market || {};
         const agg = getMarketAggregation(market);
+        const modelResults = getMarketModelResults(market);
+        const isMultiModel = modelResults.length > 1;
         const status = market.status || '相場未取得';
         const statusText = marketStatusText(market);
         const isSuccess = status === '相場取得済み';
@@ -4646,29 +4693,33 @@
           <h3>
             <span>バイク相場</span>
           </h3>
-          ${isSuccess ? marketSuccessSummaryHtml(agg, market) : `<div class="muted" style="margin-bottom:10px; white-space:pre-line;">${escapeHtml(statusText)}</div>`}
-          ${status === '車種名確認' ? marketCandidateButtonsHtml(market) : ''}
+          ${isMultiModel
+            ? marketMultiModelResultsHtml(modelResults)
+            : (isSuccess ? marketSuccessSummaryHtml(agg, market) : `<div class="muted" style="margin-bottom:10px; white-space:pre-line;">${escapeHtml(statusText)}</div>`)}
+          ${!isMultiModel && status === '車種名確認' ? marketCandidateButtonsHtml(market) : ''}
           <div id="marketSearchProgress" class="market-search-progress" role="status" aria-live="polite" hidden></div>
           <div class="application-grid">
-            ${inputField('希望車種', 'marketBikeName', customer.desiredCar, '例: R1250GS')}
-            ${inputField('年式', 'marketYear', customer.desiredYear || (market.searchYear || ''), '例: 2022 / 2020-2023 / 令和4年')}
+            ${inputField('希望車種', 'marketBikeName', customer.desiredCar, '例: R1250GS / フォルツァ CB400SF')}
+            ${inputField('年式', 'marketYear', customer.desiredYear || (market.searchYear || ''), '例: 2022 / 2002年式以降 / 令和以降')}
           </div>
           <div class="actions">
             <button type="button" id="marketSearchButton" class="primary">相場取得</button>
           </div>
           <details class="market-note" style="margin-top:12px;">
             <summary>集計詳細</summary>
-            <div class="market-grid" style="margin-top:10px;">
-              <div><label>希望車種</label><strong>${escapeHtml(market.searchBikeName || customer.desiredCar || '-')}</strong></div>
-              <div><label>年式</label><strong>${escapeHtml(marketYearDisplay(market.searchYear || customer.desiredYear))}</strong></div>
-              <div><label>掲載候補</label><strong>${formatCount(agg.extracted_count)}台</strong></div>
-              <div><label>年式一致</label><strong>${formatCount(agg.year_matched_count)}台</strong></div>
-              <div><label>集計対象</label><strong>${formatCount(agg.calculation_target_count)}台</strong></div>
-              <div><label>通常平均（高額車両除外）</label><strong>${formatYen(agg.average_price || agg.trimmed_average_price || agg.simple_average_price)}</strong></div>
-              <div><label>単純平均（全件）</label><strong>${formatYen(agg.simple_average_price)}</strong></div>
-              <div><label>中央値</label><strong>${formatYen(agg.median_price)}</strong></div>
-              <div><label>取得日時</label><strong>${escapeHtml(formatDateTimeMinute(market.fetchedAt))}</strong></div>
-            </div>
+            ${isMultiModel ? marketMultiModelDetailsHtml(modelResults) : `
+              <div class="market-grid" style="margin-top:10px;">
+                <div><label>希望車種</label><strong>${escapeHtml(market.searchBikeName || customer.desiredCar || '-')}</strong></div>
+                <div><label>判定した年式条件</label><strong>${escapeHtml(market.normalizedYearLabel || marketYearDisplay(market.searchYear || customer.desiredYear))}</strong></div>
+                <div><label>掲載候補</label><strong>${formatCount(agg.extracted_count)}台</strong></div>
+                <div><label>年式一致</label><strong>${formatCount(agg.year_matched_count)}台</strong></div>
+                <div><label>集計対象</label><strong>${formatCount(agg.calculation_target_count)}台</strong></div>
+                <div><label>通常平均（高額車両除外）</label><strong>${formatYen(agg.average_price || agg.trimmed_average_price || agg.simple_average_price)}</strong></div>
+                <div><label>単純平均（全件）</label><strong>${formatYen(agg.simple_average_price)}</strong></div>
+                <div><label>中央値</label><strong>${formatYen(agg.median_price)}</strong></div>
+                <div><label>取得日時</label><strong>${escapeHtml(formatDateTimeMinute(market.fetchedAt))}</strong></div>
+              </div>
+            `}
           </details>
           <div class="market-note">
             ※平均総額は、相場から大きく外れた高額車両を除外して算出しています。除外車両の金額は参考情報として表示します。<br>
@@ -4677,6 +4728,72 @@
             ※表示価格は掲載情報ベースであり、実売価格・陸送費・登録費用・保証費用は別途確認が必要です。
           </div>
         `;
+      }
+
+      function getMarketModelResults(market) {
+        return market && Array.isArray(market.modelResults) ? market.modelResults : [];
+      }
+
+      function isMarketModelResultSuccess(result) {
+        const agg = getMarketAggregation(result || {});
+        return result && result.status === 'success'
+          && safeNumber(agg.reference_market_price) > 0
+          && safeNumber(agg.price_available_count) > 0;
+      }
+
+      function marketMultiModelResultsHtml(modelResults) {
+        const successCount = modelResults.filter(isMarketModelResultSuccess).length;
+        return `
+          <div class="market-multi-summary">
+            <div class="market-multi-summary-note">${escapeHtml(`${modelResults.length}車種を別々に取得しています（取得済み ${successCount}/${modelResults.length}車種）`)}</div>
+            ${modelResults.map((result, index) => {
+              const modelName = result.bikeName || result.requestedBikeName || `${index + 1}台目`;
+              const yearLabel = result.normalizedYearLabel || marketYearDisplay(result.yearInput);
+              const body = isMarketModelResultSuccess(result)
+                ? marketSuccessSummaryHtml(getMarketAggregation(result), result)
+                : `<div class="market-model-result-error">${escapeHtml(marketModelResultStatusText(result))}</div>`;
+              return `
+                <section class="market-model-result">
+                  <div class="market-model-result-head">
+                    <strong>${escapeHtml(`${index + 1}台目：${modelName}`)}</strong>
+                    <span>${escapeHtml(yearLabel)}</span>
+                  </div>
+                  ${body}
+                </section>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      function marketModelResultStatusText(result) {
+        if (!result) return '相場情報を取得できませんでした。';
+        if (result.status === 'model_check') {
+          return '車種名を特定できませんでした。希望車種欄を確認して再取得してください。';
+        }
+        if (result.status === 'no_data') {
+          return 'この車種・年式条件に一致する相場データが見つかりませんでした。';
+        }
+        return '相場情報を取得できませんでした。時間を置いて再取得してください。';
+      }
+
+      function marketMultiModelDetailsHtml(modelResults) {
+        return modelResults.map((result) => {
+          const agg = getMarketAggregation(result);
+          return `
+            <div class="market-grid" style="margin-top:10px; padding-bottom:10px; border-bottom:1px solid var(--line);">
+              <div><label>車種</label><strong>${escapeHtml(result.bikeName || result.requestedBikeName || '-')}</strong></div>
+              <div><label>判定した年式条件</label><strong>${escapeHtml(result.normalizedYearLabel || marketYearDisplay(result.yearInput))}</strong></div>
+              <div><label>掲載候補</label><strong>${formatCount(agg.extracted_count)}台</strong></div>
+              <div><label>年式一致</label><strong>${formatCount(agg.year_matched_count)}台</strong></div>
+              <div><label>集計対象</label><strong>${formatCount(agg.calculation_target_count)}台</strong></div>
+              <div><label>計算方法</label><strong>${escapeHtml(marketCalculationMethodLabel(agg.calculation_method))}</strong></div>
+              <div><label>単純平均（全件）</label><strong>${formatYen(agg.simple_average_price)}</strong></div>
+              <div><label>中央値</label><strong>${formatYen(agg.median_price)}</strong></div>
+              <div><label>取得日時</label><strong>${escapeHtml(formatDateTimeMinute(result.fetchedAt))}</strong></div>
+            </div>
+          `;
+        }).join('');
       }
 
       function marketSuccessSummaryHtml(agg, market) {
@@ -4755,6 +4872,20 @@
       }
 
       function marketStatusText(market) {
+        const modelResults = getMarketModelResults(market);
+        if (modelResults.length > 1) {
+          const successCount = modelResults.filter(isMarketModelResultSuccess).length;
+          return [
+            `【${modelResults.length}車種の相場】`,
+            `取得済み：${successCount}/${modelResults.length}車種`,
+            ...modelResults.map((result) => {
+              const agg = getMarketAggregation(result);
+              return isMarketModelResultSuccess(result)
+                ? `${result.bikeName || result.requestedBikeName}：平均 ${formatYen(agg.average_price || agg.trimmed_average_price || agg.simple_average_price)}`
+                : `${result.bikeName || result.requestedBikeName}：${marketModelResultStatusText(result)}`;
+            })
+          ].join('\n');
+        }
         const status = market.status || '相場未取得';
         const agg = getMarketAggregation(market);
         if (status === '相場取得済み') {
@@ -5141,6 +5272,14 @@
 
       function marketBadge(market) {
         const status = market && market.status ? market.status : '相場未取得';
+        const modelResults = getMarketModelResults(market);
+        if (modelResults.length > 1) {
+          const successCount = modelResults.filter(isMarketModelResultSuccess).length;
+          const allSucceeded = successCount === modelResults.length;
+          const cls = allSucceeded ? 'done' : (successCount > 0 ? 'refresh' : 'error');
+          const icon = allSucceeded ? '🟢' : (successCount > 0 ? '🟡' : '🔴');
+          return `<span class="market-badge ${cls}">${escapeHtml(`${icon} ${successCount}/${modelResults.length}車種 相場取得`)}</span>`;
+        }
         const agg = getMarketAggregation(market);
         const reference = agg.reference_market_price ? ` 参考 ${formatYen(agg.reference_market_price)}` : '';
         const count = agg.price_available_count ? ` / ${formatCount(agg.price_available_count)}台` : '';

@@ -291,6 +291,9 @@ test("administrator test send is read-only and cannot create formal evidence or 
   assert.match(testAction, /testRecipient === preview\.customer\.email/);
   assert.match(testAction, /sendEcontractTestPreviewEmail\(\{\s*testRecipient,/);
   assert.match(email, /sendEcontractTestPreviewEmail[\s\S]*to: input\.testRecipient[\s\S]*buildEcontractLinkEmailContent\(input\)/);
+  assert.match(email, /\[econtract-email\] resend request failed/);
+  assert.match(email, /apiKeyFormatValid/);
+  assert.doesNotMatch(email, /console\.(?:log|info|warn|error)\([^\n]*(?:apiKey|testRecipient|input\.to)/);
 
   for (const source of [testAction, previewLoader]) {
     assert.doesNotMatch(source, /sales_econtracts|sales_econtract_access_sessions|sales_econtract_verifications|sales_econtract_events/);

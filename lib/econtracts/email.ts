@@ -69,9 +69,22 @@ async function sendResendEmail(input: { to: string; subject: string; text: strin
     const body = await response.json().catch(() => null) as { id?: string } | null;
     if (!response.ok) return { ok: false, error: "電子契約メールを送信できませんでした。" };
     return { ok: true, providerMessageId: body?.id ?? null };
-  } catch {
+  } catch (error) {
+    console.error("[econtract-email] resend request failed", {
+      errorName: error instanceof Error ? error.name : "unknown",
+      causeCode: getErrorCauseCode(error),
+      apiKeyFormatValid: /^re_[A-Za-z0-9_]+$/.test(apiKey),
+      apiKeyLength: apiKey.length
+    });
     return { ok: false, error: "電子契約メールサービスへ接続できませんでした。" };
   }
+}
+
+function getErrorCauseCode(error: unknown) {
+  if (!error || typeof error !== "object" || !("cause" in error)) return null;
+  const cause = error.cause;
+  if (!cause || typeof cause !== "object" || !("code" in cause)) return null;
+  return typeof cause.code === "string" ? cause.code.slice(0, 80) : null;
 }
 
 function escapeHtml(value: string) {

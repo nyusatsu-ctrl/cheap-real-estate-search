@@ -623,6 +623,55 @@
         text-align: right;
       }
 
+      .market-search-progress {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 10px 0;
+        border: 1px solid #b2ddff;
+        border-radius: 8px;
+        background: #eff8ff;
+        padding: 10px 12px;
+        color: #175cd3;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .market-search-progress[hidden] {
+        display: none;
+      }
+
+      .market-search-progress::before {
+        content: '';
+        width: 14px;
+        height: 14px;
+        flex: 0 0 14px;
+        border: 2px solid #84caff;
+        border-top-color: #175cd3;
+        border-radius: 50%;
+        animation: market-search-spin 0.8s linear infinite;
+      }
+
+      .market-search-progress.error {
+        border-color: #fecdca;
+        background: #fef3f2;
+        color: var(--red);
+      }
+
+      .market-search-progress.error::before {
+        content: '!';
+        display: grid;
+        place-items: center;
+        border: 0;
+        color: var(--red);
+        font-size: 15px;
+        animation: none;
+      }
+
+      @keyframes market-search-spin {
+        to { transform: rotate(360deg); }
+      }
+
       .market-note {
         margin-top: 10px;
         color: var(--muted);
@@ -4298,11 +4347,7 @@
       function runMarketSearch(payload) {
         state.saving = true;
         setBusy(true);
-        const button = document.getElementById('marketSearchButton');
-        if (button) {
-          button.disabled = true;
-          button.textContent = '相場取得中...';
-        }
+        setMarketSearchBusyState(true, 'GooBikeから相場を取得しています。完了までそのままお待ちください。');
         google.script.run
           .withSuccessHandler((result) => {
             if (result && result.customer) {
@@ -4315,18 +4360,33 @@
             showToast(result.message);
             state.saving = false;
             setBusy(false);
+            setMarketSearchBusyState(false, '');
             loadDashboard();
           })
           .withFailureHandler((error) => {
             state.saving = false;
             setBusy(false);
             showToast('相場情報を取得できませんでした。時間を置いて再度お試しください。改善しない場合は管理者に確認してください。');
-            if (button) {
-              button.disabled = false;
-              button.textContent = '相場取得';
-            }
+            setMarketSearchBusyState(false, '相場情報を取得できませんでした。もう一度お試しください。', 'error');
           })
           .searchBikeMarketForCustomer(payload);
+      }
+
+      function setMarketSearchBusyState(isBusy, message, tone) {
+        ['topMarketSearchButton', 'marketSearchButton'].forEach((id) => {
+          const button = document.getElementById(id);
+          if (!button) return;
+          button.disabled = Boolean(isBusy);
+          button.textContent = isBusy ? '相場取得中…' : '相場取得';
+          button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        });
+        const form = document.getElementById('marketForm');
+        if (form) form.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        const progress = document.getElementById('marketSearchProgress');
+        if (!progress) return;
+        progress.hidden = !message;
+        progress.className = `market-search-progress${tone === 'error' ? ' error' : ''}`;
+        progress.textContent = message || '';
       }
 
       function applyServerCustomerUpdate(customer) {
@@ -4530,6 +4590,7 @@
           </h3>
           ${isSuccess ? marketSuccessSummaryHtml(agg, market) : `<div class="muted" style="margin-bottom:10px; white-space:pre-line;">${escapeHtml(statusText)}</div>`}
           ${status === '車種名確認' ? marketCandidateButtonsHtml(market) : ''}
+          <div id="marketSearchProgress" class="market-search-progress" role="status" aria-live="polite" hidden></div>
           <div class="application-grid">
             ${inputField('希望車種', 'marketBikeName', customer.desiredCar, '例: R1250GS')}
             ${inputField('年式', 'marketYear', customer.desiredYear || (market.searchYear || ''), '例: 2022 / 2020-2023 / 令和4年')}
@@ -4573,6 +4634,10 @@
               <strong>${formatYen(agg.min_price)}</strong>
             </div>
             <div class="market-summary-row">
+              <label>平均総額</label>
+              <strong>${formatYen(agg.simple_average_price)}</strong>
+            </div>
+            <div class="market-summary-row">
               <label>最高総額</label>
               <strong>${formatYen(agg.max_price)}</strong>
             </div>
@@ -4610,6 +4675,7 @@
             `参考相場：${formatYen(agg.reference_market_price)}`,
             '',
             `最低総額：${formatYen(agg.min_price)}`,
+            `平均総額：${formatYen(agg.simple_average_price)}`,
             `最高総額：${formatYen(agg.max_price)}`,
             `価格取得：${formatCount(agg.price_available_count)}台`
           ].filter((line) => line !== '').join('\n');

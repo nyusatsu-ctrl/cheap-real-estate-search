@@ -229,7 +229,7 @@ var WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS = 240000;
 var WEBAPP_PENDING_MARKET_LOOKUP_MAX_SCAN_ROWS_PER_RUN = 120;
 var WEBAPP_PENDING_MARKET_LOOKUP_CURSOR_PROPERTY_KEY = 'PENDING_BIKE_MARKET_LOOKUP_CURSOR_ROW';
 var WEBAPP_PENDING_MARKET_LOOKUP_LOCK_TIMEOUT_MS = 1000;
-var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v20-goobike-model-master';
+var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v21-high-price-outlier-display';
 var WEBAPP_BIKE_MARKET_GOOBIKE_BASE_URL = 'https://goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_ALTERNATE_BASE_URL = 'https://www.goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_SOURCE = 'GooBike';
@@ -1107,7 +1107,7 @@ function runBikeMarketSearchForCustomer_(payload, options) {
   updates['年式(希望車種)'] = yearInput;
   updates['相場_最低総額'] = aggregation.min_price || '';
   updates['相場_最高総額'] = aggregation.max_price || '';
-  updates['相場_平均総額'] = aggregation.simple_average_price || '';
+  updates['相場_平均総額'] = aggregation.average_price || aggregation.trimmed_average_price || aggregation.simple_average_price || '';
   updates['相場_単純平均総額'] = aggregation.simple_average_price || '';
   updates['相場_中央値総額'] = aggregation.median_price || '';
   updates['相場_外れ値除外平均総額'] = aggregation.trimmed_average_price || '';
@@ -1959,6 +1959,14 @@ function readBikeMarketAggregationFromSavedColumns_(row, displayRow, headerMap) 
     }
     return strictBikeMarketNumber_(row[index]);
   }
+  var savedOutlierPrices = safeParseJson_(getCellByHeader_(displayRow, headerMap, '相場_外れ値除外価格'));
+  if (!Array.isArray(savedOutlierPrices)) {
+    savedOutlierPrices = [];
+  }
+  var medianPrice = value('相場_中央値総額');
+  var outlierPrices = savedOutlierPrices.map(strictBikeMarketNumber_).filter(function(price) {
+    return price !== null;
+  });
   return {
     extracted_count: value('相場_抽出候補件数') || 0,
     year_matched_count: value('相場_年式一致件数') || 0,
@@ -1966,13 +1974,19 @@ function readBikeMarketAggregationFromSavedColumns_(row, displayRow, headerMap) 
     calculation_target_count: value('相場_集計対象件数') || 0,
     min_price: value('相場_最低総額'),
     max_price: value('相場_最高総額'),
+    normal_min_price: value('相場_最低総額'),
+    normal_max_price: outlierPrices.length ? null : value('相場_最高総額'),
+    average_price: value('相場_平均総額') || value('相場_外れ値除外平均総額') || value('相場_単純平均総額'),
     simple_average_price: value('相場_単純平均総額') || value('相場_平均総額'),
-    median_price: value('相場_中央値総額'),
+    median_price: medianPrice,
     trimmed_average_price: value('相場_外れ値除外平均総額'),
     reference_market_price: value('相場_参考相場総額'),
     used_base_price_fallback_count: value('相場_本体価格代用件数') || 0,
     outlier_excluded_count: value('相場_外れ値除外件数') || 0,
-    outlier_excluded_prices: [],
+    outlier_excluded_prices: outlierPrices,
+    high_price_outlier_count: outlierPrices.filter(function(price) { return medianPrice && price > medianPrice; }).length,
+    high_price_outlier_prices: outlierPrices.filter(function(price) { return medianPrice && price > medianPrice; }),
+    high_price_outlier_items: [],
     calculation_method: getCellByHeader_(displayRow, headerMap, '相場_計算方法') || ''
   };
 }
@@ -2087,6 +2101,7 @@ function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHis
     market_reference_price: marketAggregation.reference_market_price || 0,
     market_min_price: marketAggregation.min_price || 0,
     market_max_price: marketAggregation.max_price || 0,
+    market_average_price: marketAggregation.average_price || marketAggregation.trimmed_average_price || marketAggregation.simple_average_price || 0,
     market_simple_average_price: marketAggregation.simple_average_price || 0,
     market_median_price: marketAggregation.median_price || 0,
     market_trimmed_average_price: marketAggregation.trimmed_average_price || 0,
@@ -2094,6 +2109,8 @@ function buildCustomerSummary_(row, rowNumber, headerMap, managementMap, callHis
     market_year_matched_count: marketAggregation.year_matched_count || 0,
     market_price_available_count: marketAggregation.price_available_count || 0,
     market_calculation_target_count: marketAggregation.calculation_target_count || 0,
+    market_high_price_outlier_count: marketAggregation.high_price_outlier_count || 0,
+    market_high_price_outlier_prices: marketAggregation.high_price_outlier_prices || [],
     market_calculation_method: marketAggregation.calculation_method || '',
     market_error_message: marketState.errorMessage || '',
     market_error_code: marketState.errorCode || '',
@@ -2315,7 +2332,7 @@ function buildBikeMarketState_(row, headerMap, hasBikeMarketCsv) {
   var aggregationValidation = validateBikeMarketAggregation_(aggregation);
   var hasSuccessValues = isBikeMarketAggregationSuccess_(aggregation);
   var displayError = normalizeBikeMarketDisplayError_(errorMessage);
-  var averagePrice = aggregation.simple_average_price || null;
+  var averagePrice = aggregation.average_price || aggregation.trimmed_average_price || aggregation.simple_average_price || null;
   var simpleAveragePrice = aggregation.simple_average_price || null;
   var medianPrice = aggregation.median_price || null;
   var trimmedAveragePrice = aggregation.trimmed_average_price || null;
@@ -2386,6 +2403,9 @@ function buildBikeMarketState_(row, headerMap, hasBikeMarketCsv) {
     usedBasePriceFallbackCount: aggregation.used_base_price_fallback_count || 0,
     outlierExcludedCount: aggregation.outlier_excluded_count || 0,
     outlierExcludedPrices: aggregation.outlier_excluded_prices || [],
+    highPriceOutlierCount: aggregation.high_price_outlier_count || 0,
+    highPriceOutlierPrices: aggregation.high_price_outlier_prices || [],
+    highPriceOutlierItems: aggregation.high_price_outlier_items || [],
     calculationMethod: aggregation.calculation_method || '',
     priceWarning: aggregation.price_warning || '',
     noDataReason: rawSummary && rawSummary.noDataReason ? rawSummary.noDataReason : '',
@@ -2405,6 +2425,21 @@ function buildBikeMarketState_(row, headerMap, hasBikeMarketCsv) {
 
 function getBikeMarketAggregation_(summary) {
   var source = summary && summary.priceAggregation ? summary.priceAggregation : {};
+  if (!strictBikeMarketNumber_(source.average_price) && summary && Array.isArray(summary.listings) && summary.listings.length) {
+    source = summarizeBikeListings_(
+      summary.bikeName || summary.requestedBikeName || '',
+      summary.yearInput || '',
+      summary.listings,
+      summary.fetchedAt || '',
+      {
+        extractedCount: summary.extractedCount != null ? summary.extractedCount : summary.listings.length,
+        yearMatchedCount: summary.yearMatchedCount != null ? summary.yearMatchedCount : summary.listings.length
+      }
+    ).priceAggregation;
+  }
+  var highPriceOutlierPrices = Array.isArray(source.high_price_outlier_prices)
+    ? source.high_price_outlier_prices.map(strictBikeMarketNumber_).filter(function(value) { return value !== null; })
+    : (Array.isArray(summary && summary.highPriceOutlierPrices) ? summary.highPriceOutlierPrices.map(strictBikeMarketNumber_).filter(function(value) { return value !== null; }) : []);
   return {
     extracted_count: strictBikeMarketNumber_(source.extracted_count) || strictBikeMarketNumber_(summary && (summary.market_extracted_count || summary.extractedCount)),
     year_matched_count: strictBikeMarketNumber_(source.year_matched_count) || strictBikeMarketNumber_(summary && (summary.market_year_matched_count || summary.yearMatchedCount)),
@@ -2412,6 +2447,9 @@ function getBikeMarketAggregation_(summary) {
     calculation_target_count: strictBikeMarketNumber_(source.calculation_target_count) || strictBikeMarketNumber_(summary && (summary.market_calculation_target_count || summary.calculationTargetCount)),
     min_price: strictBikeMarketNumber_(source.min_price) || strictBikeMarketNumber_(summary && (summary.market_min_price || summary.minTotalPriceYen)),
     max_price: strictBikeMarketNumber_(source.max_price) || strictBikeMarketNumber_(summary && (summary.market_max_price || summary.maxTotalPriceYen)),
+    normal_min_price: strictBikeMarketNumber_(source.normal_min_price) || strictBikeMarketNumber_(summary && summary.normalMinPriceYen) || strictBikeMarketNumber_(source.min_price),
+    normal_max_price: strictBikeMarketNumber_(source.normal_max_price) || strictBikeMarketNumber_(summary && summary.normalMaxPriceYen) || strictBikeMarketNumber_(source.max_price),
+    average_price: strictBikeMarketNumber_(source.average_price) || strictBikeMarketNumber_(summary && (summary.market_average_price || summary.averageTotalPriceYen)) || strictBikeMarketNumber_(source.trimmed_average_price) || strictBikeMarketNumber_(source.simple_average_price),
     simple_average_price: strictBikeMarketNumber_(source.simple_average_price) || strictBikeMarketNumber_(summary && (summary.market_simple_average_price || summary.simpleAverageTotalPriceYen || summary.averageTotalPriceYen)),
     median_price: strictBikeMarketNumber_(source.median_price) || strictBikeMarketNumber_(summary && (summary.market_median_price || summary.medianTotalPriceYen)),
     trimmed_average_price: strictBikeMarketNumber_(source.trimmed_average_price) || strictBikeMarketNumber_(summary && (summary.market_trimmed_average_price || summary.trimmedAverageTotalPriceYen)),
@@ -2419,6 +2457,9 @@ function getBikeMarketAggregation_(summary) {
     used_base_price_fallback_count: strictBikeMarketNumber_(source.used_base_price_fallback_count) || strictBikeMarketNumber_(summary && summary.market_used_base_price_fallback_count),
     outlier_excluded_count: strictBikeMarketNumber_(source.outlier_excluded_count) || strictBikeMarketNumber_(summary && summary.market_outlier_excluded_count),
     outlier_excluded_prices: Array.isArray(source.outlier_excluded_prices) ? source.outlier_excluded_prices.map(strictBikeMarketNumber_).filter(function(value) { return value !== null; }) : [],
+    high_price_outlier_count: strictBikeMarketNumber_(source.high_price_outlier_count) || strictBikeMarketNumber_(summary && summary.highPriceOutlierCount) || highPriceOutlierPrices.length,
+    high_price_outlier_prices: highPriceOutlierPrices,
+    high_price_outlier_items: Array.isArray(source.high_price_outlier_items) ? source.high_price_outlier_items : (Array.isArray(summary && summary.highPriceOutlierItems) ? summary.highPriceOutlierItems : []),
     abnormal_excluded_prices: Array.isArray(source.abnormal_excluded_prices) ? source.abnormal_excluded_prices : (Array.isArray(summary && summary.market_abnormal_excluded_prices) ? summary.market_abnormal_excluded_prices : []),
     calculation_method: String(source.calculation_method || (summary && (summary.market_calculation_method || summary.calculationMethod)) || ''),
     price_warning: String(source.price_warning || (summary && (summary.market_price_warning || summary.priceWarning)) || '')
@@ -2504,6 +2545,9 @@ function normalizeBikeMarketResult_(response) {
     market_reference_price: Number(aggregation.reference_market_price || 0),
     market_min_price: Number(aggregation.min_price || 0),
     market_max_price: Number(aggregation.max_price || 0),
+    market_normal_min_price: Number(aggregation.normal_min_price || aggregation.min_price || 0),
+    market_normal_max_price: Number(aggregation.normal_max_price || aggregation.max_price || 0),
+    market_average_price: Number(aggregation.average_price || aggregation.trimmed_average_price || aggregation.simple_average_price || 0),
     market_simple_average_price: Number(aggregation.simple_average_price || 0),
     market_median_price: Number(aggregation.median_price || 0),
     market_trimmed_average_price: Number(aggregation.trimmed_average_price || 0),
@@ -2530,6 +2574,9 @@ function normalizeBikeMarketResult_(response) {
   summary.market_reference_price = normalized.market_reference_price;
   summary.market_min_price = normalized.market_min_price;
   summary.market_max_price = normalized.market_max_price;
+  summary.market_normal_min_price = normalized.market_normal_min_price;
+  summary.market_normal_max_price = normalized.market_normal_max_price;
+  summary.market_average_price = normalized.market_average_price;
   summary.market_simple_average_price = normalized.market_simple_average_price;
   summary.market_median_price = normalized.market_median_price;
   summary.market_trimmed_average_price = normalized.market_trimmed_average_price;
@@ -2599,6 +2646,7 @@ function validateBikeMarketAggregation_(aggregation) {
       return { valid: false, errorCode: WEBAPP_BIKE_MARKET_ERROR_CODES.PRICE_CONSISTENCY_ERROR, message: '最低総額と最高総額の整合性が崩れています。' };
     }
     if (!isBikeMarketPriceInsideRange_(agg.median_price, agg.min_price, agg.max_price)
+      || !isBikeMarketPriceInsideRange_(agg.average_price, agg.min_price, agg.max_price)
       || !isBikeMarketPriceInsideRange_(agg.simple_average_price, agg.min_price, agg.max_price)
       || !isBikeMarketPriceInsideRange_(agg.reference_market_price, agg.min_price, agg.max_price)) {
       return { valid: false, errorCode: WEBAPP_BIKE_MARKET_ERROR_CODES.PRICE_CONSISTENCY_ERROR, message: '相場価格の整合性が崩れています。' };
@@ -2622,6 +2670,7 @@ function verifySavedBikeMarketFields_(sheet, headerMap, rowNumber, aggregation) 
     ['market_calculation_target_count', 'calculation_target_count'],
     ['market_min_price', 'min_price'],
     ['market_max_price', 'max_price'],
+    ['market_average_price', 'average_price'],
     ['market_simple_average_price', 'simple_average_price'],
     ['market_median_price', 'median_price'],
     ['market_reference_price', 'reference_market_price']
@@ -4786,6 +4835,7 @@ function summarizeBikeListings_(bikeName, yearInput, listings, fetchedAt, counts
   var simpleAverage = validCount ? averageBikeMarketPrices_(prices) : null;
   var median = validCount ? medianBikeMarketPrices_(prices) : null;
   var reference = calculateReferenceBikeMarketPrice_(prices, median);
+  var highPriceOutlierItems = buildHighPriceOutlierItems_(priceItems, reference.highPriceOutlierPrices);
   var priceWarning = getBikeMarketPriceRangeWarning_(prices, reference.referencePrice, reference.outlierExcludedCount, median);
 
   var errorMessage = '';
@@ -4813,17 +4863,23 @@ function summarizeBikeListings_(bikeName, yearInput, listings, fetchedAt, counts
     calculationTargetCount: reference.calculationTargetCount,
     minTotalPriceYen: validCount ? prices[0] : null,
     maxTotalPriceYen: validCount ? prices[validCount - 1] : null,
-    averageTotalPriceYen: simpleAverage,
+    averageTotalPriceYen: reference.averagePrice,
+    normalMinPriceYen: reference.normalMinPrice,
+    normalMaxPriceYen: reference.normalMaxPrice,
     simpleAverageTotalPriceYen: simpleAverage,
     medianTotalPriceYen: median,
     trimmedAverageTotalPriceYen: reference.trimmedAveragePrice,
     referenceMarketPriceYen: reference.referencePrice,
     outlierExcludedCount: reference.outlierExcludedCount,
     outlierExcludedPrices: reference.outlierExcludedPrices,
+    highPriceOutlierCount: reference.highPriceOutlierCount,
+    highPriceOutlierPrices: reference.highPriceOutlierPrices,
+    highPriceOutlierItems: highPriceOutlierItems,
     abnormalExcludedPrices: excludedPriceItems,
     calculationMethod: reference.calculationMethod,
     market_min_price: validCount ? prices[0] : null,
     market_max_price: validCount ? prices[validCount - 1] : null,
+    market_average_price: reference.averagePrice,
     market_simple_average_price: simpleAverage,
     market_median_price: median,
     market_trimmed_average_price: reference.trimmedAveragePrice,
@@ -4835,6 +4891,8 @@ function summarizeBikeListings_(bikeName, yearInput, listings, fetchedAt, counts
     market_used_base_price_fallback_count: fallbackCount,
     market_outlier_excluded_count: reference.outlierExcludedCount,
     market_outlier_excluded_prices: reference.outlierExcludedPrices,
+    market_high_price_outlier_count: reference.highPriceOutlierCount,
+    market_high_price_outlier_prices: reference.highPriceOutlierPrices,
     market_abnormal_excluded_prices: excludedPriceItems,
     market_calculation_method: reference.calculationMethod,
     market_price_warning: priceWarning,
@@ -4846,6 +4904,9 @@ function summarizeBikeListings_(bikeName, yearInput, listings, fetchedAt, counts
       calculation_target_count: reference.calculationTargetCount,
       min_price: validCount ? prices[0] : null,
       max_price: validCount ? prices[validCount - 1] : null,
+      average_price: reference.averagePrice,
+      normal_min_price: reference.normalMinPrice,
+      normal_max_price: reference.normalMaxPrice,
       simple_average_price: simpleAverage,
       median_price: median,
       trimmed_average_price: reference.trimmedAveragePrice,
@@ -4853,6 +4914,9 @@ function summarizeBikeListings_(bikeName, yearInput, listings, fetchedAt, counts
       used_base_price_fallback_count: fallbackCount,
       outlier_excluded_count: reference.outlierExcludedCount,
       outlier_excluded_prices: reference.outlierExcludedPrices,
+      high_price_outlier_count: reference.highPriceOutlierCount,
+      high_price_outlier_prices: reference.highPriceOutlierPrices,
+      high_price_outlier_items: highPriceOutlierItems,
       abnormal_excluded_prices: excludedPriceItems,
       calculation_method: reference.calculationMethod,
       price_warning: priceWarning
@@ -4931,18 +4995,34 @@ function medianBikeMarketPrices_(sortedPrices) {
 }
 
 function calculateReferenceBikeMarketPrice_(sortedPrices, median) {
-  var count = sortedPrices.length;
-  if (count === 0) {
+  var originalCount = sortedPrices.length;
+  if (originalCount === 0) {
     return {
       referencePrice: null,
+      averagePrice: null,
+      normalMinPrice: null,
+      normalMaxPrice: null,
       trimmedAveragePrice: null,
       calculationTargetCount: 0,
       outlierExcludedCount: 0,
       outlierExcludedPrices: [],
+      highPriceOutlierCount: 0,
+      highPriceOutlierPrices: [],
       calculationMethod: ''
     };
   }
-  var filtered = sortedPrices.slice();
+  var highPriceOutliers = detectHighBikeMarketPriceOutliers_(sortedPrices, median);
+  var averagePrices = removeBikeMarketPrices_(sortedPrices, highPriceOutliers);
+  if (averagePrices.length === 0) {
+    averagePrices = sortedPrices.slice();
+    highPriceOutliers = [];
+  }
+  var averagePrice = averageBikeMarketPrices_(averagePrices);
+  var normalMinPrice = averagePrices[0] || null;
+  var normalMaxPrice = averagePrices[averagePrices.length - 1] || null;
+  var workingMedian = medianBikeMarketPrices_(averagePrices);
+  var count = averagePrices.length;
+  var filtered = averagePrices.slice();
   var method = 'single_price';
   if (count === 1) {
     method = 'single_price';
@@ -4952,10 +5032,10 @@ function calculateReferenceBikeMarketPrice_(sortedPrices, median) {
     method = 'median_3_to_6_items';
   } else if (count >= 7 && count <= 9) {
     method = 'trimmed_average_7_to_9_items';
-    filtered = sortedPrices.slice(1, sortedPrices.length - 1);
+    filtered = averagePrices.slice(1, averagePrices.length - 1);
   } else {
     method = 'iqr_filtered_average_10_plus';
-    filtered = filterBikeMarketPricesByIqr_(sortedPrices);
+    filtered = filterBikeMarketPricesByIqr_(averagePrices);
     if (filtered.length === 0) {
       method = 'median_fallback';
     }
@@ -4965,25 +5045,91 @@ function calculateReferenceBikeMarketPrice_(sortedPrices, median) {
   var trimmedAverage = filtered.length ? averageBikeMarketPrices_(filtered) : null;
   var reference;
   if (count === 1) {
-    reference = sortedPrices[0];
+    reference = averagePrices[0];
   } else if (count === 2) {
-    reference = averageBikeMarketPrices_(sortedPrices);
+    reference = averageBikeMarketPrices_(averagePrices);
   } else if (count >= 3 && count <= 6) {
-    reference = median;
+    reference = workingMedian;
   } else if (filtered.length === 0) {
-    reference = median;
+    reference = workingMedian;
   } else {
     reference = trimmedAverage;
   }
 
   return {
     referencePrice: roundBikeMarketReferencePrice_(reference),
+    averagePrice: averagePrice,
+    normalMinPrice: normalMinPrice,
+    normalMaxPrice: normalMaxPrice,
     trimmedAveragePrice: trimmedAverage,
     calculationTargetCount: filtered.length || (method === 'median_fallback' ? 0 : count),
     outlierExcludedCount: excluded.length,
     outlierExcludedPrices: excluded,
+    highPriceOutlierCount: highPriceOutliers.length,
+    highPriceOutlierPrices: highPriceOutliers,
     calculationMethod: method
   };
+}
+
+function detectHighBikeMarketPriceOutliers_(sortedPrices, medianPrice) {
+  if (!sortedPrices || sortedPrices.length < 3) {
+    return [];
+  }
+  var median = medianPrice || medianBikeMarketPrices_(sortedPrices);
+  if (!median) {
+    return [];
+  }
+  var q1 = percentileBikeMarketPrice_(sortedPrices, 0.25);
+  var q3 = percentileBikeMarketPrice_(sortedPrices, 0.75);
+  var iqr = Math.max(0, q3 - q1);
+  var iqrUpperFence = q3 + 1.5 * iqr;
+  var extremeUpperFence = Math.max(median * 1.8, median + 300000);
+  var detected = sortedPrices.filter(function(price) {
+    return price > iqrUpperFence || price > extremeUpperFence;
+  });
+  var maxExcludedCount = Math.max(0, sortedPrices.length - 2);
+  if (detected.length > maxExcludedCount) {
+    detected = detected.slice(detected.length - maxExcludedCount);
+  }
+  return detected;
+}
+
+function removeBikeMarketPrices_(prices, excludedPrices) {
+  var remainingExclusions = {};
+  (excludedPrices || []).forEach(function(price) {
+    var key = String(price);
+    remainingExclusions[key] = (remainingExclusions[key] || 0) + 1;
+  });
+  return (prices || []).filter(function(price) {
+    var key = String(price);
+    if (!remainingExclusions[key]) {
+      return true;
+    }
+    remainingExclusions[key]--;
+    return false;
+  });
+}
+
+function buildHighPriceOutlierItems_(priceItems, highPriceOutlierPrices) {
+  var remaining = {};
+  (highPriceOutlierPrices || []).forEach(function(price) {
+    var key = String(price);
+    remaining[key] = (remaining[key] || 0) + 1;
+  });
+  return (priceItems || []).filter(function(item) {
+    var key = String(item.price);
+    if (!remaining[key]) {
+      return false;
+    }
+    remaining[key]--;
+    return true;
+  }).map(function(item) {
+    return {
+      price: item.price,
+      title: item.title || '',
+      url: item.url || ''
+    };
+  });
 }
 
 function filterBikeMarketPricesByIqr_(sortedPrices) {

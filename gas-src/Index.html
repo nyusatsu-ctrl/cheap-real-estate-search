@@ -623,6 +623,48 @@
         text-align: right;
       }
 
+      .market-summary-outliers {
+        display: grid;
+        gap: 7px;
+        border: 1px solid #fedf89;
+        border-radius: 8px;
+        background: #fffaeb;
+        padding: 10px;
+      }
+
+      .market-summary-outliers-title {
+        color: #93370d;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .market-summary-outlier-list {
+        display: grid;
+        gap: 5px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .market-summary-outlier-list li {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .market-summary-outlier-list span {
+        color: var(--muted);
+        font-size: 11px;
+        overflow-wrap: anywhere;
+        text-align: right;
+      }
+
+      .market-summary-outliers-note {
+        color: #93370d;
+        font-size: 11px;
+      }
+
       .market-search-progress {
         display: flex;
         align-items: center;
@@ -4415,6 +4457,9 @@
           market_reference_price: Number(agg.reference_market_price || summary.market_reference_price || summary.referenceMarketPriceYen || 0),
           market_min_price: Number(agg.min_price || summary.market_min_price || summary.minTotalPriceYen || 0),
           market_max_price: Number(agg.max_price || summary.market_max_price || summary.maxTotalPriceYen || 0),
+          market_normal_min_price: Number(agg.normal_min_price || summary.market_normal_min_price || summary.normalMinPriceYen || agg.min_price || 0),
+          market_normal_max_price: Number(agg.normal_max_price || summary.market_normal_max_price || summary.normalMaxPriceYen || agg.max_price || 0),
+          market_average_price: Number(agg.average_price || summary.market_average_price || summary.averageTotalPriceYen || agg.trimmed_average_price || agg.simple_average_price || 0),
           market_simple_average_price: Number(agg.simple_average_price || summary.market_simple_average_price || summary.simpleAverageTotalPriceYen || summary.averageTotalPriceYen || 0),
           market_median_price: Number(agg.median_price || summary.market_median_price || summary.medianTotalPriceYen || 0),
           market_trimmed_average_price: Number(agg.trimmed_average_price || summary.market_trimmed_average_price || summary.trimmedAverageTotalPriceYen || 0),
@@ -4424,6 +4469,9 @@
           market_calculation_target_count: Number(agg.calculation_target_count || summary.market_calculation_target_count || summary.calculationTargetCount || 0),
           market_calculation_method: agg.calculation_method || summary.market_calculation_method || summary.calculationMethod || '',
           market_price_warning: agg.price_warning || summary.market_price_warning || summary.priceWarning || '',
+          market_high_price_outlier_count: Number(agg.high_price_outlier_count || summary.market_high_price_outlier_count || summary.highPriceOutlierCount || 0),
+          market_high_price_outlier_prices: Array.isArray(agg.high_price_outlier_prices) ? agg.high_price_outlier_prices : (summary.highPriceOutlierPrices || []),
+          market_high_price_outlier_items: Array.isArray(agg.high_price_outlier_items) ? agg.high_price_outlier_items : (summary.highPriceOutlierItems || []),
           market_error_message: '',
           market_error_code: '',
           market_fetched_at: summary.fetchedAt || new Date().toISOString(),
@@ -4453,18 +4501,25 @@
           calculation_target_count: normalized.market_calculation_target_count,
           min_price: normalized.market_min_price,
           max_price: normalized.market_max_price,
+          normal_min_price: normalized.market_normal_min_price,
+          normal_max_price: normalized.market_normal_max_price,
+          average_price: normalized.market_average_price,
           simple_average_price: normalized.market_simple_average_price,
           median_price: normalized.market_median_price,
           trimmed_average_price: normalized.market_trimmed_average_price,
           reference_market_price: normalized.market_reference_price,
           calculation_method: normalized.market_calculation_method,
-          price_warning: normalized.market_price_warning
+          price_warning: normalized.market_price_warning,
+          high_price_outlier_count: normalized.market_high_price_outlier_count,
+          high_price_outlier_prices: normalized.market_high_price_outlier_prices,
+          high_price_outlier_items: normalized.market_high_price_outlier_items
         };
         state.selected.market = Object.assign({}, state.selected.market || {}, {
           status: '相場取得済み',
           marketStatus: 'success',
           minPrice: normalized.market_min_price,
           maxPrice: normalized.market_max_price,
+          averagePrice: normalized.market_average_price,
           simpleAveragePrice: normalized.market_simple_average_price,
           medianPrice: normalized.market_median_price,
           trimmedAveragePrice: normalized.market_trimmed_average_price,
@@ -4475,6 +4530,9 @@
           calculationTargetCount: normalized.market_calculation_target_count,
           calculationMethod: normalized.market_calculation_method,
           priceWarning: normalized.market_price_warning,
+          highPriceOutlierCount: normalized.market_high_price_outlier_count,
+          highPriceOutlierPrices: normalized.market_high_price_outlier_prices,
+          highPriceOutlierItems: normalized.market_high_price_outlier_items,
           priceAggregation: agg,
           fetchedAt: normalized.market_fetched_at,
           errorMessage: '',
@@ -4606,12 +4664,14 @@
               <div><label>掲載候補</label><strong>${formatCount(agg.extracted_count)}台</strong></div>
               <div><label>年式一致</label><strong>${formatCount(agg.year_matched_count)}台</strong></div>
               <div><label>集計対象</label><strong>${formatCount(agg.calculation_target_count)}台</strong></div>
-              <div><label>単純平均</label><strong>${formatYen(agg.simple_average_price)}</strong></div>
+              <div><label>通常平均（高額車両除外）</label><strong>${formatYen(agg.average_price || agg.trimmed_average_price || agg.simple_average_price)}</strong></div>
+              <div><label>単純平均（全件）</label><strong>${formatYen(agg.simple_average_price)}</strong></div>
               <div><label>中央値</label><strong>${formatYen(agg.median_price)}</strong></div>
               <div><label>取得日時</label><strong>${escapeHtml(formatDateTimeMinute(market.fetchedAt))}</strong></div>
             </div>
           </details>
           <div class="market-note">
+            ※平均総額は、相場から大きく外れた高額車両を除外して算出しています。除外車両の金額は参考情報として表示します。<br>
             ※参考相場は、台数に応じて中央値または外れ値除外後の平均を使用しています。<br>
             ※総額が取得できない車両は本体価格で代用している場合があります。<br>
             ※表示価格は掲載情報ベースであり、実売価格・陸送費・登録費用・保証費用は別途確認が必要です。
@@ -4634,17 +4694,47 @@
               <strong>${formatYen(agg.min_price)}</strong>
             </div>
             <div class="market-summary-row">
-              <label>平均総額</label>
-              <strong>${formatYen(agg.simple_average_price)}</strong>
+              <label>平均総額（高額車両除外）</label>
+              <strong>${formatYen(agg.average_price || agg.trimmed_average_price || agg.simple_average_price)}</strong>
             </div>
+            ${Number(agg.high_price_outlier_count || 0) > 0 ? `
+              <div class="market-summary-row">
+                <label>通常価格帯</label>
+                <strong>${formatYen(agg.normal_min_price)} ～ ${formatYen(agg.normal_max_price)}</strong>
+              </div>
+            ` : ''}
             <div class="market-summary-row">
               <label>最高総額</label>
               <strong>${formatYen(agg.max_price)}</strong>
             </div>
+            ${marketHighPriceOutliersHtml(agg)}
             <div class="market-summary-row">
               <label>価格取得</label>
               <strong>${formatCount(agg.price_available_count)}台</strong>
             </div>
+          </div>
+        `;
+      }
+
+      function marketHighPriceOutliersHtml(agg) {
+        const sourceItems = Array.isArray(agg && agg.high_price_outlier_items) ? agg.high_price_outlier_items : [];
+        const sourcePrices = Array.isArray(agg && agg.high_price_outlier_prices) ? agg.high_price_outlier_prices : [];
+        const items = sourceItems.length > 0
+          ? sourceItems.map((item) => ({ price: safeNumber(item && item.price), title: String((item && item.title) || '') }))
+          : sourcePrices.map((price) => ({ price: safeNumber(price), title: '' }));
+        const visibleItems = items.filter((item) => item.price !== null);
+        if (visibleItems.length === 0) {
+          return '';
+        }
+        return `
+          <div class="market-summary-outliers">
+            <div class="market-summary-outliers-title">参考：高額車両（平均から除外）</div>
+            <ul class="market-summary-outlier-list">
+              ${visibleItems.map((item) => `
+                <li><strong>${formatYen(item.price)}</strong>${item.title ? `<span>${escapeHtml(item.title)}</span>` : ''}</li>
+              `).join('')}
+            </ul>
+            <div class="market-summary-outliers-note">この価格の車両も掲載されていますが、通常の平均総額には含めていません。</div>
           </div>
         `;
       }

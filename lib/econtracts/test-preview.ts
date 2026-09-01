@@ -3,6 +3,7 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { canIssueLoanEcontract } from "@/lib/econtracts/rules";
 import { requireEcontractFeatureEnabled } from "@/lib/econtracts/server";
 import { buildEcontractDocument } from "@/lib/econtracts/templates";
+import { isKnownAdminTestRecipient } from "@/lib/econtracts/test-recipient";
 import type { EcontractCustomerSnapshot, EcontractDocumentSnapshot } from "@/lib/econtracts/types";
 import type { AdminIdentity } from "@/lib/admin";
 import type { SalesContract, SalesCustomer, SalesLoan, SalesVehicle } from "@/lib/sales-contracts/types";
@@ -77,18 +78,19 @@ export async function loadEcontractTestPreview(contractId: string): Promise<Econ
 }
 
 export async function isAuthorizedAdminTestRecipient(recipient: string, currentAdmin: AdminIdentity) {
-  const normalizedRecipient = normalizeEmail(recipient);
-  if (normalizedRecipient === normalizeEmail(currentAdmin.email)) return true;
+  if (isKnownAdminTestRecipient(recipient, currentAdmin)) return true;
   const client = requireReadonlyClient();
   const result = await client
     .from("profiles")
-    .select("id")
+    .select("email")
     .eq("role", "admin")
-    .eq("email", normalizedRecipient)
-    .limit(1)
-    .maybeSingle();
+    .limit(1000);
   if (result.error) throw result.error;
-  return Boolean(result.data);
+  return isKnownAdminTestRecipient(
+    recipient,
+    currentAdmin,
+    (result.data ?? []).map((profile) => profile.email)
+  );
 }
 
 export function buildEcontractTestPreviewUrl(baseUrl: string, contractId: string) {
@@ -105,8 +107,4 @@ function requireReadonlyClient() {
   const client = createSupabaseServiceRoleClient();
   if (!client) throw new Error("電子契約データベース設定が未完了です。");
   return client;
-}
-
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
 }

@@ -113,7 +113,7 @@ export type SalesVehicle = {
 export type SalesLoan = {
   id: string;
   contract_id: string;
-  finance_company: SalesFinanceCompany;
+  finance_company: SalesFinanceCompany | null;
   application_number: string | null;
   contract_number: string | null;
   approval_status: SalesApprovalStatus | null;

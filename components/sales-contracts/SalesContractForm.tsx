@@ -86,7 +86,7 @@ export function SalesContractForm({
   const sourceLinkMemo = buildSourceLinkMemo(sourceDefaults);
   const sourceSnapshotJson = buildSourceSnapshotJson(sourceDefaults);
   const sourceSystemValue = contract?.source_system ?? sourceDefaults?.source_system ?? "";
-  const isLoanReviewImport = mode === "create" && sourceSystemValue === "gas_loan_review";
+  const isLoanReviewImport = sourceSystemValue === "gas_loan_review";
   const sourceReceivedAtValue = dateTimeLocalValue(contract?.source_received_at ?? sourceDefaults?.source_received_at);
   const sourceVehicleModel = vehicle?.model ?? sourceDefaults?.desired_vehicle ?? "";
   const sourceMonthlyPayment = firstPresentValue(

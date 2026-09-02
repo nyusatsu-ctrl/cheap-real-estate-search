@@ -351,7 +351,7 @@ export function formatYen(value: number | null | undefined) {
 }
 
 export function getCounterpartyLabel(item: Pick<SalesContractListItem, "contract" | "loan" | "lease">) {
-  if (item.contract.contract_type === "loan" && item.loan) return FINANCE_COMPANY_LABELS[item.loan.finance_company];
+  if (item.contract.contract_type === "loan" && item.loan) return item.loan.finance_company ? FINANCE_COMPANY_LABELS[item.loan.finance_company] : "未選択（審査前）";
   if (item.contract.contract_type === "lease" && item.lease) return LEASE_COMPANY_LABELS[item.lease.lease_company];
   return "-";
 }

@@ -49,7 +49,7 @@ export default async function EcontractTestPreviewPage({ params }: { params: Tes
           <PreviewInfo label="申込者" value={`${preview.customer.name} 様`} />
           <PreviewInfo label="車両区分" value={VEHICLE_TYPE_LABELS[preview.terms.vehicleType]} />
           <PreviewInfo label="希望車種" value={preview.terms.desiredVehicle || "未登録"} />
-          <PreviewInfo label="信販会社" value={FINANCE_COMPANY_LABELS[preview.terms.financeCompany]} />
+          <PreviewInfo label="信販会社" value={preview.terms.financeCompany ? FINANCE_COMPANY_LABELS[preview.terms.financeCompany] : "未選択（審査前）"} />
         </dl>
 
         <section aria-labelledby="test-important-items" className="rounded-lg border border-amber-300 bg-amber-50 p-5 shadow-sm sm:p-6">

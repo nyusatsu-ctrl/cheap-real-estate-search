@@ -2,6 +2,7 @@ import { canIssueLoanEcontract } from "@/lib/econtracts/rules";
 
 export type EcontractCandidatePayload = {
   sourceSystem: "gas_loan_review";
+  applicationType: "pre_screening";
   sourceRowKey: string;
   sourceRowNumber: number;
   sourceReceivedAt: string | null;
@@ -14,8 +15,8 @@ export type EcontractCandidatePayload = {
   vehicleType: "car" | "bike";
   desiredVehicle: string | null;
   contractType: "loan";
-  financeCompany: "premium" | "ast";
-  approvalStatus: "approved";
+  financeCompany: "premium" | "ast" | null;
+  approvalStatus: "unrequested" | "pending" | "approved" | "guarantor_required" | "rejected";
 };
 
 export function normalizeEcontractCandidatePayload(value: unknown): EcontractCandidatePayload | null {
@@ -26,8 +27,9 @@ export function normalizeEcontractCandidatePayload(value: unknown): EcontractCan
   const customerName = clean(input.customerName, 200);
   const vehicleType = clean(input.vehicleType, 20);
   const contractType = clean(input.contractType, 20);
-  const financeCompany = clean(input.financeCompany, 20);
-  const approvalStatus = clean(input.approvalStatus, 30);
+  const applicationType = clean(input.applicationType, 30);
+  const financeCompany = nullableClean(input.financeCompany, 20);
+  const approvalStatus = clean(input.approvalStatus, 30) || "unrequested";
   const applicationNumber = clean(input.applicationNumber, 500) || sourceRowKey;
   const email = clean(input.email, 320).toLowerCase();
   const receivedAt = normalizeTimestamp(input.sourceReceivedAt);
@@ -39,8 +41,12 @@ export function normalizeEcontractCandidatePayload(value: unknown): EcontractCan
     || sourceRowNumber < 2
     || sourceRowNumber > 10_000_000
     || !applicationNumber
+    || applicationType !== "pre_screening"
     || (vehicleType !== "car" && vehicleType !== "bike")
-    || !canIssueLoanEcontract({ contractType, financeCompany, approvalStatus })
+    || !canIssueLoanEcontract({ contractType })
+    || (financeCompany !== null && financeCompany !== "premium" && financeCompany !== "ast")
+    || !["unrequested", "pending", "approved", "guarantor_required", "rejected"].includes(approvalStatus)
+    || (financeCompany === null && approvalStatus !== "unrequested")
     || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
   ) {
     return null;
@@ -48,6 +54,7 @@ export function normalizeEcontractCandidatePayload(value: unknown): EcontractCan
 
   return {
     sourceSystem: "gas_loan_review",
+    applicationType: "pre_screening",
     sourceRowKey,
     sourceRowNumber,
     sourceReceivedAt: receivedAt,
@@ -60,8 +67,8 @@ export function normalizeEcontractCandidatePayload(value: unknown): EcontractCan
     vehicleType,
     desiredVehicle: nullableClean(input.desiredVehicle, 500),
     contractType: "loan",
-    financeCompany: financeCompany as "premium" | "ast",
-    approvalStatus: "approved"
+    financeCompany: financeCompany as "premium" | "ast" | null,
+    approvalStatus: approvalStatus as EcontractCandidatePayload["approvalStatus"]
   };
 }
 

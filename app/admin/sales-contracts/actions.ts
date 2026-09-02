@@ -409,7 +409,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
   const monthlyLeaseFee = numberField(formData, "monthly_lease_fee");
   const leaseStartDate = nullableString(formData, "lease_start_date");
   const leaseEndDate = nullableString(formData, "lease_end_date");
-  const isLoanReviewCandidate = Boolean(options.validateMinimumFields && sourceSystem === "gas_loan_review");
+  const isLoanReviewCandidate = sourceSystem === "gas_loan_review";
   const selection = validateSalesContractSelection({
     vehicleType,
     contractType,
@@ -501,7 +501,9 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
       gps_installed: checkboxField(formData, "gps_installed"),
       memo: nullableString(formData, "vehicle_memo")
     },
-    loan: contractType === "loan" && financeCompany ? getLoanPayload(formData, financeCompany, installmentCount) : null,
+    loan: contractType === "loan" && (financeCompany || isLoanReviewCandidate)
+      ? getLoanPayload(formData, financeCompany || null, installmentCount)
+      : null,
     lease: contractType === "lease" && leaseCompany ? getLeasePayload(formData, leaseCompany) : null,
     guarantor: getGuarantorPayload(formData),
     documents: getDocumentPayloads(formData),
@@ -509,7 +511,7 @@ function getValidatedFormInput(formData: FormData, failurePath: string, options:
   };
 }
 
-function getLoanPayload(formData: FormData, financeCompany: SalesFinanceCompany, installmentCount: number | null) {
+function getLoanPayload(formData: FormData, financeCompany: SalesFinanceCompany | null, installmentCount: number | null) {
   return {
     finance_company: financeCompany,
     application_number: nullableString(formData, "application_number"),

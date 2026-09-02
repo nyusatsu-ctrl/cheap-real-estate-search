@@ -27,16 +27,14 @@ export function EcontractAdminCard({
   const legacyContracts = summary.contracts.filter((contract) => contract.contract_kind === "vehicle_confirmation");
   const hasSigned = summary.contracts.some((contract) => contract.contract_kind === "purchase_intent" && contract.status === "signed");
   const eligible = canIssueLoanEcontract({
-    contractType: detail.contract.contract_type,
-    approvalStatus: detail.loan?.approval_status,
-    financeCompany: detail.loan?.finance_company
+    contractType: detail.contract.contract_type
   });
 
   return (
     <section id="econtracts" className="scroll-mt-4 rounded-lg border border-teal-200 bg-teal-50 p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-black text-teal-700">審査可決後フロー</p>
+          <p className="text-sm font-black text-teal-700">審査前契約フロー</p>
           <h2 className="mt-1 text-2xl font-black text-teal-950">電子契約</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-teal-900">購入申込と手続継続の確認を、送信から本人認証・締結・証跡保存まで一つの契約で管理します。</p>
         </div>
@@ -55,7 +53,7 @@ export function EcontractAdminCard({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-black text-teal-700">今回の契約</p>
-                <h3 className="mt-1 text-lg font-black text-slate-950">自社ローン審査可決後 購入申込・手続継続確認契約書</h3>
+                <h3 className="mt-1 text-lg font-black text-slate-950">自社ローン審査申込・購入手続継続確認契約書</h3>
               </div>
               <ContractBadge contract={current} compact />
             </div>
@@ -81,7 +79,7 @@ export function EcontractAdminCard({
                     <button className="w-full rounded bg-teal-700 px-4 py-3 text-sm font-black text-white shadow-sm focus-ring">電子契約をメール送信</button>
                   </form>
                 ) : (
-                  <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-900">電子契約はプレミアまたはアストで可決済みの自社ローン顧客だけに送信できます。</p>
+                  <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-900">電子契約は自社ローン契約だけに送信できます。</p>
                 )
               ) : null}
               {current ? <ContractActions contract={current} contractId={detail.contract.id} /> : null}

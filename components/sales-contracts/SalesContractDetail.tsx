@@ -134,7 +134,7 @@ export function SalesContractDetail({
         <Section title="ローン情報">
           {item.loan ? (
             <InfoGrid columns="md:grid-cols-4">
-              <Info label="信販会社" value={FINANCE_COMPANY_LABELS[item.loan.finance_company]} />
+              <Info label="信販会社" value={item.loan.finance_company ? FINANCE_COMPANY_LABELS[item.loan.finance_company] : "未選択（審査前）"} />
               <Info label="支払回数" value={item.loan.installment_count ? `${item.loan.installment_count}回` : "-"} />
               <Info label="初回支払額" value={formatYen(item.loan.initial_payment_amount)} />
               <Info label="月額" value={formatYen(item.loan.monthly_payment)} />

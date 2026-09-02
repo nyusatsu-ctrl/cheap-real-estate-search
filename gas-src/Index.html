@@ -3729,7 +3729,7 @@
 
       function openEcontractCandidate(customer) {
         if (!isEcontractEligible(customer)) {
-          showToast('電子契約はプレミアまたはアストで可決済みの顧客だけが対象です。');
+          showToast('電子契約は仮審査申込の顧客だけが対象です。');
           return;
         }
         const opened = window.open('about:blank', '_blank');
@@ -4149,13 +4149,7 @@
       }
 
       function isEcontractEligible(customer) {
-        if (!customer) return false;
-        const combined = [customer.status, customer.review1, customer.review2].join(' ');
-        if (combined.indexOf('保証人') !== -1) return false;
-        return customer.status === 'プレミア可決'
-          || customer.status === 'アスト可決'
-          || customer.review1 === '可決'
-          || customer.review2 === '可決';
+        return Boolean(customer && String(customer.applicationType || '').trim() === '仮審査申込');
       }
 
       function isAstApproved(customer) {

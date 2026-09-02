@@ -38,14 +38,10 @@ export const ECONTRACT_STATUS_LABELS: Record<EcontractStatus, string> = {
 
 type EcontractLoanEligibility = {
   contractType: string | null | undefined;
-  approvalStatus: string | null | undefined;
-  financeCompany: string | null | undefined;
 };
 
 export function canIssueLoanEcontract(input: EcontractLoanEligibility) {
-  return input.contractType === "loan"
-    && input.approvalStatus === "approved"
-    && (input.financeCompany === "premium" || input.financeCompany === "ast");
+  return input.contractType === "loan";
 }
 
 export function getEcontractStatusLabel(status: EcontractStatus, linkExpiresAt?: string | null, now = Date.now()) {

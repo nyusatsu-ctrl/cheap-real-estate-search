@@ -611,14 +611,14 @@ function syncEcontractCandidate(payload) {
 
   var row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
   var rowKey = buildApplicationRowKey_(row, headerMap);
+  var applicationType = String(getManagedCell_(row, managementMap, '申込種別') || '仮審査申込').trim();
+  if (applicationType !== '仮審査申込') {
+    throw new Error('電子契約は仮審査申込の顧客だけが対象です。');
+  }
   var status = normalizeStatusLabel_(getManagedCell_(row, managementMap, '対応状況') || getManagedCell_(row, managementMap, '対応ステータス') || '');
   var premiumReview = String(getManagedCell_(row, managementMap, 'プレミアファイナンス審査結果') || '未依頼').trim();
   var astReview = String(getManagedCell_(row, managementMap, 'アスト審査結果') || '未依頼').trim();
   var eligibility = getEcontractEligibility_(status, premiumReview, astReview);
-  if (!eligibility.eligible) {
-    throw new Error('電子契約はプレミアまたはアストで可決済みの顧客だけが対象です。');
-  }
-
   var requestType = String(getCellByHeader_(row, headerMap, 'ご希望') || '');
   var response = UrlFetchApp.fetch(WEBAPP_ECONTRACT_CANDIDATE_API_URL, {
     method: 'post',
@@ -628,6 +628,7 @@ function syncEcontractCandidate(payload) {
     },
     payload: JSON.stringify({
       sourceSystem: 'gas_loan_review',
+      applicationType: 'pre_screening',
       sourceRowKey: rowKey,
       sourceRowNumber: rowNumber,
       sourceReceivedAt: getCellByHeader_(row, headerMap, '受信日時') || '',
@@ -640,8 +641,8 @@ function syncEcontractCandidate(payload) {
       vehicleType: requestType.indexOf('バイク') !== -1 ? 'bike' : 'car',
       desiredVehicle: getCellByHeader_(row, headerMap, '希望車種(希望車種)') || '',
       contractType: 'loan',
-      financeCompany: eligibility.financeCompany,
-      approvalStatus: 'approved'
+      financeCompany: eligibility.financeCompany || null,
+      approvalStatus: eligibility.approvalStatus
     }),
     muteHttpExceptions: true
   });
@@ -665,17 +666,38 @@ function syncEcontractCandidate(payload) {
 }
 
 function getEcontractEligibility_(status, premiumReview, astReview) {
-  var combined = [status, premiumReview, astReview].join(' ');
-  if (combined.indexOf('保証人') !== -1) {
-    return { eligible: false, financeCompany: '' };
+  var normalizedStatus = String(status || '').trim();
+  var normalizedPremium = String(premiumReview || '').trim();
+  var normalizedAst = String(astReview || '').trim();
+  if (normalizedStatus.indexOf('アスト') !== -1 || !isEcontractReviewUnrequested_(normalizedAst)) {
+    return {
+      eligible: true,
+      financeCompany: 'ast',
+      approvalStatus: getEcontractApprovalStatus_(isEcontractReviewUnrequested_(normalizedAst) ? normalizedStatus : normalizedAst)
+    };
   }
-  if (status === 'アスト可決' || astReview === '可決') {
-    return { eligible: true, financeCompany: 'ast' };
+  if (normalizedStatus.indexOf('プレミア') !== -1 || !isEcontractReviewUnrequested_(normalizedPremium)) {
+    return {
+      eligible: true,
+      financeCompany: 'premium',
+      approvalStatus: getEcontractApprovalStatus_(isEcontractReviewUnrequested_(normalizedPremium) ? normalizedStatus : normalizedPremium)
+    };
   }
-  if (status === 'プレミア可決' || premiumReview === '可決') {
-    return { eligible: true, financeCompany: 'premium' };
-  }
-  return { eligible: false, financeCompany: '' };
+  return { eligible: true, financeCompany: '', approvalStatus: 'unrequested' };
+}
+
+function isEcontractReviewUnrequested_(value) {
+  var text = String(value || '').trim();
+  return !text || text === '-' || text === '未依頼';
+}
+
+function getEcontractApprovalStatus_(value) {
+  var text = String(value || '');
+  if (text.indexOf('保証人') !== -1) return 'guarantor_required';
+  if (text.indexOf('可決') !== -1) return 'approved';
+  if (text.indexOf('否決') !== -1) return 'rejected';
+  if (text.indexOf('審査中') !== -1 || text.indexOf('依頼中') !== -1) return 'pending';
+  return 'unrequested';
 }
 
 function buildDisplayDuplicateKey_(customer) {

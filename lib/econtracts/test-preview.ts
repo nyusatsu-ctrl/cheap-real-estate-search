@@ -46,11 +46,9 @@ export async function loadEcontractTestPreview(contractId: string): Promise<Econ
   const vehicle = (vehicleResult.data as SalesVehicle | null) ?? null;
   const loan = loanResult.data as SalesLoan;
   if (!canIssueLoanEcontract({
-    contractType: contract.contract_type,
-    approvalStatus: loan.approval_status,
-    financeCompany: loan.finance_company
+    contractType: contract.contract_type
   })) {
-    throw new Error("テスト送信はプレミアまたはアストで可決済みの自社ローン顧客だけに使用できます。");
+    throw new Error("テスト送信は自社ローン契約だけに使用できます。");
   }
 
   const customerSnapshot: EcontractCustomerSnapshot = {

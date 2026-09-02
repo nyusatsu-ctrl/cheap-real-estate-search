@@ -80,7 +80,7 @@ function getPreviewErrorMessage(error: unknown) {
   if (
     message === "対象の販売契約が見つかりません。"
     || message === "顧客またはローン情報が見つかりません。"
-    || message === "テスト送信はプレミアまたはアストで可決済みの自社ローン顧客だけに使用できます。"
+    || message === "テスト送信は自社ローン契約だけに使用できます。"
   ) return message;
   return "テストプレビューを準備できませんでした。";
 }

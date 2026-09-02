@@ -291,11 +291,9 @@ function buildTermsSnapshot(source: SourceDetail) {
 
 function requireEligibleSource(source: SourceDetail, contractId: string) {
   if (!canIssueLoanEcontract({
-    contractType: source.contract.contract_type,
-    approvalStatus: source.loan.approval_status,
-    financeCompany: source.loan.finance_company
+    contractType: source.contract.contract_type
   })) {
-    fail(contractId, "電子契約はプレミアまたはアストで可決済みの自社ローン顧客だけに送信できます。");
+    fail(contractId, "電子契約は自社ローン契約だけに送信できます。");
   }
 }
 

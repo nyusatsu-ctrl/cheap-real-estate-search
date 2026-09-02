@@ -50,20 +50,11 @@ const completeFeatureEnvironment = {
   ECONTRACT_OTP_PEPPER: "test-only"
 };
 
-test("only premium or AST approved loan contracts are eligible", () => {
-  const eligible = (financeCompany: string, approvalStatus: string, contractType = "loan") => canIssueLoanEcontract({
-    contractType,
-    financeCompany,
-    approvalStatus
-  });
-  assert.equal(eligible("premium", "approved"), true);
-  assert.equal(eligible("ast", "approved"), true);
-  assert.equal(eligible("aplus", "approved"), false);
-  assert.equal(eligible("premium", "pending"), false);
-  assert.equal(eligible("ast", "rejected"), false);
-  assert.equal(eligible("premium", "guarantor_required"), false);
-  assert.equal(eligible("premium", "unrequested"), false);
-  assert.equal(eligible("premium", "approved", "cash"), false);
+test("loan contracts are eligible before screening without depending on approval state", () => {
+  assert.equal(canIssueLoanEcontract({ contractType: "loan" }), true);
+  assert.equal(canIssueLoanEcontract({ contractType: "cash" }), false);
+  assert.equal(canIssueLoanEcontract({ contractType: "lease" }), false);
+  assert.equal(canIssueLoanEcontract({ contractType: null }), false);
 });
 
 test("contract login branding covers sales and e-contract routes without changing diagnosis or GPS", async () => {
@@ -114,7 +105,7 @@ test("feature gate remains fail closed and dedicated", () => {
 
 test("the formal one-stage document has the exact title and nine individual checks", () => {
   const expectedItems = [
-    "今回のローン可決は、株式会社エコループを販売店とする今回の取引についての審査結果であり、他店で同じ審査結果になることが保証されているものではないことを理解しました。",
+    "本契約を締結してもローン審査の可決が保証されるものではなく、審査結果により購入手続を継続できない場合があることを理解しました。",
     "私は株式会社エコループから自動車またはバイクを購入する意思があり、車両探索その他の購入準備を依頼します。",
     "現時点で個別車両が未確定の場合があり、私が承認していない特定車両を一方的に購入させられるものではないことを理解しました。",
     "特定車両が提示された後、LINE、SMS、メールその他記録が残る方法で私が購入手続を承認した場合、株式会社エコループが落札・仕入・陸送・登録準備等へ進むことを理解しました。",
@@ -126,12 +117,13 @@ test("the formal one-stage document has the exact title and nine individual chec
   ];
   const document = buildEcontractDocument(customer);
   assert.equal(document.title, ECONTRACT_DOCUMENT_TITLE);
-  assert.equal(document.title, "自社ローン審査可決後 購入申込・手続継続確認契約書");
+  assert.equal(document.title, "自社ローン審査申込・購入手続継続確認契約書");
   assert.deepEqual(ECONTRACT_IMPORTANT_ITEMS.map((item) => item.text), expectedItems);
   assert.equal(new Set(ECONTRACT_IMPORTANT_ITEMS.map((item) => item.id)).size, 9);
   for (let article = 1; article <= 13; article += 1) assert.match(document.text, new RegExp(`第${article}条`));
   for (const phrase of [
     "本契約は特定の車両についての最終売買契約そのものではありませんが",
+    "本契約の締結は、ローン審査の可決、特定の利用条件または融資実行を意味するものではありません。",
     "車両決定まで1か月以上を要する場合があります。",
     "その最終確認後3営業日以内に回答がなく",
     "3万円を無条件または一律に請求するものではありません。",
@@ -140,6 +132,7 @@ test("the formal one-stage document has the exact title and nine individual chec
   ]) assert.match(document.text, new RegExp(phrase));
   assert.doesNotMatch(document.text, /個別車両購入確認書を別途締結/);
   assert.doesNotMatch(document.text, /第2契約/);
+  assert.doesNotMatch(document.text, /ローン審査が可決となった後/);
   assert.match(sha256(document.text), /^[0-9a-f]{64}$/);
 });
 
@@ -183,13 +176,16 @@ test("token, OTP, identity, expiry and evidence primitives remain enforced", () 
   assert.notEqual(buildEvidenceHash({ signedAt: "a" }), buildEvidenceHash({ signedAt: "b" }));
 });
 
-test("candidate sync is server-revalidated, idempotent and never sends mail or creates an e-contract", async () => {
-  const [candidateRoute, candidateParser, migration, gasServer, gasUi] = await Promise.all([
+test("pre-screening candidate sync is server-revalidated, idempotent and never sends mail or creates an e-contract", async () => {
+  const [candidateRoute, candidateParser, baseMigration, preScreeningMigration, gasServer, gasUi, salesActions, salesForm] = await Promise.all([
     readFile(new URL("../app/api/sales-contracts/econtract-candidate/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/econtracts/candidate.ts", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/20260828234610_single_stage_econtract_candidate.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260902002625_allow_preapproval_econtract_candidates.sql", import.meta.url), "utf8"),
     readFile(new URL("../gas-src/CustomerService.js", import.meta.url), "utf8"),
-    readFile(new URL("../gas-src/Index.html", import.meta.url), "utf8")
+    readFile(new URL("../gas-src/Index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/sales-contracts/actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/sales-contracts/SalesContractForm.tsx", import.meta.url), "utf8")
   ]);
   assert.match(candidateRoute, /if \(!isEcontractFeatureEnabled\(\)\)/);
   assert.match(candidateRoute, /normalizeEcontractCandidatePayload/);
@@ -198,29 +194,44 @@ test("candidate sync is server-revalidated, idempotent and never sends mail or c
   assert.doesNotMatch(candidateRoute, /sendEcontract|Resend|sales_econtracts/);
   assert.match(candidateParser, /canIssueLoanEcontract/);
   assert.match(candidateParser, /sourceSystem: "gas_loan_review"/);
+  assert.match(candidateParser, /applicationType: "pre_screening"/);
+  assert.match(candidateParser, /financeCompany: "premium" \| "ast" \| null/);
+  assert.match(candidateParser, /approvalStatus: "unrequested" \| "pending" \| "approved" \| "guarantor_required" \| "rejected"/);
+  assert.match(candidateParser, /legacyApprovedCandidate = !applicationType && supportedFinanceCompany && approvalStatus === "approved"/);
 
-  assert.match(migration, /sales_contracts_gas_source_row_key_active_uidx/);
-  assert.match(migration, /sales_contracts_gas_source_row_number_active_uidx/);
-  assert.match(migration, /pg_advisory_xact_lock/g);
-  assert.match(migration, /sc\.source_row_key = v_source_row_key\s+or sl\.application_number = v_application_number/);
-  assert.match(migration, /return jsonb_build_object\('contract_id', v_existing_contract_id, 'created', false\)/);
+  assert.match(baseMigration, /sales_contracts_gas_source_row_key_active_uidx/);
+  assert.match(baseMigration, /sales_contracts_gas_source_row_number_active_uidx/);
+  assert.match(preScreeningMigration, /alter column finance_company drop not null/);
+  assert.match(preScreeningMigration, /v_application_type is distinct from 'pre_screening' and not v_is_legacy_approved/);
+  assert.match(preScreeningMigration, /v_is_legacy_approved := v_application_type = ''/);
+  assert.match(preScreeningMigration, /v_finance_company is null and v_approval_status <> 'unrequested'/);
+  assert.match(preScreeningMigration, /pg_advisory_xact_lock/g);
+  assert.match(preScreeningMigration, /sc\.source_row_key = v_source_row_key\s+or sl\.application_number = v_application_number/);
+  assert.match(preScreeningMigration, /return jsonb_build_object\('contract_id', v_existing_contract_id, 'created', false\)/);
   for (const table of ["sales_customers", "sales_contracts", "sales_vehicles", "sales_loans", "sales_audit_logs"]) {
-    assert.match(migration, new RegExp(`insert into public\\.${table}`));
+    assert.match(preScreeningMigration, new RegExp(`insert into public\\.${table}`));
   }
-  assert.doesNotMatch(migration, /insert into public\.sales_econtracts/);
-  assert.match(migration, /'emailSent', false/);
-  assert.match(migration, /'econtractCreated', false/);
-  assert.match(migration, /grant execute on function public\.upsert_sales_econtract_candidate\(jsonb\) to service_role/);
-  assert.doesNotMatch(migration, /grant execute[^;]+to (?:anon|authenticated)/);
+  assert.doesNotMatch(preScreeningMigration, /insert into public\.sales_econtracts/);
+  assert.match(preScreeningMigration, /'emailSent', false/);
+  assert.match(preScreeningMigration, /'econtractCreated', false/);
+  assert.match(preScreeningMigration, /grant execute on function public\.upsert_sales_econtract_candidate\(jsonb\) to service_role/);
+  assert.doesNotMatch(preScreeningMigration, /grant execute[^;]+to (?:anon|authenticated)/);
 
   const syncFunction = gasServer.slice(gasServer.indexOf("function syncEcontractCandidate"), gasServer.indexOf("function getEcontractEligibility_"));
   assert.match(syncFunction, /findCurrentRowNumber_/);
   assert.match(syncFunction, /getEcontractEligibility_/);
+  assert.match(syncFunction, /applicationType: 'pre_screening'/);
+  assert.match(syncFunction, /approvalStatus: eligibility\.approvalStatus/);
   assert.match(syncFunction, /WEBAPP_ECONTRACT_CANDIDATE_API_URL/);
   assert.doesNotMatch(syncFunction, /GmailApp|sendEmail|電子契約をメール送信/);
   assert.match(gasUi, /isEcontractEligible\(customer\).*data-econtract-sync/s);
   assert.match(gasUi, /\.syncEcontractCandidate\(\{ rowNumber: customer\.rowNumber, rowKey: customer\.rowKey \}\)/);
-  assert.match(gasUi, /combined\.indexOf\('保証人'\) !== -1/);
+  assert.match(gasUi, /String\(customer\.applicationType \|\| ''\)\.trim\(\) === '仮審査申込'/);
+  assert.doesNotMatch(gasUi, /電子契約はプレミアまたはアストで可決済み/);
+  assert.match(salesActions, /const isLoanReviewCandidate = sourceSystem === "gas_loan_review"/);
+  assert.match(salesActions, /financeCompany \|\| isLoanReviewCandidate/);
+  assert.match(salesActions, /getLoanPayload\(formData, financeCompany \|\| null, installmentCount\)/);
+  assert.match(salesForm, /const isLoanReviewImport = sourceSystemValue === "gas_loan_review"/);
 });
 
 test("new operations issue one kind only, block signed reissue and revalidate resend", async () => {
@@ -236,6 +247,9 @@ test("new operations issue one kind only, block signed reissue and revalidate re
   assert.match(actions, /status === "signed"/);
   assert.match(actions, /締結済みの電子契約があるため、新しい電子契約は発行できません/);
   assert.match(card, /電子契約をメール送信/);
+  assert.match(card, /審査前契約フロー/);
+  assert.doesNotMatch(actions, /プレミアまたはアストで可決済み/);
+  assert.doesNotMatch(card, /審査可決後|プレミアまたはアストで可決済み/);
   assert.doesNotMatch(card, /第1契約|第2契約|issueVehicleConfirmation/);
   assert.match(card, /過去の電子契約証跡/);
 });

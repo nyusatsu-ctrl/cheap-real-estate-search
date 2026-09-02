@@ -24,14 +24,19 @@ declare
   v_desired_vehicle text := nullif(btrim(coalesce(p_payload ->> 'desiredVehicle', '')), '');
   v_finance_company text := nullif(btrim(coalesce(p_payload ->> 'financeCompany', '')), '');
   v_approval_status text := btrim(coalesce(p_payload ->> 'approvalStatus', 'unrequested'));
+  v_is_legacy_approved boolean;
   v_received_at timestamptz;
   v_existing_contract_id uuid;
   v_customer_id uuid;
   v_contract_id uuid;
 begin
+  v_is_legacy_approved := v_application_type = ''
+    and v_finance_company in ('premium', 'ast')
+    and v_approval_status = 'approved';
+
   if p_payload ->> 'sourceSystem' is distinct from 'gas_loan_review'
     or p_payload ->> 'contractType' is distinct from 'loan'
-    or v_application_type is distinct from 'pre_screening'
+    or (v_application_type is distinct from 'pre_screening' and not v_is_legacy_approved)
     or (v_finance_company is not null and v_finance_company not in ('premium', 'ast'))
     or v_approval_status not in ('unrequested', 'pending', 'approved', 'guarantor_required', 'rejected')
     or (v_finance_company is null and v_approval_status <> 'unrequested')
@@ -126,7 +131,7 @@ begin
     v_received_at,
     jsonb_build_object(
       'sourceSystem', 'gas_loan_review',
-      'applicationType', v_application_type,
+      'applicationType', case when v_is_legacy_approved then 'legacy_approved' else v_application_type end,
       'sourceRowKey', v_source_row_key,
       'sourceRowNumber', v_source_row_number,
       'sourceReceivedAt', v_received_at,
@@ -168,7 +173,7 @@ begin
     null,
     jsonb_build_object(
       'sourceSystem', 'gas_loan_review',
-      'applicationType', v_application_type,
+      'applicationType', case when v_is_legacy_approved then 'legacy_approved' else v_application_type end,
       'sourceRowKey', v_source_row_key,
       'applicationNumber', v_application_number,
       'financeCompany', v_finance_company,
@@ -187,4 +192,4 @@ revoke all on function public.upsert_sales_econtract_candidate(jsonb) from publi
 grant execute on function public.upsert_sales_econtract_candidate(jsonb) to service_role;
 
 comment on function public.upsert_sales_econtract_candidate(jsonb)
-  is 'Atomically creates or returns one pre-screening e-contract candidate; it never issues an e-contract or sends email.';
+  is 'Atomically creates or returns one pre-screening e-contract candidate. Legacy approved payloads remain transition-compatible; the function never issues an e-contract or sends email.';

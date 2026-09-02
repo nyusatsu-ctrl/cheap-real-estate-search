@@ -30,6 +30,8 @@ export function normalizeEcontractCandidatePayload(value: unknown): EcontractCan
   const applicationType = clean(input.applicationType, 30);
   const financeCompany = nullableClean(input.financeCompany, 20);
   const approvalStatus = clean(input.approvalStatus, 30) || "unrequested";
+  const supportedFinanceCompany = financeCompany === "premium" || financeCompany === "ast";
+  const legacyApprovedCandidate = !applicationType && supportedFinanceCompany && approvalStatus === "approved";
   const applicationNumber = clean(input.applicationNumber, 500) || sourceRowKey;
   const email = clean(input.email, 320).toLowerCase();
   const receivedAt = normalizeTimestamp(input.sourceReceivedAt);
@@ -41,10 +43,10 @@ export function normalizeEcontractCandidatePayload(value: unknown): EcontractCan
     || sourceRowNumber < 2
     || sourceRowNumber > 10_000_000
     || !applicationNumber
-    || applicationType !== "pre_screening"
+    || (applicationType !== "pre_screening" && !legacyApprovedCandidate)
     || (vehicleType !== "car" && vehicleType !== "bike")
     || !canIssueLoanEcontract({ contractType })
-    || (financeCompany !== null && financeCompany !== "premium" && financeCompany !== "ast")
+    || (financeCompany !== null && !supportedFinanceCompany)
     || !["unrequested", "pending", "approved", "guarantor_required", "rejected"].includes(approvalStatus)
     || (financeCompany === null && approvalStatus !== "unrequested")
     || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))

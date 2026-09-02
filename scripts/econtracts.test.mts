@@ -197,11 +197,13 @@ test("pre-screening candidate sync is server-revalidated, idempotent and never s
   assert.match(candidateParser, /applicationType: "pre_screening"/);
   assert.match(candidateParser, /financeCompany: "premium" \| "ast" \| null/);
   assert.match(candidateParser, /approvalStatus: "unrequested" \| "pending" \| "approved" \| "guarantor_required" \| "rejected"/);
+  assert.match(candidateParser, /legacyApprovedCandidate = !applicationType && supportedFinanceCompany && approvalStatus === "approved"/);
 
   assert.match(baseMigration, /sales_contracts_gas_source_row_key_active_uidx/);
   assert.match(baseMigration, /sales_contracts_gas_source_row_number_active_uidx/);
   assert.match(preScreeningMigration, /alter column finance_company drop not null/);
-  assert.match(preScreeningMigration, /v_application_type is distinct from 'pre_screening'/);
+  assert.match(preScreeningMigration, /v_application_type is distinct from 'pre_screening' and not v_is_legacy_approved/);
+  assert.match(preScreeningMigration, /v_is_legacy_approved := v_application_type = ''/);
   assert.match(preScreeningMigration, /v_finance_company is null and v_approval_status <> 'unrequested'/);
   assert.match(preScreeningMigration, /pg_advisory_xact_lock/g);
   assert.match(preScreeningMigration, /sc\.source_row_key = v_source_row_key\s+or sl\.application_number = v_application_number/);

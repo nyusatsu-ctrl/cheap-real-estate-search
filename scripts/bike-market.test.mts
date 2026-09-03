@@ -12,6 +12,7 @@ type BikeMarketSandbox = {
   getGoobikeModelMasterSeedRows_(updatedAt: string): unknown;
   normalizeBikeMarketKeyPart_(value: string): string;
   normalizeGoobikeSearchPhrase_(value: string): string;
+  getBikeModelDictionaryEntryForName_(value: string): { canonicalKey: string; prioritySearchWord: string } | null;
   getBikeModelSearchPhrases_(value: string): string[];
   buildGoobikeDiagnosisUrls_(bikeName: string, normalizedYear: { valid: boolean; unspecified: boolean; from: number | null; to: number | null }): string[];
   getBikeMarketModelMatchInfo_(input: string, title: string): { matched: boolean };
@@ -207,6 +208,9 @@ test("隼とXJR1300を2車種へ分け、GooBike正式表記にも照合する",
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("隼 XJR1300")), ["隼", "XJR1300"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("ハヤブサとXJR 1300")), ["ハヤブサ", "XJR 1300"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("ハヤブサ ペケJR1300")), ["ハヤブサ", "ペケJR1300"]);
+  assert.equal(sandbox.getBikeModelDictionaryEntryForName_("隼")?.canonicalKey, "gsx1300rhayabusa");
+  assert.ok(Array.from(sandbox.getBikeModelSearchPhrases_("隼")).includes("GSX1300R Hayabusa"));
+  assert.equal(sandbox.getBikeMarketModelMatchInfo_("隼", "スズキ ハヤブサ（GSX1300R Hayabusa） 2020年式").matched, true);
   assert.equal(sandbox.getBikeMarketModelMatchInfo_("XJR1300", "ヤマハ XJR1300 2018年式").matched, true);
   assert.equal(sandbox.getBikeMarketModelMatchInfo_("ペケJR1300", "ヤマハ XJR1300 2018年式").matched, true);
   assert.equal(sandbox.getBikeMarketModelMatchInfo_("XJR1300", "ヤマハ XJR1200").matched, false);
@@ -215,6 +219,57 @@ test("隼とXJR1300を2車種へ分け、GooBike正式表記にも照合する",
   assert.ok(xjrUrls.includes("https://www.goobike.com/maker-yamaha/car-xjr1300/index.html"));
   assert.ok(xjrUrls.includes("https://www.goobike.com/maker-yamaha/car-xjr1300/used/index.html"));
   assert.ok(xjrUrls.some((url) => url.includes("phrase=XJR1300") && url.includes("syear1=2015") && url.includes("syear2=2018")));
+});
+
+test("現在の申込一覧にある特定可能な車種表記を検索辞書へ解決する", async () => {
+  const { sandbox } = await loadBikeMarketServer();
+  const currentSpecificInputs: Array<[string, string]> = [
+    ["pcx１２５", "pcx125"],
+    ["ヤマハ ドラッグスタークラシック400 10thアニバーサリーエディション", "dragstarclassic400"],
+    ["CBX550F", "cbx550f"],
+    ["gsx250eザリ", "gsx250e"],
+    ["ZRX400", "zrx400"],
+    ["Kawasaki ZX 10R", "ninjazx10r"],
+    ["ホンダ NS-1", "ns1"],
+    ["カワサキ DトラッカーX", "dtrackerx"],
+    ["ジェイド", "jade250"],
+    ["ハーレーダビッドソン XL883", "xl883"],
+    ["gt380", "gt380"],
+    ["ジャイロx50cc", "gyro_x"],
+    ["mt-10", "mt10"],
+    ["GB350", "gb350"],
+    ["クロスカブ110ライト", "crosscub110"],
+    ["ＧＳＸ－Ｒ１２５", "gsxr125"],
+    ["s1000rr", "bmws1000rr"],
+    ["CBR２５０RR MC２２", "cbr250rrmc22"],
+    ["Ｎmax 155cc", "nmax155"],
+    ["Ninja Zx-25r SE", "ninjazx25rse"],
+    ["ドラッグスター400", "dragstar400"],
+    ["cbx400f", "cbx400f"],
+    ["VTR1000F", "vtr1000f"],
+    ["cb400n", "cb400n"],
+    ["ヤマハ ビーノ", "vino"],
+    ["バリオス1〜2", "balius"],
+    ["ＺＲＸ４００－II", "zrx400"],
+  ];
+
+  for (const [input, canonicalKey] of currentSpecificInputs) {
+    const entry = sandbox.getBikeModelDictionaryEntryForName_(input);
+    assert.equal(entry?.canonicalKey, canonicalKey, `${input} must resolve to ${canonicalKey}`);
+    assert.ok(entry?.prioritySearchWord, `${input} must have a GooBike search phrase`);
+  }
+
+  assert.equal(sandbox.getBikeModelDictionaryEntryForName_("125cc"), null, "排気量だけで特定車種を決めない");
+  assert.equal(sandbox.getBikeModelDictionaryEntryForName_("ハーレー"), null, "メーカー名だけで特定車種を決めない");
+  assert.equal(sandbox.getBikeModelDictionaryEntryForName_("ホンダ レブル"), null, "排気量不明のレブルを1車種へ固定しない");
+});
+
+test("空白・句読点・ピリオドで併記された最大3車種を個別に分ける", async () => {
+  const { sandbox } = await loadBikeMarketServer();
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("インパルス400 xjr400 ジェイド250")), ["インパルス400", "xjr400", "ジェイド250"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("GSX250E GSX250T GSX250L")), ["GSX250E", "GSX250T", "GSX250L"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("w650、w400.tr250")), ["w650", "w400", "tr250"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("CB400sf、ZX25R")), ["CB400sf", "ZX25R"]);
 });
 
 test("フォルツァの日本語検索語を消さず、ひらがな・カタカナ・英字を相互照合する", async () => {

@@ -313,9 +313,15 @@ var GOOBIKE_MODEL_MASTER_SEEDS = [
 var BIKE_MODEL_ALIASES = {
   cb400sf: ['cb400sf', 'cb 400 sf', 'cb400 super four', 'cb 400 super four', 'cb400スーパーフォア', 'cb400スーパーフォアsf', 'シービー400エスエフ', 'シービー400スーパーフォア', 'cb400 superfour', 'cb400sf vtec', 'ＣＢ４００Ｓｕｐｅｒ Ｆｏｕｒ'],
   forza: ['フォルツァ', 'フォルツァ250', 'フォルツァ 250', 'forza', 'forza250', 'forza 250', 'mf06', 'mf08', 'mf10', 'mf12', 'mf13', 'mf15', 'mf17'],
+  pcx125: ['pcx125', 'pcx 125', 'pcx125cc', 'ホンダ pcx125'],
   ninjazx4rse: ['ninjazx4rse', 'ninja zx-4r se', 'ninja zx4r se', 'ニンジャzx4rse', 'ニンジャzx-4r se', 'ｎｉｎｊａ ｚｘ−４ｒ ｓｅ', 'zx400p'],
+  ninjazx25rse: ['ninja zx-25r se', 'ninja zx25r se', 'ninjazx25rse', 'zx-25r se', 'zx25r se', 'zx-25r', 'zx25r', 'ニンジャzx-25r se'],
+  ninjazx10r: ['ninja zx-10r', 'ninja zx10r', 'ninjazx10r', 'zx-10r', 'zx10r', 'zx 10r', 'kawasaki zx 10r'],
   bmws1000r: ['bmws1000r', 'bmw s1000r', 's1000r', 's 1000 r', 'bmw s 1000 r'],
+  bmws1000rr: ['bmws1000rr', 'bmw s1000rr', 's1000rr', 's 1000 rr', 'bmw s 1000 rr'],
   dragstar250: ['ドラッグスター250', 'ドラッグスター 250', 'ドラッグスター250cc', 'dragstar250', 'drag star 250', 'DragStar250', 'DRAGSTAR250', 'xvs250', 'XVS250'],
+  dragstar400: ['ドラッグスター400', 'ドラッグスター 400', 'dragstar400', 'drag star 400', 'xvs400'],
+  dragstarclassic400: ['ドラッグスタークラシック400', 'ドラッグスタークラッシック400', 'ドラッグスター400クラシック', 'drag star classic 400', 'dragstarclassic400', 'xvs400c', 'ヤマハ ドラッグスタークラシック400 10thアニバーサリーエディション', 'ヤマハ ドラッグスタークラッシック400 10周年アニバーサリーエディション'],
   skywave250: ['スカイウェイブ250', 'スカイウェイブ 250', 'スカイウェイブ250ss', 'スカイウェイブ250 SS', 'skywave250', 'sky wave 250', 'SKYWAVE250', 'Skywave 250', 'cj46a', 'cj45a', 'cj44a', 'CJ46A', 'CJ45A', 'CJ44A'],
   cygnus: ['シグナス', 'シグナスx', 'cygnus', 'cygnus x'],
   adv160: ['adv160', 'adv 160', 'ADV160', 'ADV 160', 'ホンダadv160', 'ホンダ ADV160', 'honda adv160', 'HONDA ADV160', 'ADV１６０', 'ＡＤＶ１６０'],
@@ -332,11 +338,38 @@ var BIKE_MODEL_ALIASES = {
   magna50: ['マグナ50', 'マグナ 50', 'magna50', 'MAGNA50', 'magna fifty', 'MAGNA FIFTY', 'マグナフィフティ', 'ホンダ マグナ50', 'HONDA MAGNA50', 'honda magna fifty', 'ac13'],
   supercub110pro: ['スーパーカブ110プロ', 'スーパーカブ 110 プロ', 'cub110pro', 'CUB110PRO', 'cub 110 pro', 'CUB 110 PRO', 'super cub 110 pro', 'SUPER CUB 110 PRO', 'supercub110pro', 'スーパーカブ110', 'C110', 'ja10', 'ja42', 'ja61'],
   hornet250: ['ホーネット250', 'ホーネット 250', 'hornet250', 'HORNET250', 'hornet 250', 'HORNET 250', 'ホンダ ホーネット250', 'HONDA HORNET250', 'mc31', 'MC31'],
+  ns1: ['ns-1', 'ns1', 'ホンダ ns-1', 'ac12'],
+  dtrackerx: ['dトラッカーx', 'd-トラッカーx', 'd-tracker x', 'dtrackerx', 'カワサキ dトラッカーx'],
+  jade250: ['ジェイド', 'ジェイド250', 'jade', 'jade250', 'jade 250', 'mc23'],
   cb400t: ['cb400t', 'cb 400 t', 'ホークii', 'ホーク2', 'hawk ii', 'hawk2'],
+  cb400n: ['cb400n', 'cb 400 n', 'ホークiii', 'ホーク3', 'hawk iii', 'hawk3'],
+  cbx400f: ['cbx400f', 'cbx 400 f'],
+  cbx550f: ['cbx550f', 'cbx 550 f'],
   cb400r: ['cb400r', 'CB400R', 'cb 400 r', 'honda cb400r'],
   cbr400r: ['cbr400r', 'CBR400R', 'cbr 400 r', 'honda cbr400r'],
+  cbr250rrmc22: ['cbr250rr mc22', 'cbr 250 rr mc22', 'cbr２５０rr mc２２', 'mc22'],
+  vtr1000f: ['vtr1000f', 'vtr 1000 f', 'firestorm', 'ファイヤーストーム'],
   gsx1300rhayabusa: ['gsx1300rハヤブサ', 'gsx1300隼', 'gsx1300r 隼', 'gsx1300r hayabusa', 'GSX1300R Hayabusa', 'hayabusa', 'Hayabusa', 'ハヤブサ', '隼'],
   xjr1300: ['xjr1300', 'xjr 1300', 'XJR1300', 'XJR 1300', 'ヤマハ xjr1300', 'YAMAHA XJR1300', 'エックスジェーアール1300', 'ペケjr1300', 'ペケ JR1300', 'ペケジェーアール1300', 'ベキjr1300'],
+  xjr400: ['xjr400', 'xjr 400', 'ペケjr400', 'ペケジェーアール400'],
+  zrx400: ['zrx400', 'zrx 400', 'zrx400-ii', 'zrx400ii', 'ＺＲＸ４００－II'],
+  impulse400: ['インパルス400', 'gsx400インパルス', 'gsx400 impulse', 'impulse400'],
+  gt380: ['gt380', 'gt 380', 'サンパチ'],
+  gsx250e: ['gsx250e', 'gsx 250 e', 'gsx250eザリ', 'ザリ'],
+  gsx250t: ['gsx250t', 'gsx 250 t'],
+  gsx250l: ['gsx250l', 'gsx 250 l'],
+  gsxr125: ['gsx-r125', 'gsxr125', 'ＧＳＸ－Ｒ１２５'],
+  gb350: ['gb350', 'gb 350'],
+  crosscub110: ['クロスカブ110', 'クロスカブ110ライト', 'cross cub 110', 'crosscub110', 'cc110'],
+  gyro_x: ['ジャイロx', 'ジャイロx50cc', 'gyro x', 'gyrox', 'td01', 'td02'],
+  mt10: ['mt-10', 'mt10', 'yamaha mt-10'],
+  nmax155: ['nmax155', 'nmax 155', 'nmax155cc', 'nmax 155cc', 'Ｎmax 155cc'],
+  w650: ['w650', 'w 650'],
+  w400: ['w400', 'w 400'],
+  tr250: ['tr250', 'tr 250'],
+  vino: ['ビーノ', 'ヤマハ ビーノ', 'vino'],
+  balius: ['バリオス', 'バリオス1', 'バリオス2', 'バリオス1〜2', 'balius', 'balius i', 'balius ii'],
+  xl883: ['xl883', 'xl 883', 'スポーツスター883', 'ハーレーダビッドソン xl883'],
   flhxs: ['flhxs', 'FLHXS', 'street glide special', 'Street Glide Special', 'ストリートグライドスペシャル'],
   ultra_electra_glide: ['ウルトラエレクトラグライド', 'エレクトラグライドウルトラ', 'エレクトラグライドウルトラクラシック', 'FLHTCU', 'FLHTK', 'FLHT', 'Ultra Classic', 'Electra Glide Ultra Classic'],
   street_glide_special: ['FLHXS', 'ストリートグライドスペシャル', 'Street Glide Special'],
@@ -345,8 +378,12 @@ var BIKE_MODEL_ALIASES = {
 };
 var BIKE_MODEL_EXCLUDES = {
   cb400sf: ['cb400ss', 'cb400f', 'cb400t', 'cb400r', 'cbr400r'],
-  ninjazx4rse: ['zx4rr', '4rr'],
+  pcx125: ['pcx150', 'pcx160'],
+  ninjazx4rse: ['zx4rr', '4rr', 'zx25r', 'zx-25r'],
+  ninjazx25rse: ['zx4r', 'zx-4r', 'zx4rr', 'zx-4rr'],
   dragstar250: ['ドラッグスター400', 'ドラッグスター1100', 'dragstar400', 'dragstar1100'],
+  dragstar400: ['ドラッグスター250', 'ドラッグスター1100', 'dragstar250', 'dragstar1100', 'クラシック'],
+  dragstarclassic400: ['ドラッグスター250', 'ドラッグスター1100', 'dragstar250', 'dragstar1100'],
   skywave250: ['スカイウェイブ400', 'スカイウェイブ650', 'skywave400', 'skywave650'],
   adv160: ['ADV150', 'ADV 150', 'X-ADV', 'XADV'],
   zephyr400: ['zephyr750', 'ゼファー750', 'zephyr1100', 'ゼファー1100', 'ゼファーχ', 'zephyrχ', 'zephyrx', 'ゼファーx', 'zephyr400χ', 'ゼファー400χ'],
@@ -356,6 +393,14 @@ var BIKE_MODEL_EXCLUDES = {
   hornet250: ['ホーネット600', 'ホーネット900', 'HORNET600', 'HORNET900'],
   yzfr1: ['yzf-r15', 'yzf-r125', 'yzf-r25', 'yzf-r3'],
   gsr250: ['gsr400', 'gsr600', 'gsr750'],
+  xjr400: ['xjr1200', 'xjr 1200', 'xjr1300', 'xjr 1300'],
+  zrx400: ['zrx1100', 'zrx 1100', 'zrx1200', 'zrx 1200'],
+  gsx250e: ['gsx250t', 'gsx 250 t', 'gsx250l', 'gsx 250 l'],
+  gsx250t: ['gsx250e', 'gsx 250 e', 'gsx250l', 'gsx 250 l'],
+  gsx250l: ['gsx250e', 'gsx 250 e', 'gsx250t', 'gsx 250 t'],
+  cbr250rrmc22: ['mc51'],
+  w650: ['w800'],
+  w400: ['w650', 'w800'],
   xjr1300: ['xjr1200', 'xjr 1200'],
   cb400r: ['cbr400r'],
   cbr400r: ['cbr400rr', 'cbr 400 rr']
@@ -5942,9 +5987,15 @@ function getDefaultBikeModelPrioritySearchWord_(canonicalKey) {
   var priorities = {
     cb400sf: 'CB400 SUPER FOUR',
     forza: 'フォルツァ',
+    pcx125: 'PCX125',
     ninjazx4rse: 'Ninja ZX-4R SE',
+    ninjazx25rse: 'Ninja ZX-25R SE',
+    ninjazx10r: 'Ninja ZX-10R',
     bmws1000r: 'BMW S1000R',
+    bmws1000rr: 'BMW S1000RR',
     dragstar250: 'ドラッグスター 250',
+    dragstar400: 'ドラッグスター400',
+    dragstarclassic400: 'ドラッグスタークラシック400',
     skywave250: 'スカイウェイブ 250',
     cygnus: 'シグナス',
     adv160: 'ADV160',
@@ -5961,11 +6012,38 @@ function getDefaultBikeModelPrioritySearchWord_(canonicalKey) {
     magna50: 'マグナ50',
     supercub110pro: 'スーパーカブ110プロ',
     hornet250: 'HORNET250',
+    ns1: 'NS-1',
+    dtrackerx: 'D-TRACKER X',
+    jade250: 'JADE',
     cb400t: 'CB400T',
+    cb400n: 'CB400N',
+    cbx400f: 'CBX400F',
+    cbx550f: 'CBX550F',
     cb400r: 'CB400R',
     cbr400r: 'CBR400R',
+    cbr250rrmc22: 'CBR250RR',
+    vtr1000f: 'VTR1000F',
     gsx1300rhayabusa: 'GSX1300R Hayabusa',
     xjr1300: 'XJR1300',
+    xjr400: 'XJR400',
+    zrx400: 'ZRX400',
+    impulse400: 'GSX400 インパルス',
+    gt380: 'GT380',
+    gsx250e: 'GSX250E',
+    gsx250t: 'GSX250T',
+    gsx250l: 'GSX250L',
+    gsxr125: 'GSX-R125',
+    gb350: 'GB350',
+    crosscub110: 'クロスカブ110',
+    gyro_x: 'ジャイロX',
+    mt10: 'MT-10',
+    nmax155: 'NMAX155',
+    w650: 'W650',
+    w400: 'W400',
+    tr250: '250TR',
+    vino: 'ビーノ',
+    balius: 'バリオス',
+    xl883: 'XL883',
     flhxs: 'Street Glide Special'
   };
   return priorities[canonicalKey] || canonicalKey;
@@ -6979,6 +7057,15 @@ function getBikeModelDictionaryEntryForName_(bikeName) {
   if (!key) {
     return null;
   }
+  if (/^\d{2,4}(?:cc)?(?:スクーター)?$/i.test(key)) {
+    return null;
+  }
+  // 「隼」のような短い入力でも、辞書と完全一致する正式別名は優先する。
+  // 部分一致は従来どおり3文字以上に限定し、短い文字の誤検出は防ぐ。
+  var exactEntry = getExactBikeModelDictionaryEntryForName_(bikeName);
+  if (exactEntry) {
+    return exactEntry;
+  }
   var entries = getBikeModelDictionaryEntries_();
   var best = null;
   var bestScore = 0;
@@ -7110,7 +7197,7 @@ function splitMultipleBikeModelInput_(bikeName) {
   if (strongSignalParts.length > 1) {
     return strongSignalParts.slice(0, WEBAPP_BIKE_MARKET_MAX_MODELS_PER_REQUEST);
   }
-  var explicitSeparator = /(?:または|又は|もしくは|あるいは|\bor\b|と|か|\/|、|,|・|\r|\n)/i.test(raw);
+  var explicitSeparator = /(?:または|又は|もしくは|あるいは|\bor\b|と|か|\/|、|,|・|[.．](?=[A-Za-zＡ-Ｚａ-ｚ]+\s*\d)|\r|\n)/i.test(raw);
   if (!explicitSeparator && getExactBikeModelDictionaryEntryForName_(raw)) {
     return [raw];
   }
@@ -7128,6 +7215,7 @@ function splitMultipleBikeModelInput_(bikeName) {
     .replace(/[とか]/g, '|')
     .replace(/[\r\n]+/g, '|')
     .replace(/[\/、,・]/g, '|')
+    .replace(/[.．](?=[A-Za-zＡ-Ｚａ-ｚ]+\s*\d)/g, '|')
     .replace(/\s+/g, function(match) {
       return explicitSeparator ? match : '|';
     });
@@ -7143,7 +7231,7 @@ function splitMultipleBikeModelInput_(bikeName) {
   });
   if (!explicitSeparator && parts.length <= 3) {
     var joined = parts.join(' ');
-    if (getBikeModelDictionaryEntryForName_(joined) || /^[^\d]+[\s　]+\d+(?:cc)?(?:[\s　]+プロ)?$/i.test(joined)) {
+    if (getExactBikeModelDictionaryEntryForName_(joined) || /^[^\d]+[\s　]+\d+(?:cc)?(?:[\s　]+プロ)?$/i.test(joined)) {
       return [raw];
     }
   }
@@ -7466,7 +7554,7 @@ function getBikeMarketModelMatchInfo_(customerBikeName, listingBikeName) {
       info.reason = 'false / 除外語 "' + excludedWord + '" のため除外';
       return info;
     }
-    var aliases = [entry.canonicalKey].concat(entry.aliases || []);
+    var aliases = [entry.canonicalKey, entry.canonicalName, entry.prioritySearchWord].concat(entry.aliases || []);
     for (var a = 0; a < aliases.length; a++) {
       var aliasKey = normalizeBikeMarketKeyPart_(aliases[a]);
       if (aliasKey && aliasKey.length >= 3 && listingKey.indexOf(aliasKey) !== -1) {

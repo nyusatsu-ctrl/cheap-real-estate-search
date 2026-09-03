@@ -229,8 +229,9 @@ var WEBAPP_PENDING_MARKET_LOOKUP_SAFE_RUNTIME_MS = 240000;
 var WEBAPP_PENDING_MARKET_LOOKUP_MAX_SCAN_ROWS_PER_RUN = 120;
 var WEBAPP_PENDING_MARKET_LOOKUP_CURSOR_PROPERTY_KEY = 'PENDING_BIKE_MARKET_LOOKUP_CURSOR_ROW';
 var WEBAPP_PENDING_MARKET_LOOKUP_LOCK_TIMEOUT_MS = 1000;
-var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v23-script-aliases';
+var WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v24-context-model-year';
 var WEBAPP_BIKE_MARKET_MAX_MODELS_PER_REQUEST = 3;
+var WEBAPP_BIKE_MARKET_APPROXIMATE_YEAR_TOLERANCE = 2;
 var WEBAPP_BIKE_MARKET_GOOBIKE_BASE_URL = 'https://goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_ALTERNATE_BASE_URL = 'https://www.goobike.com';
 var WEBAPP_BIKE_MARKET_GOOBIKE_SOURCE = 'GooBike';
@@ -296,6 +297,7 @@ var GOOBIKE_MODEL_MASTER_SEEDS = [
   { maker: 'ヤマハ', officialModelName: 'ドラッグスター２５０', sourceUrl: 'https://www.goobike.com/maker-yamaha/car-dragstar250/index.html' },
   { maker: 'ヤマハ', officialModelName: 'シグナスＸ', sourceUrl: 'https://www.goobike.com/maker-yamaha/car-cygnus_x/index.html' },
   { maker: 'ヤマハ', officialModelName: 'ＹＺＦ－Ｒ１', sourceUrl: 'https://www.goobike.com/maker-yamaha/car-yzf-r1/index.html' },
+  { maker: 'ヤマハ', officialModelName: 'ＸＪＲ１３００', sourceUrl: 'https://www.goobike.com/maker-yamaha/car-xjr1300/index.html' },
   { maker: 'BMW', officialModelName: 'Ｓ１０００Ｒ', sourceUrl: 'https://www.goobike.com/maker-bmw/car-s1000r/index.html' },
   { maker: 'HARLEY-DAVIDSON', officialModelName: 'ＦＬＨＸＳ　ストリートグライドスペシャル', sourceUrl: 'https://www.goobike.com/maker-harley_davidson/car-flhxs_streetglidespecial/index.html' },
   { maker: 'HARLEY-DAVIDSON', officialModelName: 'ＦＬＨＴＣＵ　エレクトラグライドウルトラクラシック', sourceUrl: 'https://www.goobike.com/maker-harley_davidson/car-flhtcu_electra_glide_ultra_classic/index.html' },
@@ -330,6 +332,7 @@ var BIKE_MODEL_ALIASES = {
   cb400r: ['cb400r', 'CB400R', 'cb 400 r', 'honda cb400r'],
   cbr400r: ['cbr400r', 'CBR400R', 'cbr 400 r', 'honda cbr400r'],
   gsx1300rhayabusa: ['gsx1300rハヤブサ', 'gsx1300隼', 'gsx1300r 隼', 'gsx1300r hayabusa', 'GSX1300R Hayabusa', 'hayabusa', 'Hayabusa', 'ハヤブサ', '隼'],
+  xjr1300: ['xjr1300', 'xjr 1300', 'XJR1300', 'XJR 1300', 'ヤマハ xjr1300', 'YAMAHA XJR1300', 'エックスジェーアール1300'],
   flhxs: ['flhxs', 'FLHXS', 'street glide special', 'Street Glide Special', 'ストリートグライドスペシャル'],
   ultra_electra_glide: ['ウルトラエレクトラグライド', 'エレクトラグライドウルトラ', 'エレクトラグライドウルトラクラシック', 'FLHTCU', 'FLHTK', 'FLHT', 'Ultra Classic', 'Electra Glide Ultra Classic'],
   street_glide_special: ['FLHXS', 'ストリートグライドスペシャル', 'Street Glide Special'],
@@ -349,6 +352,7 @@ var BIKE_MODEL_EXCLUDES = {
   hornet250: ['ホーネット600', 'ホーネット900', 'HORNET600', 'HORNET900'],
   yzfr1: ['yzf-r15', 'yzf-r125', 'yzf-r25', 'yzf-r3'],
   gsr250: ['gsr400', 'gsr600', 'gsr750'],
+  xjr1300: ['xjr1200', 'xjr 1200'],
   cb400r: ['cbr400r'],
   cbr400r: ['cbr400rr', 'cbr 400 rr']
 };
@@ -5628,6 +5632,27 @@ function normalizeYearInput_(value) {
       return { raw: text, cachePart: '-' + toYear, from: null, to: toYear, unspecified: false, valid: true };
     }
   }
+  // 「2020年ぐらい」などは厳密な単年指定ではなく、前後2年の希望帯として扱う。
+  // 併記された車種は同じ希望帯を車種ごとに照合するため、XJR1300の2018年式と
+  // ハヤブサの2019〜2021年式を混ぜずに、それぞれの相場へ取り込める。
+  var approximateMatch = text.match(new RegExp(yearTokenPattern + '(?:年式|年)?(?:くらい|ぐらい|頃|前後|位|程度|あたり)'));
+  if (approximateMatch) {
+    var approximateYear = parseBikeMarketYearBoundary_(approximateMatch[1]);
+    if (approximateYear) {
+      var approximateFrom = Math.max(1900, approximateYear - WEBAPP_BIKE_MARKET_APPROXIMATE_YEAR_TOLERANCE);
+      var approximateTo = Math.min(new Date().getFullYear() + 1, approximateYear + WEBAPP_BIKE_MARKET_APPROXIMATE_YEAR_TOLERANCE);
+      return {
+        raw: text,
+        cachePart: '~' + approximateYear,
+        from: approximateFrom,
+        to: approximateTo,
+        centerYear: approximateYear,
+        approximate: true,
+        unspecified: false,
+        valid: true
+      };
+    }
+  }
   var rangeMatch = text.match(/^(.+?)[〜～~-](.+)$/);
   if (rangeMatch) {
     var rangeFrom = parseSingleBikeMarketYear_(rangeMatch[1]);
@@ -5680,6 +5705,9 @@ function getBikeMarketYearConditionLabel_(normalizedYear) {
   }
   if (normalizedYear.unspecified || (!normalizedYear.from && !normalizedYear.to)) {
     return '年式指定なし';
+  }
+  if (normalizedYear.approximate && normalizedYear.centerYear) {
+    return normalizedYear.centerYear + '年式前後（' + normalizedYear.from + '年～' + normalizedYear.to + '年）';
   }
   if (normalizedYear.from && normalizedYear.to) {
     return normalizedYear.from === normalizedYear.to
@@ -5809,6 +5837,7 @@ function getDefaultBikeModelPrioritySearchWord_(canonicalKey) {
     cb400r: 'CB400R',
     cbr400r: 'CBR400R',
     gsx1300rhayabusa: 'GSX1300R Hayabusa',
+    xjr1300: 'XJR1300',
     flhxs: 'Street Glide Special'
   };
   return priorities[canonicalKey] || canonicalKey;
@@ -6168,7 +6197,7 @@ function inferBikeMakerFromName_(value) {
   var checks = [
     { maker: 'カワサキ', patterns: ['kawasaki', 'ninja', 'ニンジャ', 'zephyr', 'ゼファー', 'zrx', 'zzr', 'エリミネーター', 'eliminator', 'バリオス'] },
     { maker: 'ホンダ', patterns: ['honda', 'cb', 'cbr', 'pcx', 'adv', 'magna', 'マグナ', 'hornet', 'ホーネット', 'cub', 'カブ', 'dax', 'ct', 'crf'] },
-    { maker: 'ヤマハ', patterns: ['yamaha', 'yzf', 'ybr', 'nmax', 'xmax', 'シグナス', 'cygnus', 'ドラッグスター', 'dragstar', 'majesty', 'マジェスティ', 'sr400', 'sr500', 'セロー', 'wr'] },
+    { maker: 'ヤマハ', patterns: ['yamaha', 'yzf', 'ybr', 'xjr', 'nmax', 'xmax', 'シグナス', 'cygnus', 'ドラッグスター', 'dragstar', 'majesty', 'マジェスティ', 'sr400', 'sr500', 'セロー', 'wr'] },
     { maker: 'スズキ', patterns: ['suzuki', 'gsx', 'gsr', 'hayabusa', 'ハヤブサ', '隼', 'バンディット', 'bandit', 'スカイウェイブ', 'skywave', 'アドレス', 'vストローム', 'vstrom', 'ジクサー', 'gixxer'] },
     { maker: 'BMW', patterns: ['bmw', 's1000r', 'r1250', 'r1300', 'k1600', 'g310'] },
     { maker: 'HARLEY-DAVIDSON', patterns: ['harley', 'flh', 'flhx', 'flhxs', 'flht', 'flhtcu', 'flhtk', 'fltr', 'fltrxs', 'fxdl', 'fxd', 'fxlrs', 'xl', 'ストリートグライド', 'エレクトラグライド', 'ローライダー', 'スポーツスター', 'ウルトラ'] }
@@ -6233,10 +6262,13 @@ function isGoobikeOfficialModelDisplayableCandidate_(row) {
   if (!official) {
     return false;
   }
-  if (Number(row && row.listingCount || 0) < 1 && !isConfiguredGoobikeModelSeed_(row)) {
+  var configuredSeed = isConfiguredGoobikeModelSeed_(row);
+  if (Number(row && row.listingCount || 0) < 1 && !configuredSeed) {
     return false;
   }
-  if (isLikelyBareBikeModelCode_(official)) {
+  // XJR1300のように正式車種名そのものが英数字コードの車種は、
+  // 公式URLを固定登録した車種に限って候補として利用する。
+  if (isLikelyBareBikeModelCode_(official) && !configuredSeed) {
     return false;
   }
   return true;
@@ -6278,6 +6310,7 @@ function extractBikeModelMajorTerms_(value) {
     { term: 'gsr', patterns: ['gsr'] },
     { term: 'gsx', patterns: ['gsx', 'hayabusa', 'ハヤブサ', '隼'] },
     { term: 'yzfr1', patterns: ['yzf-r1', 'yzfr1', 'yzf r1'] },
+    { term: 'xjr', patterns: ['xjr', 'エックスジェーアール'] },
     { term: 'cbr', patterns: ['cbr'] },
     { term: 'cb', patterns: ['cb'] },
     { term: 'adv', patterns: ['adv'] },
@@ -7227,6 +7260,7 @@ function extractBikeModelCandidateWords_(value) {
     /CB400T|CB\s*400\s*T|ホークII|ホーク2|HAWK\s*II/ig,
     /CBR?400R{0,2}|CBR\s*400\s*RR/ig,
     /GSX1300R?\s*(?:ハヤブサ|隼|HAYABUSA)|GSX1300\s*隼/ig,
+    /XJR\s*1300|エックスジェーアール\s*1300/ig,
     /ZZR\s*1400|ZX[-\s]?14R|ZXR\s*1400/ig,
     /ADV\s*160/ig,
     /GSR\s*250/ig,

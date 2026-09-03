@@ -4704,7 +4704,7 @@
           <div id="marketSearchProgress" class="market-search-progress" role="status" aria-live="polite" hidden></div>
           <div class="application-grid">
             ${inputField('希望車種', 'marketBikeName', customer.desiredCar, '例: R1250GS / フォルツァ CB400SF')}
-            ${inputField('年式', 'marketYear', customer.desiredYear || (market.searchYear || ''), '例: 2022 / 2002年式以降 / 令和以降')}
+            ${inputField('年式', 'marketYear', customer.desiredYear || (market.searchYear || ''), '例: 2020年ぐらい / 2002年式以降 / 令和以降')}
           </div>
           <div class="actions">
             <button type="button" id="marketSearchButton" class="primary">相場取得</button>
@@ -4729,6 +4729,7 @@
             ※平均総額は、相場から大きく外れた高額車両を除外して算出しています。除外車両の金額は参考情報として表示します。<br>
             ※参考相場は、台数に応じて中央値または外れ値除外後の平均を使用しています。<br>
             ※総額が取得できない車両は本体価格で代用している場合があります。<br>
+            ※「2020年ぐらい」などの希望は前後2年で照合し、併記された車種は車種ごとに別々に集計します。<br>
             ※表示価格は掲載情報ベースであり、実売価格・陸送費・登録費用・保証費用は別途確認が必要です。
           </div>
         `;
@@ -5000,6 +5001,11 @@
         const normalized = text.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, '');
         if (!normalized || ['特になし', 'なし', '未指定', '不明', '年式なし', '年式未指定', 'なるべく新しめ', '新しめ', '高年式', '最近の年式'].includes(normalized)) {
           return '年式指定なし';
+        }
+        const approximate = normalized.match(/(19\d{2}|20\d{2})(?:年式|年)?(?:くらい|ぐらい|頃|前後|位|程度|あたり)/);
+        if (approximate) {
+          const center = Number(approximate[1]);
+          return `${center}年式前後（${center - 2}年～${Math.min(new Date().getFullYear() + 1, center + 2)}年）`;
         }
         return text;
       }

@@ -16,7 +16,8 @@ type BikeMarketSandbox = {
   buildGoobikeDiagnosisUrls_(bikeName: string, normalizedYear: { valid: boolean; unspecified: boolean; from: number | null; to: number | null }): string[];
   getBikeMarketModelMatchInfo_(input: string, title: string): { matched: boolean };
   splitMultipleBikeModelInput_(value: string): string[];
-  normalizeYearInput_(value: string): { cachePart: string; from: number | null; to: number | null; unspecified: boolean; valid: boolean };
+  normalizeYearInput_(value: string): { cachePart: string; from: number | null; to: number | null; centerYear?: number; approximate?: boolean; unspecified: boolean; valid: boolean };
+  getBikeMarketYearConditionLabel_(value: { from: number | null; to: number | null; centerYear?: number; approximate?: boolean; unspecified: boolean; valid: boolean }): string;
   isYearMatched_(listingYear: number, normalizedYear: { from: number | null; to: number | null; unspecified: boolean; valid: boolean }): boolean;
   buildGoobikeFreeSearchUrl_(bikeName: string, normalizedYear: { from: number | null; to: number | null; unspecified: boolean; valid: boolean }): string;
   getBikeMarketSummaryWithCache_(bikeName: string, yearInput: string, now: Date): {
@@ -198,6 +199,20 @@ test("空白や接続詞で併記されたフォルツァとCB400SFを2車種へ
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("フォルツァ / CB400SF")), ["フォルツァ", "CB400SF"]);
 });
 
+test("隼とXJR1300を2車種へ分け、GooBike正式表記にも照合する", async () => {
+  const { sandbox } = await loadBikeMarketServer();
+  sandbox.WEBAPP_GOOBIKE_MODEL_MASTER_RUNTIME_CACHE = sandbox.getGoobikeModelMasterSeedRows_("2026/09/04 06:00:00");
+
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("隼 XJR1300")), ["隼", "XJR1300"]);
+  assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("ハヤブサとXJR 1300")), ["ハヤブサ", "XJR 1300"]);
+  assert.equal(sandbox.getBikeMarketModelMatchInfo_("XJR1300", "ヤマハ XJR1300 2018年式").matched, true);
+  assert.equal(sandbox.getBikeMarketModelMatchInfo_("XJR1300", "ヤマハ XJR1200").matched, false);
+
+  const xjrUrls = Array.from(sandbox.buildGoobikeDiagnosisUrls_("XJR1300", sandbox.normalizeYearInput_("2020年位")));
+  assert.ok(xjrUrls.includes("https://www.goobike.com/maker-yamaha/car-xjr1300/index.html"));
+  assert.ok(xjrUrls.some((url) => url.includes("phrase=XJR1300") && url.includes("syear1=2018") && url.includes("syear2=2022")));
+});
+
 test("フォルツァの日本語検索語を消さず、ひらがな・カタカナ・英字を相互照合する", async () => {
   const { sandbox, source } = await loadBikeMarketServer();
   sandbox.WEBAPP_GOOBIKE_MODEL_MASTER_RUNTIME_CACHE = sandbox.getGoobikeModelMasterSeedRows_("2026/09/02 12:00:00");
@@ -246,6 +261,29 @@ test("年式欄の以降・以前・元号表現を検索範囲へ変換する",
   assert.match(searchUrl, new RegExp(`syear2=${new Date().getFullYear() + 1}`));
 });
 
+test("2020年ぐらいは前後2年として車種ごとに照合する", async () => {
+  const { sandbox } = await loadBikeMarketServer();
+  const approximate = sandbox.normalizeYearInput_("2020年ぐらい");
+  const kanjiApproximate = sandbox.normalizeYearInput_("2020年位");
+
+  assert.equal(approximate.cachePart, "~2020");
+  assert.equal(approximate.centerYear, 2020);
+  assert.equal(approximate.approximate, true);
+  assert.equal(approximate.from, 2018);
+  assert.equal(approximate.to, 2022);
+  assert.equal(kanjiApproximate.cachePart, "~2020");
+  assert.equal(sandbox.isYearMatched_(2018, approximate), true, "XJR1300の最終年式を含める");
+  assert.equal(sandbox.isYearMatched_(2021, approximate), true, "ハヤブサの近い年式を含める");
+  assert.equal(sandbox.isYearMatched_(2017, approximate), false);
+  assert.equal(sandbox.isYearMatched_(2023, approximate), false);
+  assert.equal(sandbox.getBikeMarketYearConditionLabel_(approximate), "2020年式前後（2018年～2022年）");
+
+  const exact = sandbox.normalizeYearInput_("2020年式");
+  assert.equal(exact.from, 2020);
+  assert.equal(exact.to, 2020);
+  assert.equal(exact.approximate, undefined);
+});
+
 test("2車種は同じ年式条件で個別取得し、価格を混ぜずに保持する", async () => {
   const { context, sandbox } = await loadBikeMarketServer();
   vm.runInContext(`
@@ -281,6 +319,45 @@ test("2車種は同じ年式条件で個別取得し、価格を混ぜずに保�
   assert.deepEqual(Array.from(result.modelResults || [], (item) => item.bikeName), ["フォルツァ", "CB400SF"]);
   assert.deepEqual(Array.from(result.modelResults || [], (item) => item.priceAggregation.average_price), [410000, 780000]);
   assert.deepEqual(Array.from(result.modelResults || [], (item) => item.normalizedYearLabel), ["2002年式以降", "2002年式以降"]);
+});
+
+test("隼とXJR1300へ同じ近似年式条件を個別適用する", async () => {
+  const { context, sandbox } = await loadBikeMarketServer();
+  vm.runInContext(`
+    getSingleBikeMarketSummaryWithCache_ = function(bikeName, yearInput) {
+      var normalizedYear = normalizeYearInput_(yearInput);
+      return {
+        bikeName: bikeName,
+        yearInput: yearInput,
+        status: 'success',
+        fetchedAt: '2026/09/04 06:00:00',
+        sources: ['GooBike'],
+        warnings: [],
+        priceAggregation: {
+          valid_price_count: 5,
+          price_available_count: 5,
+          calculation_target_count: 5,
+          min_price: bikeName === '隼' ? 900000 : 700000,
+          max_price: bikeName === '隼' ? 1500000 : 1000000,
+          average_price: bikeName === '隼' ? 1200000 : 850000,
+          simple_average_price: bikeName === '隼' ? 1200000 : 850000,
+          median_price: bikeName === '隼' ? 1200000 : 850000,
+          trimmed_average_price: bikeName === '隼' ? 1200000 : 850000,
+          reference_market_price: bikeName === '隼' ? 1200000 : 850000,
+          calculation_method: 'median_3_to_6_items'
+        },
+        normalizedYear: normalizedYear
+      };
+    };
+  `, context);
+
+  const result = sandbox.getBikeMarketSummaryWithCache_("隼 XJR1300", "2020年位", new Date("2026-09-03T21:00:00Z"));
+  assert.equal(result.modelCount, 2);
+  assert.deepEqual(Array.from(result.modelResults || [], (item) => item.bikeName), ["隼", "XJR1300"]);
+  assert.deepEqual(
+    Array.from(result.modelResults || [], (item) => item.normalizedYearLabel),
+    ["2020年式前後（2018年～2022年）", "2020年式前後（2018年～2022年）"]
+  );
 });
 
 test("審査管理画面は2車種の相場を別カードで表示する", async () => {

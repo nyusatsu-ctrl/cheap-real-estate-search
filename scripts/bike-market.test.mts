@@ -202,13 +202,14 @@ test("空白や接続詞で併記されたフォルツァとCB400SFを2車種へ
 });
 
 test("隼とXJR1300を2車種へ分け、GooBike正式表記にも照合する", async () => {
-  const { sandbox } = await loadBikeMarketServer();
+  const { sandbox, source } = await loadBikeMarketServer();
   sandbox.WEBAPP_GOOBIKE_MODEL_MASTER_RUNTIME_CACHE = sandbox.getGoobikeModelMasterSeedRows_("2026/09/04 06:00:00");
 
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("隼 XJR1300")), ["隼", "XJR1300"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("ハヤブサとXJR 1300")), ["ハヤブサ", "XJR 1300"]);
   assert.deepEqual(Array.from(sandbox.splitMultipleBikeModelInput_("ハヤブサ ペケJR1300")), ["ハヤブサ", "ペケJR1300"]);
   assert.equal(sandbox.getBikeModelDictionaryEntryForName_("隼")?.canonicalKey, "gsx1300rhayabusa");
+  assert.match(source, /WEBAPP_BIKE_MARKET_CACHE_VERSION = 'v26-model-aliases'/, "古い車種判定キャッシュを再利用しない");
   assert.ok(Array.from(sandbox.getBikeModelSearchPhrases_("隼")).includes("GSX1300R Hayabusa"));
   assert.equal(sandbox.getBikeMarketModelMatchInfo_("隼", "スズキ ハヤブサ（GSX1300R Hayabusa） 2020年式").matched, true);
   assert.equal(sandbox.getBikeMarketModelMatchInfo_("XJR1300", "ヤマハ XJR1300 2018年式").matched, true);
